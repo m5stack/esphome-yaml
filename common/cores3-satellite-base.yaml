@@ -1,0 +1,706 @@
+substitutions:
+  loading_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
+  idle_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
+  listening_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
+  thinking_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
+  replying_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
+  error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
+
+
+  loading_illustration_background_color: '000000'
+  idle_illustration_background_color: '000000'
+  listening_illustration_background_color: 'FFFFFF'
+  thinking_illustration_background_color: 'FFFFFF'
+  replying_illustration_background_color: 'FFFFFF'
+  error_illustration_background_color: '000000'
+
+  # Phases of the Voice Assistant
+  # The voice assistant is ready to be triggered by a wake word
+  voice_assist_idle_phase_id: "1"
+  # The voice assistant is listening for a voice command
+  voice_assist_listening_phase_id: "2"
+  # The voice assistant is currently processing the command
+  voice_assist_thinking_phase_id: "3"
+  # The voice assistant is replying to the command
+  voice_assist_replying_phase_id: "4"
+  # The voice assistant is not ready
+  voice_assist_not_ready_phase_id: "10"
+  # The voice assistant encountered an error
+  voice_assist_error_phase_id: "11"
+  # Muted phase
+  voice_assist_muted_phase_id: "12"
+
+
+  # Add support for non-unicode characters by using better glyphset
+  font_glyphsets: "GF_Latin_Core"
+  # for Greek use "Noto Sans" for other languages use a compatible font family
+  font_family: Figtree
+
+esphome:
+  project:
+    name: m5stack.cores3-voice-assistant
+    version: 2025.9.0
+  min_version: 2025.5.0
+  libraries:
+    - m5stack/M5Unified@^0.2.8
+  includes:
+    - <M5Unified.h>
+  # Hardware initialize phase, set a higher priority.
+  # We are using libraries here, it will increase the firmware size
+  # since not all functionalities were used, yet they are compiled into the firmware.
+  on_boot:
+    - priority: 800
+      then:
+        - lambda: |-
+            auto cfg = M5.config();
+            M5.begin(cfg);
+            delay(10);
+            M5.Mic.begin();
+            delay(10);
+            M5.Speaker.begin();
+            delay(10);
+            ESP_LOGD("M5Unified", "Setup Peripheral Success.");
+    - priority: 600
+      then:
+        - script.execute: draw_display
+        - delay: 30s
+        - if:
+            condition:
+              lambda: return id(init_in_progress);
+            then:
+              - lambda: id(init_in_progress) = false;
+              - script.execute: draw_display
+
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    ## Note: Disable these configurations if you face the boot loop issue.
+    sdkconfig_options:
+        CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+        CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+        CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+        # Moves instructions and read only data from flash into PSRAM on boot.
+        # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+        # Considerably speeds up mWW at the cost of using more PSRAM.
+        CONFIG_SPIRAM_RODATA: "y"
+        CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+        CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+        CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+
+        CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+        CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
+
+psram:
+  mode: quad
+  speed: 80MHz
+
+# Enable logging
+logger:
+  level: DEBUG
+
+
+# Enable Home Assistant API
+api:
+  on_client_connected:
+    - script.execute: draw_display
+  on_client_disconnected:
+    - script.execute: draw_display
+
+wifi:
+  on_connect:
+    - script.execute: draw_display
+    - delay: 5s # Wait for connection
+  on_disconnect:
+    - script.execute: draw_display
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: voice_assistant_phase
+    type: int
+    restore_value: no
+    initial_value: ${voice_assist_not_ready_phase_id}
+
+
+i2c:
+  sda: GPIO12
+  scl: GPIO11
+
+spi:
+  - id: spi_bus
+    clk_pin: GPIO36
+    mosi_pin: GPIO37
+
+i2s_audio:
+  id: i2s_audio_bus
+  i2s_lrclk_pin: GPIO33
+  i2s_bclk_pin: GPIO34
+
+
+microphone:
+  - platform: i2s_audio
+    id: m5cores3_mic
+    i2s_din_pin: GPIO14
+    adc_type: external
+    sample_rate: 16000
+    bits_per_sample: 16bit 
+    i2s_audio_id: i2s_audio_bus
+
+speaker:
+  - platform: i2s_audio
+    i2s_audio_id: i2s_audio_bus
+    id: m5cores3_spk
+    dac_type: external
+    i2s_dout_pin: GPIO13
+
+media_player:
+  - platform: speaker
+    name: None
+    id: va_media_player
+    volume_min: 0.2
+    volume_max: 1.0
+    announcement_pipeline:
+      speaker: m5cores3_spk
+      format: FLAC
+      sample_rate: 16000
+      num_channels: 1 
+    files:
+      - id: wake_word_triggered_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+      - id: error_cloud_expired
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+    on_announcement:
+      # Stop the wake word (mWW or VA) if the mic is capturing
+      - if:
+          condition:
+            - microphone.is_capturing:
+          then:
+            - script.execute: stop_wake_word
+            # Ensure VA stops before moving on
+            - if:
+                condition:
+                  - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+                then:
+                  - wait_until:
+                      - not:
+                          voice_assistant.is_running:
+      # Since VA isn't running, this is user-intiated media playback. Draw the mute display
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+            - script.execute: draw_display
+            
+    on_idle:
+      # Since VA isn't running, this is the end of user-intiated media playback. Restart the wake word.
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - script.execute: start_wake_word
+            - script.execute: set_idle_or_mute_phase
+
+micro_wake_word:
+  id: mww
+  microphone: m5cores3_mic
+  stop_after_detection: false
+  models:
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+      id: okay_nabu
+    - model: hey_jarvis
+      id: hey_jarvis
+    - model: hey_mycroft
+      id: hey_mycroft
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: stop
+      internal: true
+  vad:
+  on_wake_word_detected:
+    - script.execute:
+        id: play_sound
+        priority: true
+        sound_file: !lambda return id(wake_word_triggered_sound);
+  
+    - delay: 2s
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  microphone: m5cores3_mic
+  media_player: va_media_player
+  use_wake_word: false
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_listening:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
+    - text_sensor.template.publish:
+        id: text_request
+        state: "..."
+    - text_sensor.template.publish:
+        id: text_response
+        state: "..."
+    - script.execute: draw_display
+  on_stt_vad_end:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute: draw_display
+  on_stt_end:
+    - text_sensor.template.publish:
+        id: text_request
+        state: !lambda return x;
+    - script.execute: draw_display
+  on_tts_start:
+    - text_sensor.template.publish:
+        id: text_response
+        state: !lambda return x;
+    - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+    - script.execute: draw_display
+  on_end:
+    # Wait a short amount of time to see if an announcement starts
+    - wait_until:
+        condition:
+          - media_player.is_announcing:
+        timeout: 0.5s
+    # Announcement is finished and the I2S bus is free
+    - wait_until:
+        - and:
+            - not:
+                media_player.is_announcing:
+            - not:
+                speaker.is_playing:
+    # Restart only mWW if enabled; streaming wake words automatically restart
+    - if:
+        condition:
+          - lambda: return id(wake_word_engine_location).state == "On device";
+        then:
+          - lambda: id(va).set_use_wake_word(false);
+          - micro_wake_word.start:
+    - script.execute: set_idle_or_mute_phase
+    - script.execute: draw_display
+    # Clear text sensors
+    - text_sensor.template.publish:
+        id: text_request
+        state: ""
+    - text_sensor.template.publish:
+        id: text_response
+        state: ""
+  on_error:
+    # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
+    # These two are ignored for a better user experience
+    - if:
+        condition:
+          and:
+            - lambda: return !id(init_in_progress);
+            - lambda: return code != "duplicate_wake_up_detected";
+            - lambda: return code != "stt-no-text-recognized";
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+          - script.execute: draw_display
+          - delay: 1s
+          - if:
+              condition:
+                switch.is_off: mute
+              then:
+                - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+              else:
+                - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+        # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
+    - if:
+        condition:
+          - lambda: return code == "cloud-auth-failed";
+        then:
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: !lambda return id(error_cloud_expired);
+          - script.execute: draw_display
+
+  on_client_connected:
+    - lambda: id(init_in_progress) = false;
+    - script.execute: start_wake_word
+    - script.execute: set_idle_or_mute_phase
+    - script.execute: draw_display
+
+  on_client_disconnected:
+    - script.execute: stop_wake_word
+    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id}; 
+    - script.execute: draw_display
+
+
+switch:
+- platform: template
+  name: Mute
+  id: mute
+  optimistic: true
+  restore_mode: RESTORE_DEFAULT_OFF
+  entity_category: config
+  on_turn_off:
+      - microphone.unmute:
+      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      - script.execute: draw_display
+      
+  on_turn_on:
+      - microphone.mute:
+      - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+      - script.execute: draw_display
+
+select:
+  - platform: template
+    entity_category: config
+    name: Wake word engine location
+    id: wake_word_engine_location
+    icon: "mdi:account-voice"
+    optimistic: true
+    restore_value: true
+    options:
+      - In Home Assistant
+      - On device
+    initial_option: On device
+    on_value:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - wait_until:
+                lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+            - if:
+                condition:
+                  lambda: return x == "In Home Assistant";
+                then:
+                  - micro_wake_word.stop
+                  - delay: 500ms
+                  - if:
+                      condition:
+                        switch.is_off: mute
+                      then:
+                        - lambda: id(va).set_use_wake_word(true);
+                        - voice_assistant.start_continuous:
+            - if:
+                condition:
+                  lambda: return x == "On device";
+                then:
+                  - lambda: id(va).set_use_wake_word(false);
+                  - voice_assistant.stop
+                  - delay: 500ms
+                  - if:
+                      condition:
+                        switch.is_off: mute
+                      then:
+                        - micro_wake_word.start
+
+
+  - platform: template
+    name: "Wake word sensitivity"
+    optimistic: true
+    initial_option: Slightly sensitive
+    restore_value: true
+    entity_category: config
+    options:
+      - Slightly sensitive
+      - Moderately sensitive
+      - Very sensitive
+    on_value:
+      # Sets specific wake word probabilities computed for each particular model
+      # Note probability cutoffs are set as a quantized uint8 value, each comment has the corresponding floating point cutoff
+      # False Accepts per Hour values are tested against all units and channels from the Dinner Party Corpus.
+      # These cutoffs apply only to the specific models included in the firmware: okay_nabu@20241226.3, hey_jarvis@v2, hey_mycroft@v2
+      lambda: |-
+        if (x == "Slightly sensitive") {
+          id(okay_nabu).set_probability_cutoff(217);    // 0.85 -> 0.000 FAPH on DipCo (Manifest's default)
+          id(hey_jarvis).set_probability_cutoff(247);   // 0.97 -> 0.563 FAPH on DipCo (Manifest's default)
+          id(hey_mycroft).set_probability_cutoff(253);  // 0.99 -> 0.567 FAPH on DipCo
+        } else if (x == "Moderately sensitive") {
+          id(okay_nabu).set_probability_cutoff(176);    // 0.69 -> 0.376 FAPH on DipCo
+          id(hey_jarvis).set_probability_cutoff(235);   // 0.92 -> 0.939 FAPH on DipCo
+          id(hey_mycroft).set_probability_cutoff(242);  // 0.95 -> 1.502 FAPH on DipCo (Manifest's default)
+        } else if (x == "Very sensitive") {
+          id(okay_nabu).set_probability_cutoff(143);    // 0.56 -> 0.751 FAPH on DipCo
+          id(hey_jarvis).set_probability_cutoff(212);   // 0.83 -> 1.502 FAPH on DipCo
+          id(hey_mycroft).set_probability_cutoff(237);  // 0.93 -> 1.878 FAPH on DipCo
+        }
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: m5cores3_display
+    refresh: 0s
+
+
+display:
+  - platform: m5cores3_display
+    model: ILI9342
+    dc_pin: GPIO35
+    update_interval: never
+    id: m5cores3_lcd
+    pages:
+      - id: idle_page
+        lambda: |-
+          it.fill(id(idle_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_idle), ImageAlign::CENTER);
+      - id: listening_page
+        lambda: |-
+          it.fill(id(listening_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_listening), ImageAlign::CENTER);
+      - id: thinking_page
+        lambda: |-
+          it.fill(id(thinking_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_thinking), ImageAlign::CENTER);
+          it.filled_rectangle(20 , 20 , 280 , 30 , Color::WHITE );
+          it.rectangle(20 , 20 , 280 , 30 , Color::BLACK );
+          it.printf(30, 25, id(font_request), Color::BLACK, "%s", id(text_request).state.c_str());
+      - id: replying_page
+        lambda: |-
+          it.fill(id(replying_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_replying), ImageAlign::CENTER);
+          it.filled_rectangle(20 , 20 , 280 , 30 , Color::WHITE );
+          it.rectangle(20 , 20 , 280 , 30 , Color::BLACK );
+          it.filled_rectangle(20 , 190 , 280 , 30 , Color::WHITE );
+          it.rectangle(20 , 190 , 280 , 30 , Color::BLACK );
+          it.printf(30, 25, id(font_request), Color::BLACK, "%s", id(text_request).state.c_str());
+          it.printf(30, 195, id(font_response), Color::BLACK, "%s", id(text_response).state.c_str());
+      - id: error_page
+        lambda: |-
+          it.fill(id(error_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_error), ImageAlign::CENTER);
+      - id: no_ha_page
+        lambda: |-
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_ha), ImageAlign::CENTER);
+      - id: no_wifi_page
+        lambda: |-
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_wifi), ImageAlign::CENTER);
+      - id: initializing_page
+        lambda: |-
+          it.fill(id(loading_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_initializing), ImageAlign::CENTER);
+      - id: muted_page
+        lambda: |-
+          it.fill(Color::BLACK);
+          it.printf(30, 195, id(font_response), Color::WHITE, "%s", "Software muted.");
+          it.printf(30, 225, id(font_response), Color::WHITE, "%s", "Unmute to continue with Voice Assistant.");
+
+script:
+  - id: draw_display
+    then:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - if:
+                condition:
+                  wifi.connected:
+                then:
+                  - if:
+                      condition:
+                        api.connected:
+                      then:
+                        - lambda: |
+                            switch(id(voice_assistant_phase)) {
+                              case ${voice_assist_listening_phase_id}:
+                                id(m5cores3_lcd).show_page(listening_page);
+                                id(m5cores3_lcd).update();
+                                break;
+                              case ${voice_assist_thinking_phase_id}:
+                                id(m5cores3_lcd).show_page(thinking_page);
+                                id(m5cores3_lcd).update();
+                                break;
+                              case ${voice_assist_replying_phase_id}:
+                                id(m5cores3_lcd).show_page(replying_page);
+                                id(m5cores3_lcd).update();
+                                break;
+                              case ${voice_assist_error_phase_id}:
+                                id(m5cores3_lcd).show_page(error_page);
+                                id(m5cores3_lcd).update();
+                                break;
+                              case ${voice_assist_muted_phase_id}:
+                                id(m5cores3_lcd).show_page(muted_page);
+                                id(m5cores3_lcd).update();
+                                break;
+                              case ${voice_assist_not_ready_phase_id}:
+                                id(m5cores3_lcd).show_page(no_ha_page);
+                                id(m5cores3_lcd).update();
+                                break;
+                              default:
+                                id(m5cores3_lcd).show_page(idle_page);
+                                id(m5cores3_lcd).update();
+                            }
+                      else:
+                        - display.page.show: no_ha_page
+                        - component.update: m5cores3_lcd
+                else:
+                  - display.page.show: no_wifi_page
+                  - component.update: m5cores3_lcd
+          else:
+            - display.page.show: initializing_page
+            - component.update: m5cores3_lcd
+  # Starts either mWW or the streaming wake word, depending on the configured location
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - lambda: return id(wake_word_engine_location).state == "On device";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - delay: 100ms
+            - micro_wake_word.start:
+      - if:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(true);
+            - voice_assistant.start_continuous:  
+
+  # Stops either mWW or the streaming wake word, depending on the configured location
+  - id: stop_wake_word
+    then:
+      - if:
+          condition:
+            lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - voice_assistant.stop:
+      - if:
+          condition:
+            lambda: return id(wake_word_engine_location).state == "On device";
+          then:
+            - micro_wake_word.stop:
+  - id: set_idle_or_mute_phase
+    then:
+      - if:
+          condition:
+            switch.is_off: mute
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+          else:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+
+  - id: play_sound
+    parameters:
+      priority: bool
+      sound_file: "audio::AudioFile*"
+    then:
+      - lambda: |-
+          if (priority) {
+            id(va_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+              .set_announcement(true)
+              .perform();
+          }
+          if ( (id(va_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
+            id(va_media_player)
+              ->play_file(sound_file, true, false);
+          }
+      - script.execute: stop_wake_word
+
+image:
+  - file: ${error_illustration_file}
+    id: casita_error
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: ${idle_illustration_file}
+    id: casita_idle
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: ${listening_illustration_file}
+    id: casita_listening
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: ${thinking_illustration_file}
+    id: casita_thinking
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: ${replying_illustration_file}
+    id: casita_replying
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: ${loading_illustration_file}
+    id: casita_initializing
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-wifi.png
+    id: error_no_wifi
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+  - file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-ha.png
+    id: error_no_ha
+    resize: 320x240
+    type: RGB
+    transparency: alpha_channel
+
+font:
+  - file:
+      type: gfonts
+      family: ${font_family}
+      weight: 300
+      italic: true
+    id: font_request
+    size: 15
+    glyphsets:
+      - ${font_glyphsets}
+  - file:
+      type: gfonts
+      family: ${font_family}
+      weight: 300
+    id: font_response
+    size: 15
+    glyphsets:
+      - ${font_glyphsets}
+
+
+text_sensor:
+  - id: text_request
+    platform: template
+    on_value:
+      lambda: |-
+        if(id(text_request).state.length()>32) {
+          std::string name = id(text_request).state.c_str();
+          std::string truncated = esphome::str_truncate(name.c_str(),31);
+          id(text_request).state = (truncated+"...").c_str();
+        }
+
+  - id: text_response
+    platform: template
+    on_value:
+      lambda: |-
+        if(id(text_response).state.length()>32) {
+          std::string name = id(text_response).state.c_str();
+          std::string truncated = esphome::str_truncate(name.c_str(),31);
+          id(text_response).state = (truncated+"...").c_str();
+        }
+
+color:
+  - id: idle_color
+    hex: ${idle_illustration_background_color}
+  - id: listening_color
+    hex: ${listening_illustration_background_color}
+  - id: thinking_color
+    hex: ${thinking_illustration_background_color}
+  - id: replying_color
+    hex: ${replying_illustration_background_color}
+  - id: loading_color
+    hex: ${loading_illustration_background_color}
+  - id: error_color
+    hex: ${error_illustration_background_color}

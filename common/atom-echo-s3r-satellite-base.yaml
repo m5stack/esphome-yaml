@@ -1,0 +1,495 @@
+---
+substitutions:
+  # Phases of the Voice Assistant
+  # The voice assistant is ready to be triggered by a wake word
+  voice_assist_idle_phase_id: "1"
+  # The voice assistant is listening for a voice command
+  voice_assist_listening_phase_id: "2"
+  # The voice assistant is currently processing the command
+  voice_assist_thinking_phase_id: "3"
+  # The voice assistant is replying to the command
+  voice_assist_replying_phase_id: "4"
+  # The voice assistant is not ready
+  voice_assist_not_ready_phase_id: "10"
+  # The voice assistant encountered an error
+  voice_assist_error_phase_id: "11"
+  # Muted phase
+  voice_assist_muted_phase_id: "12"
+  # Finished timer phase
+  voice_assist_timer_finished_phase_id: "20"
+
+esphome:
+  project: 
+    name: m5stack.echo-s3r-satellite
+    version: 2025.9.0
+  min_version: 2025.5.0
+  on_boot:
+    priority: 600
+    then:
+      - delay: 30s
+      - if:
+          condition:
+            lambda: return id(init_in_progress);
+          then:
+            - lambda: id(init_in_progress) = false;
+            
+
+esp32:
+  board: esp32s3box
+  flash_size: 8MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    ## Note: Disable these configurations if you face the boot loop issue.
+    sdkconfig_options:
+        CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+        CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+        CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+        # Moves instructions and read only data from flash into PSRAM on boot.
+        # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+        # Considerably speeds up mWW at the cost of using more PSRAM.
+        CONFIG_SPIRAM_RODATA: "y"
+        CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+        CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+        CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+
+        CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+        CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+button:
+  - platform: factory_reset
+    id: factory_reset_btn
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    id: user_button
+    internal: true
+    on_multi_click:
+      - timing:
+          - ON for at least 50ms
+          - OFF for at least 50ms
+        then:
+          - switch.turn_off: timer_ringing
+      - timing:
+          - ON for at least 10s
+        then:
+          - button.press: factory_reset_btn 
+
+# I2C Bus Configuration
+i2c:
+  sda: GPIO45
+  scl: GPIO0
+  scan: false
+  id: i2c0
+
+# I2S Bus Configuration
+i2s_audio:
+  - id: i2s_audio_bus
+    i2s_lrclk_pin: GPIO3
+    i2s_bclk_pin: GPIO17
+    i2s_mclk_pin: GPIO11
+
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    bits_per_sample: 16bit
+    sample_rate: 48000
+
+microphone:
+  - platform: i2s_audio
+    id: i2s_mic
+    sample_rate: 16000
+    i2s_din_pin: GPIO4
+    bits_per_sample: 16bit
+    adc_type: external
+
+speaker:
+  - platform: i2s_audio
+    id: i2s_speaker
+    i2s_dout_pin: GPIO48
+    dac_type: external
+    sample_rate: 48000
+    bits_per_sample: 16bit
+    channel: left
+    audio_dac: es8311_dac
+    buffer_duration: 100ms
+
+media_player:
+  - platform: speaker
+    name: None
+    id: speaker_media_player
+    volume_min: 0.5
+    volume_max: 0.8
+    announcement_pipeline:
+      speaker: i2s_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1  # Atom Echo S3R only has one output channel
+    files:
+      - id: wake_word_triggered_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+      - id: timer_finished_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+      - id: error_cloud_expired
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+    on_announcement:
+      # Stop the wake word (mWW or VA) if the mic is capturing
+      - if:
+          condition:
+            - microphone.is_capturing:
+          then:
+            - script.execute: stop_wake_word
+            # Ensure VA stops before moving on
+            - if:
+                condition:
+                  - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+                then:
+                  - wait_until:
+                      - not:
+                          voice_assistant.is_running:
+      # Since VA isn't running, this is user-intiated media playback. Draw the mute display
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+            
+    on_idle:
+      # Since VA isn't running, this is the end of user-intiated media playback. Restart the wake word.
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - script.execute: start_wake_word
+            - script.execute: set_idle_or_mute_phase
+
+micro_wake_word:
+  id: mww
+  microphone: i2s_mic
+  stop_after_detection: false
+  models:
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+      id: okay_nabu
+    - model: hey_jarvis
+      id: hey_jarvis
+    - model: hey_mycroft
+      id: hey_mycroft
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: stop
+      internal: true
+  vad:
+  on_wake_word_detected:
+    - script.execute:
+        id: play_sound
+        priority: true
+        sound_file: !lambda return id(wake_word_triggered_sound);
+    
+    - delay: 300ms
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  microphone: i2s_mic
+  media_player: speaker_media_player
+  micro_wake_word: mww
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_listening:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
+  on_stt_vad_end:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+  on_tts_start:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+  on_end:
+    # Wait a short amount of time to see if an announcement starts
+    - wait_until:
+        condition:
+          - media_player.is_announcing:
+        timeout: 0.5s
+    # Announcement is finished and the I2S bus is free
+    - wait_until:
+        - and:
+            - not:
+                media_player.is_announcing:
+            - not:
+                speaker.is_playing:
+    # Restart only mWW if enabled; streaming wake words automatically restart
+    - if:
+        condition:
+          - lambda: return id(wake_word_engine_location).state == "On device";
+        then:
+          - lambda: id(va).set_use_wake_word(false);
+          - micro_wake_word.start:
+    - script.execute: set_idle_or_mute_phase
+    
+  on_error:
+    # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
+    # These two are ignored for a better user experience
+    - if:
+        condition:
+          and:
+            - lambda: return !id(init_in_progress);
+            - lambda: return code != "duplicate_wake_up_detected";
+            - lambda: return code != "stt-no-text-recognized";
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+          
+          - delay: 1s
+          - if:
+              condition:
+                switch.is_off: mute
+              then:
+                - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+              else:
+                - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+        # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
+    - if:
+        condition:
+          - lambda: return code == "cloud-auth-failed";
+        then:
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: !lambda return id(error_cloud_expired);
+          
+  on_client_connected:
+    - lambda: id(init_in_progress) = false;
+    - script.execute: start_wake_word
+    - script.execute: set_idle_or_mute_phase
+    
+  on_client_disconnected:
+    - script.execute: stop_wake_word
+    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id};
+  
+  on_timer_finished:
+    - switch.turn_on: timer_ringing
+    - wait_until:
+        media_player.is_announcing:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_timer_finished_phase_id};
+    
+
+script:
+  # Starts either mWW or the streaming wake word, depending on the configured location
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - lambda: return id(wake_word_engine_location).state == "On device";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - micro_wake_word.start:
+      - if:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(true);
+            - voice_assistant.start_continuous:
+  # Stops either mWW or the streaming wake word, depending on the configured location
+  - id: stop_wake_word
+    then:
+      - if:
+          condition:
+            lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - voice_assistant.stop:
+      - if:
+          condition:
+            lambda: return id(wake_word_engine_location).state == "On device";
+          then:
+            - micro_wake_word.stop:
+  # Set the voice assistant phase to idle or muted, depending on if the software mute switch is activated
+  - id: set_idle_or_mute_phase
+    then:
+      - if:
+          condition:
+            switch.is_off: mute
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+          else:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+  
+  - id: play_sound
+    parameters:
+      priority: bool
+      sound_file: "audio::AudioFile*"
+    then:
+      - lambda: |-
+          if (priority) {
+            id(speaker_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+              .set_announcement(true)
+              .perform();
+          }
+          if ( (id(speaker_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
+            id(speaker_media_player)
+              ->play_file(sound_file, true, false);
+          }
+      - script.execute: stop_wake_word
+
+switch:
+  - platform: gpio
+    name: Speaker Enable
+    pin: GPIO18
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    disabled_by_default: true
+    internal: true
+  - platform: template
+    name: Mute
+    id: mute
+    icon: "mdi:microphone-off"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    on_turn_off:
+      - microphone.unmute:
+      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      
+    on_turn_on:
+      - microphone.mute:
+      - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+      
+  - platform: template
+    id: timer_ringing
+    optimistic: true
+    internal: true
+    restore_mode: ALWAYS_OFF
+    on_turn_off:
+      # Turn off the repeat mode and disable the pause between playlist items
+      - lambda: |-
+              id(speaker_media_player)
+                ->make_call()
+                .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_OFF)
+                .set_announcement(true)
+                .perform();
+              id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 0);
+      # Stop playing the alarm
+      - media_player.stop:
+          announcement: true
+    on_turn_on:
+      # Turn on the repeat mode and pause for 1000 ms between playlist items/repeats
+      - lambda: |-
+            id(speaker_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+              .set_announcement(true)
+              .perform();
+            id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 1000);
+      - media_player.speaker.play_on_device_media_file:
+          media_file: timer_finished_sound
+          announcement: true
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+
+select:
+  - platform: template
+    entity_category: config
+    name: Wake word engine location
+    id: wake_word_engine_location
+    icon: "mdi:account-voice"
+    optimistic: true
+    restore_value: true
+    options:
+      - In Home Assistant
+      - On device
+    initial_option: On device
+    on_value:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - wait_until:
+                lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+            - if:
+                condition:
+                  lambda: return x == "In Home Assistant";
+                then:
+                  - micro_wake_word.stop
+                  - delay: 500ms
+                  - if:
+                      condition:
+                        switch.is_off: mute
+                      then:
+                        - lambda: id(va).set_use_wake_word(true);
+                        - voice_assistant.start_continuous:
+            - if:
+                condition:
+                  lambda: return x == "On device";
+                then:
+                  - lambda: id(va).set_use_wake_word(false);
+                  - voice_assistant.stop
+                  - delay: 500ms
+                  - if:
+                      condition:
+                        switch.is_off: mute
+                      then:
+                        - micro_wake_word.start
+
+
+  - platform: template
+    name: "Wake word sensitivity"
+    optimistic: true
+    initial_option: Slightly sensitive
+    restore_value: true
+    entity_category: config
+    options:
+      - Slightly sensitive
+      - Moderately sensitive
+      - Very sensitive
+    on_value:
+      # Sets specific wake word probabilities computed for each particular model
+      # Note probability cutoffs are set as a quantized uint8 value, each comment has the corresponding floating point cutoff
+      # False Accepts per Hour values are tested against all units and channels from the Dinner Party Corpus.
+      # These cutoffs apply only to the specific models included in the firmware: okay_nabu@20241226.3, hey_jarvis@v2, hey_mycroft@v2
+      lambda: |-
+        if (x == "Slightly sensitive") {
+          id(okay_nabu).set_probability_cutoff(217);    // 0.85 -> 0.000 FAPH on DipCo (Manifest's default)
+          id(hey_jarvis).set_probability_cutoff(247);   // 0.97 -> 0.563 FAPH on DipCo (Manifest's default)
+          id(hey_mycroft).set_probability_cutoff(253);  // 0.99 -> 0.567 FAPH on DipCo
+        } else if (x == "Moderately sensitive") {
+          id(okay_nabu).set_probability_cutoff(176);    // 0.69 -> 0.376 FAPH on DipCo
+          id(hey_jarvis).set_probability_cutoff(235);   // 0.92 -> 0.939 FAPH on DipCo
+          id(hey_mycroft).set_probability_cutoff(242);  // 0.95 -> 1.502 FAPH on DipCo (Manifest's default)
+        } else if (x == "Very sensitive") {
+          id(okay_nabu).set_probability_cutoff(143);    // 0.56 -> 0.751 FAPH on DipCo
+          id(hey_jarvis).set_probability_cutoff(212);   // 0.83 -> 1.502 FAPH on DipCo
+          id(hey_mycroft).set_probability_cutoff(237);  // 0.93 -> 1.878 FAPH on DipCo
+        }
+
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: false
+    initial_value: "true"
+  - id: voice_assistant_phase
+    type: int
+    restore_value: false
+    initial_value: ${voice_assist_not_ready_phase_id}
+ 
