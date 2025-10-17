@@ -30,32 +30,6 @@ void AXP2101::AXP2101::setup()
     this->disableCPUSLDO();
     this->disableDLDO1();
 
-    delay(10);
-    this->setALDO1Voltage(3300); // for AW88298
-    delay(10);
-    this->setALDO2Voltage(3300); // for ES7210
-    // this->setALDO3Voltage(3300);  // for CAM, disabled by default
-    // this->setALDO4Voltage(3300); // for TF card slot, disabled by default
-    delay(10);
-    this->setBLDO1Voltage(3300); // AVDD 
-    delay(10);
-    this->setBLDO2Voltage(1800); // DVDD 
-    delay(10);
-    this->setDLDO1Voltage(3300); // LCD BL
-
-
-    delay(10);
-
-    this->enableALDO1(); // for AW88298
-    this->enableALDO2(); // for ES7210
-    // this->enableALDO3(); // for camera
-    // this->enableALDO4(); // for TF card slot
-    this->enableBLDO1();
-    this->enableBLDO2();
-    this->enableDLDO1(); // LCD BL
-
-    delay(10);
-
     this->clearIrqStatus();
 
     this->enableVbusVoltageMeasure();
@@ -161,11 +135,7 @@ void AXP2101::AXP2101::setup()
 
 
 
-void AXP2101::AXP2101::loop()
-{
-    // put your main code here, to run repeatedly: 
-    // delay(1000);
-}
+void AXP2101::AXP2101::loop(){ }
 
 
 void AXP2101::AXP2101::dump_config()
@@ -188,10 +158,6 @@ void AXP2101::AXP2101::dump_config()
 
 }
 
-
-void AXP2101::update() {
-
-}
 
 /*
 *  Convenient functions to operate with registers, implement with internal ESPHome method.
@@ -737,7 +703,7 @@ void AXP2101::disableDC1LowVoltageTurnOff(){ clrRegisterBit(XPOWERS_AXP2101_DC_O
 bool AXP2101::setSysPowerDownVoltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_VSYS_VOL_THRESHOLD_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_VSYS_VOL_THRESHOLD_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_VSYS_VOL_THRESHOLD_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_VSYS_VOL_THRESHOLD_MIN) {
@@ -1185,7 +1151,7 @@ bool AXP2101::disableDC1(void){ return clrRegisterBit(XPOWERS_AXP2101_DC_ONOFF_D
 bool AXP2101::setDC1Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_DCDC1_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_DCDC1_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_DCDC1_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_DCDC1_VOL_MIN) {
@@ -1229,13 +1195,13 @@ bool AXP2101::setDC2Voltage(uint16_t millivolt)
     val &= 0x80;
     if (millivolt >= XPOWERS_AXP2101_DCDC2_VOL1_MIN && millivolt <= XPOWERS_AXP2101_DCDC2_VOL1_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC2_VOL_STEPS1) {
-            ESP_LOGE(TAG, "Mistake !  The steps is must %umV", XPOWERS_AXP2101_DCDC2_VOL_STEPS1);
+            ESP_LOGE(TAG, "Mistake !  The steps must be %umV", XPOWERS_AXP2101_DCDC2_VOL_STEPS1);
             return false;
         }
         return  0 == writeRegister(XPOWERS_AXP2101_DC_VOL1_CTRL, val | (millivolt - XPOWERS_AXP2101_DCDC2_VOL1_MIN) / XPOWERS_AXP2101_DCDC2_VOL_STEPS1);
     } else if (millivolt >= XPOWERS_AXP2101_DCDC2_VOL2_MIN && millivolt <= XPOWERS_AXP2101_DCDC2_VOL2_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC2_VOL_STEPS2) {
-            ESP_LOGE(TAG, "Mistake !  The steps is must %umV", XPOWERS_AXP2101_DCDC2_VOL_STEPS2);
+            ESP_LOGE(TAG, "Mistake !  The steps must be %umV", XPOWERS_AXP2101_DCDC2_VOL_STEPS2);
             return false;
         }
         val |= (((millivolt - XPOWERS_AXP2101_DCDC2_VOL2_MIN) / XPOWERS_AXP2101_DCDC2_VOL_STEPS2) + XPOWERS_AXP2101_DCDC2_VOL_STEPS2_BASE);
@@ -1287,20 +1253,20 @@ bool AXP2101::setDC3Voltage(uint16_t millivolt)
     val &= 0x80;
     if (millivolt >= XPOWERS_AXP2101_DCDC3_VOL1_MIN && millivolt <= XPOWERS_AXP2101_DCDC3_VOL1_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC3_VOL_STEPS1) {
-            ESP_LOGE(TAG, "Mistake ! The steps is must %umV", XPOWERS_AXP2101_DCDC3_VOL_STEPS1);
+            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP2101_DCDC3_VOL_STEPS1);
             return false;
         }
         return  0 == writeRegister(XPOWERS_AXP2101_DC_VOL2_CTRL, val | (millivolt - XPOWERS_AXP2101_DCDC3_VOL_MIN) / XPOWERS_AXP2101_DCDC3_VOL_STEPS1);
     } else if (millivolt >= XPOWERS_AXP2101_DCDC3_VOL2_MIN && millivolt <= XPOWERS_AXP2101_DCDC3_VOL2_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC3_VOL_STEPS2) {
-            ESP_LOGE(TAG, "Mistake ! The steps is must %umV", XPOWERS_AXP2101_DCDC3_VOL_STEPS2);
+            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP2101_DCDC3_VOL_STEPS2);
             return false;
         }
         val |= (((millivolt - XPOWERS_AXP2101_DCDC3_VOL2_MIN) / XPOWERS_AXP2101_DCDC3_VOL_STEPS2) + XPOWERS_AXP2101_DCDC3_VOL_STEPS2_BASE);
         return  0 == writeRegister(XPOWERS_AXP2101_DC_VOL2_CTRL, val);
     } else if (millivolt >= XPOWERS_AXP2101_DCDC3_VOL3_MIN && millivolt <= XPOWERS_AXP2101_DCDC3_VOL3_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC3_VOL_STEPS3) {
-            ESP_LOGE(TAG, "Mistake ! The steps is must %umV", XPOWERS_AXP2101_DCDC3_VOL_STEPS3);
+            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP2101_DCDC3_VOL_STEPS3);
             return false;
         }
         val |= (((millivolt - XPOWERS_AXP2101_DCDC3_VOL3_MIN) / XPOWERS_AXP2101_DCDC3_VOL_STEPS3) + XPOWERS_AXP2101_DCDC3_VOL_STEPS3_BASE);
@@ -1356,14 +1322,14 @@ bool AXP2101::setDC4Voltage(uint16_t millivolt)
     val &= 0x80;
     if (millivolt >= XPOWERS_AXP2101_DCDC4_VOL1_MIN && millivolt <= XPOWERS_AXP2101_DCDC4_VOL1_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC4_VOL_STEPS1) {
-            ESP_LOGE(TAG, "Mistake ! The steps is must %umV", XPOWERS_AXP2101_DCDC4_VOL_STEPS1);
+            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP2101_DCDC4_VOL_STEPS1);
             return false;
         }
         return  0 == writeRegister(XPOWERS_AXP2101_DC_VOL3_CTRL, val | (millivolt - XPOWERS_AXP2101_DCDC4_VOL1_MIN) / XPOWERS_AXP2101_DCDC4_VOL_STEPS1);
 
     } else if (millivolt >= XPOWERS_AXP2101_DCDC4_VOL2_MIN && millivolt <= XPOWERS_AXP2101_DCDC4_VOL2_MAX) {
         if (millivolt % XPOWERS_AXP2101_DCDC4_VOL_STEPS2) {
-            ESP_LOGE(TAG, "Mistake ! The steps is must %umV", XPOWERS_AXP2101_DCDC4_VOL_STEPS2);
+            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP2101_DCDC4_VOL_STEPS2);
             return false;
         }
         val |= (((millivolt - XPOWERS_AXP2101_DCDC4_VOL2_MIN) / XPOWERS_AXP2101_DCDC4_VOL_STEPS2) + XPOWERS_AXP2101_DCDC4_VOL_STEPS2_BASE);
@@ -1409,7 +1375,7 @@ bool AXP2101::disableDC5(void){ return clrRegisterBit(XPOWERS_AXP2101_DC_ONOFF_D
 bool AXP2101::setDC5Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_DCDC5_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_DCDC5_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_DCDC5_VOL_STEPS);
         return false;
     }
     if (millivolt != XPOWERS_AXP2101_DCDC5_VOL_1200MV && millivolt < XPOWERS_AXP2101_DCDC5_VOL_MIN) {
@@ -1465,7 +1431,7 @@ bool AXP2101::disableALDO1(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setALDO1Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_ALDO1_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_ALDO1_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_ALDO1_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_ALDO1_VOL_MIN) {
@@ -1498,7 +1464,7 @@ bool AXP2101::disableALDO2(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setALDO2Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_ALDO2_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_ALDO2_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_ALDO2_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_ALDO2_VOL_MIN) {
@@ -1531,7 +1497,7 @@ bool AXP2101::disableALDO3(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setALDO3Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_ALDO3_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_ALDO3_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_ALDO3_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_ALDO3_VOL_MIN) {
@@ -1564,7 +1530,7 @@ bool AXP2101::disableALDO4(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setALDO4Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_ALDO4_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_ALDO4_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_ALDO4_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_ALDO4_VOL_MIN) {
@@ -1597,7 +1563,7 @@ bool AXP2101::disableBLDO1(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setBLDO1Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_BLDO1_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_BLDO1_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_BLDO1_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_BLDO1_VOL_MIN) {
@@ -1634,7 +1600,7 @@ bool AXP2101::disableBLDO2(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setBLDO2Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_BLDO2_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_BLDO2_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_BLDO2_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_BLDO2_VOL_MIN) {
@@ -1669,7 +1635,7 @@ bool AXP2101::disableCPUSLDO(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ON
 bool AXP2101::setCPUSLDOVoltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_CPUSLDO_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_CPUSLDO_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_CPUSLDO_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_CPUSLDO_VOL_MIN) {
@@ -1705,7 +1671,7 @@ bool AXP2101::disableDLDO1(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setDLDO1Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_DLDO1_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_DLDO1_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_DLDO1_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_DLDO1_VOL_MIN) {
@@ -1740,7 +1706,7 @@ bool AXP2101::disableDLDO2(void){ return clrRegisterBit(XPOWERS_AXP2101_LDO_ONOF
 bool AXP2101::setDLDO2Voltage(uint16_t millivolt)
 {
     if (millivolt % XPOWERS_AXP2101_DLDO2_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps is must %u mV", XPOWERS_AXP2101_DLDO2_VOL_STEPS);
+        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP2101_DLDO2_VOL_STEPS);
         return false;
     }
     if (millivolt < XPOWERS_AXP2101_DLDO2_VOL_MIN) {
@@ -2687,4 +2653,6 @@ float AXP2101::resistance_to_temperature(float resistance, float SteinhartA,
 
 } // namespace axp2101
 } // namespace esphome
+
+
 

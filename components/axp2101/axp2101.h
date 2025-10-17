@@ -9,19 +9,18 @@
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/core/component.h"
 #include "axp2101_const.h"
+
 namespace esphome {
 namespace axp2101 {
 
-class AXP2101 : public PollingComponent, public i2c::I2CDevice {
+class AXP2101 : public Component, public i2c::I2CDevice {
 
 public:
     void setup() override;
     void loop() override;
     void dump_config() override;
-
-    void update() override;
-
-
+    float get_setup_priority() const override { return setup_priority::IO; }
+    
     int readRegister(uint8_t reg);
     int writeRegister(uint8_t reg, uint8_t val);
     // int readRegister(uint8_t reg, uint8_t *buf, uint8_t len);
@@ -412,10 +411,9 @@ public:
     bool isChargeOverTimeoutIrq(void);
     bool isBatOverVoltageIrq(void);
     uint8_t getChipID(void);
+
+
 protected:
-    
-
-
     bool getProtectedChannel(uint8_t channel);
     uint16_t getPowerChannelVoltage(uint8_t channel);
     bool inline enablePowerOutput(uint8_t channel);
@@ -436,10 +434,8 @@ private:
 
     uint8_t __chipModel{0};
     uint32_t __protectedMask{0};
-    
+
 };
-
-
     
     
 } // namespace axp2101
