@@ -16,10 +16,7 @@ void AW88298::setup() {
     ESP_LOGCONFIG(TAG, "Setting up AW88298...");
 
     uint16_t id_code;
-    AW88298_ERROR_CHECK(this->read_byte_16(IDCODE, &id_code), "Failed to read AW88298 ID Code, please check your connections.");
-    // uint8_t id_code;
-    // AW88298_ERROR_CHECK(this->read_byte(IDCODE, &id_code), "Failed to read AW88298 ID Code, please check your connections.");
-    // ESP_LOGI(TAG, "AW88298 IDCODE: 0x%04X", id_code);
+    AW88298_ERROR_CHECK(this->read_byte_16(IDCODE, &id_code), "Failed to read AW88298 ID Code");
 
     // Reset the device, all configuration registers will be reset to default value after 0x55aa is written
     AW88298_ERROR_CHECK(this->write_byte_16(IDCODE, 0x55aa), "Failed to reset AW88298");
