@@ -1,4 +1,7 @@
+---
 substitutions:
+  name: cores3-va
+  friendly_name: M5Stack CoreS3 Voice Assistant
   loading_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
   idle_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
   listening_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
@@ -37,31 +40,17 @@ substitutions:
   font_family: Figtree
 
 esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
   project:
     name: m5stack.cores3-voice-assistant
     version: 2025.9.0
-  min_version: 2025.5.0
-  libraries:
-    - m5stack/M5Unified@^0.2.8
-  includes:
-    - <M5Unified.h>
-  # Hardware initialize phase, set a higher priority.
-  # We are using libraries here, it will increase the firmware size
-  # since not all functionalities were used, yet they are compiled into the firmware.
   on_boot:
-    - priority: 800
-      then:
-        - lambda: |-
-            auto cfg = M5.config();
-            M5.begin(cfg);
-            delay(10);
-            M5.Mic.begin();
-            delay(10);
-            M5.Speaker.begin();
-            delay(10);
-            ESP_LOGD("M5Unified", "Setup Peripheral Success.");
     - priority: 600
       then:
+        - light.turn_on:
+            id: lcd_backlight
+            brightness: 80%
         - script.execute: draw_display
         - delay: 30s
         - if:
@@ -99,11 +88,6 @@ psram:
   mode: quad
   speed: 80MHz
 
-# Enable logging
-logger:
-  level: DEBUG
-
-
 # Enable Home Assistant API
 api:
   on_client_connected:
@@ -111,12 +95,23 @@ api:
   on_client_disconnected:
     - script.execute: draw_display
 
+ota:
+  - platform: esphome
+    id: ota_esphome
+
 wifi:
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
   on_connect:
     - script.execute: draw_display
-    - delay: 5s # Wait for connection
   on_disconnect:
-    - script.execute: draw_display
+    - script.execute: draw_display      
+
+captive_portal:
+
+# Enable logging
+logger:
+  level: DEBUG
 
 globals:
   - id: init_in_progress
@@ -128,6 +123,11 @@ globals:
     restore_value: no
     initial_value: ${voice_assist_not_ready_phase_id}
 
+i2s_audio:
+  id: i2s_audio_bus
+  i2s_lrclk_pin: GPIO33
+  i2s_bclk_pin: GPIO34
+  i2s_mclk_pin: GPIO0
 
 i2c:
   sda: GPIO12
@@ -138,15 +138,124 @@ spi:
     clk_pin: GPIO36
     mosi_pin: GPIO37
 
-i2s_audio:
-  id: i2s_audio_bus
-  i2s_lrclk_pin: GPIO33
-  i2s_bclk_pin: GPIO34
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [axp2101, aw88298, aw9523b ]
+    refresh: 0s
 
+
+# PMU
+sensor:
+  - platform: axp2101
+    id: axp2101_sensor
+    battery_level:
+      name: "Battery Level"
+    battery_voltage:
+      name: "Battery Voltage"
+    axp_temperature:
+      name: "AXP2101 Temperature"
+    battery_charging:
+      name: "Battery Charging"
+    
+axp2101:
+  id: axp2101_pmu
+
+# IO Expander
+aw9523b:
+  id: aw9523b_hub
+
+output:
+  - platform: axp2101
+    type: range
+    channel: DLDO1
+    id: lcd_backlight_output
+    min_voltage: 2600
+    max_voltage: 3300
+
+  - platform: axp2101
+    channel: ALDO1
+    voltage: 1800
+
+  - platform: axp2101
+    channel: ALDO2
+    voltage: 3300
+  
+  - platform: axp2101
+    channel: BLDO1
+    voltage: 2800
+  
+  - platform: axp2101
+    channel: BLDO2
+    voltage: 1500
+
+light:
+  - platform: monochromatic
+    id: lcd_backlight
+    name: "LCD Backlight"
+    icon: "mdi:television"
+    entity_category: config
+    output: lcd_backlight_output
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 250ms
+
+# some aw9523b inputs (handle interrupts)
+# and other binary sensors
+binary_sensor:
+  - platform: gpio
+    name: "ES_INT P0_3"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 3
+    on_press:
+      then:
+        - logger.log: "ES7210 interrupt triggered"
+    internal: true
+
+  - platform: gpio
+    name: "TF_SW P0_4"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 4 
+    on_press:
+      then:
+        - logger.log: "TF_SW interrupt triggered"
+    internal: true
+  
+  - platform: gpio
+    name: "TOUCH_INT P1_2"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 10
+    on_press:
+      then:
+        - logger.log: "TOUCH interrupt triggered"
+    internal: true
+
+  - platform: gpio
+    name: "AW_INT P1_3"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 11
+    on_press:
+      then:
+        - logger.log: "AW88298 interrupt triggered"
+    internal: true
+
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    bits_per_sample: 16bit
+    sample_rate: 16000
+    mic_gain: 36
+
+audio_dac:
+  - platform: aw88298
+    id: aw88298_dac
+    sample_rate: 48000
 
 microphone:
   - platform: i2s_audio
-    id: m5cores3_mic
+    id: i2s_mic
     i2s_din_pin: GPIO14
     adc_type: external
     sample_rate: 16000
@@ -156,21 +265,22 @@ microphone:
 speaker:
   - platform: i2s_audio
     i2s_audio_id: i2s_audio_bus
-    id: m5cores3_spk
+    id: i2s_speaker
     dac_type: external
     i2s_dout_pin: GPIO13
+    audio_dac: aw88298_dac
 
 media_player:
   - platform: speaker
     name: None
     id: va_media_player
-    volume_min: 0.2
-    volume_max: 1.0
+    volume_min: 0.5
+    volume_max: 0.8
     announcement_pipeline:
-      speaker: m5cores3_spk
+      speaker: i2s_speaker
       format: FLAC
-      sample_rate: 16000
-      num_channels: 1 
+      sample_rate: 48000
+      num_channels: 1
     files:
       - id: wake_word_triggered_sound
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
@@ -212,7 +322,7 @@ media_player:
 
 micro_wake_word:
   id: mww
-  microphone: m5cores3_mic
+  microphone: i2s_mic
   stop_after_detection: false
   models:
     - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
@@ -230,15 +340,14 @@ micro_wake_word:
         id: play_sound
         priority: true
         sound_file: !lambda return id(wake_word_triggered_sound);
-  
-    - delay: 2s
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
 
 voice_assistant:
   id: va
-  microphone: m5cores3_mic
+  microphone: i2s_mic
   media_player: va_media_player
+  micro_wake_word: mww
   use_wake_word: false
   noise_suppression_level: 2
   auto_gain: 31dBFS
@@ -339,21 +448,40 @@ voice_assistant:
 
 
 switch:
-- platform: template
-  name: Mute
-  id: mute
-  optimistic: true
-  restore_mode: RESTORE_DEFAULT_OFF
-  entity_category: config
-  on_turn_off:
-      - microphone.unmute:
-      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
-      - script.execute: draw_display
-      
-  on_turn_on:
-      - microphone.mute:
-      - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
-      - script.execute: draw_display
+  - platform: gpio
+    name: "AW RST P0_2"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 2
+    internal: true
+    restore_mode: RESTORE_DEFAULT_ON
+    disabled_by_default: true
+
+
+  - platform: gpio
+    name: "CAM RST P1_0"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 8
+    internal: true
+    restore_mode: RESTORE_DEFAULT_ON
+    disabled_by_default: true
+
+  - platform: template
+    name: Mute
+    id: mute
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    on_turn_off:
+        - microphone.unmute:
+        - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+        - script.execute: draw_display
+        
+    on_turn_on:
+        - microphone.mute:
+        - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+        - script.execute: draw_display
 
 select:
   - platform: template
@@ -430,17 +558,16 @@ select:
           id(hey_mycroft).set_probability_cutoff(237);  // 0.93 -> 1.878 FAPH on DipCo
         }
 
-external_components:
-  - source: github://m5stack/esphome-yaml/components
-    components: m5cores3_display
-    refresh: 0s
-
-
 display:
-  - platform: m5cores3_display
-    model: ILI9342
+  - platform: mipi_spi
+    model: M5CORE
     dc_pin: GPIO35
+    reset_pin:
+      aw9523b: aw9523b_hub
+      number: 9
+    cs_pin: GPIO3
     update_interval: never
+    invert_colors: true
     id: m5cores3_lcd
     pages:
       - id: idle_page
@@ -487,6 +614,27 @@ display:
           it.fill(Color::BLACK);
           it.printf(30, 195, id(font_response), Color::WHITE, "%s", "Software muted.");
           it.printf(30, 225, id(font_response), Color::WHITE, "%s", "Unmute to continue with Voice Assistant.");
+
+
+touchscreen:
+  - platform: ft63x6
+    id: touch
+    reset_pin:
+      aw9523b: aw9523b_hub
+      number: 0
+    calibration:
+      x_min: 0
+      x_max: 320
+      y_min: 0
+      y_max: 240
+    on_touch:
+      - lambda: |-
+            ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+                touch.x,
+                touch.y,
+                touch.x_raw,
+                touch.y_raw
+                );  
 
 script:
   - id: draw_display
@@ -553,7 +701,6 @@ script:
               - lambda: return id(wake_word_engine_location).state == "On device";
           then:
             - lambda: id(va).set_use_wake_word(false);
-            - delay: 100ms
             - micro_wake_word.start:
       - if:
           condition:
