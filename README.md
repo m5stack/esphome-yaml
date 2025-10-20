@@ -22,7 +22,7 @@
 As of now the below devices/functionalities are supported:
 
 - [Atom EchoS3R Voice Assistant](https://docs.m5stack.com/en/core/Atom_EchoS3R)
-
+- [M5Stack CoreS3 Voice Assistant](https://docs.m5stack.com/en/homeassistant/voice_assistant/cores3_voice_assistant)
 
 ## ❤️ Feature Request & Contributing
 
