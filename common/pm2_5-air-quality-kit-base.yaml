@@ -1,0 +1,660 @@
+esphome:
+  name: pm25-air-quality-kit
+  friendly_name: PM2.5 Air Quality Kit-SHT30
+  project:
+    name: m5stack.pm2_5-air-quality-kit
+    version: 2025.9.0
+
+esp32:
+  board: esp32dev
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+
+captive_portal:
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  
+uart:
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 9600
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO39
+    name: "Button A"
+    on_press:
+      then:
+        - lvgl.page.previous
+
+  - platform: gpio
+    pin: GPIO38
+    name: "Button B"
+    on_press:
+      then:
+        - lvgl.page.show: main_page
+        
+  - platform: gpio
+    pin: GPIO37
+    name: "Button C"
+    on_press:
+      then:
+        - lvgl.page.next
+
+sensor:
+  - platform: sht3xd
+    heater_enabled: false # For accurate readings
+    temperature:
+      name: "Temperature"
+      id: sht_temp
+      on_value:
+        - lvgl.indicator.update:
+            id: temperature_needle
+            value: !lambda return x * 10;
+        - lvgl.label.update:
+            id: temperature_text
+            text:
+              format: "%.1f°C"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: temp_val
+            text:
+              format: "%.1f°C"
+              args: [ 'x' ]
+    humidity:
+      name: "Humidity"
+      id: sht_hum
+      on_value:
+        - lvgl.label.update:
+            id: humi_val
+            text:
+              format: "%.1f%%"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: humidity_text
+            text:
+              format: "%.1f%%"
+              args: [ 'x' ]
+    address: 0x44
+    update_interval: 60s
+
+  
+  - platform: pmsx003
+    type: PMSX003
+    pm_1_0:
+      name: "PM1"
+      id: sensor_pm1
+      filters:
+        - sliding_window_moving_average:
+            window_size: 180
+            send_every: 60
+      on_value:
+        - lvgl.label.update:
+            id: pm1_rt_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+    pm_2_5:
+      name: "PM2.5"
+      id: sensor_pm25
+      filters:
+        - sliding_window_moving_average:
+            window_size: 180
+            send_every: 60
+      on_value:
+        - lvgl.label.update:
+            id: pm2_5_rt_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+        - lvgl.label.update:
+            id: pm_2_5_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+    pm_10_0:
+      name: "PM10"
+      id: sensor_pm10
+      filters:
+        - sliding_window_moving_average:
+            window_size: 180
+            send_every: 60
+      on_value:
+        - lvgl.label.update:
+            id: pm10_rt_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+    pm_1_0_std:
+      name: "PM1.0 STD"
+      id: sensor_pm1_std
+      filters:
+        - sliding_window_moving_average:
+            window_size: 180
+            send_every: 60
+      on_value:
+        - lvgl.label.update:
+            id: pm1_std_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+    pm_2_5_std:
+      name: "PM2.5 STD"
+      id: sensor_pm25_std
+      filters:
+        - sliding_window_moving_average:
+            window_size: 180
+            send_every: 60
+      on_value:
+        - lvgl.label.update:
+            id: pm2_5_std_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+    pm_10_0_std:
+      name: "PM10 STD"
+      id: sensor_pm10_0_std
+      filters:
+        - sliding_window_moving_average:
+            window_size: 180
+            send_every: 60
+      on_value:
+        - lvgl.label.update:
+            id: pm10_0_std_val
+            text:
+              format: "%.0f μg/m³"
+              args: [ 'x' ]
+
+    # Particles
+    pm_0_3um:
+      name: "0.3 μm particle count"
+      id: sensor_num_pm0_3
+      on_value:
+        - lvgl.label.update:
+            id: num_pm0_3_val
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+    pm_0_5um:
+      name: "0.5 μm particle count"
+      id: sensor_num_pm0_5
+      on_value:
+        - lvgl.label.update:
+            id: num_pm0_5_val
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+    pm_1_0um:
+      name: "1.0 μm particle count"
+      id: sensor_num_pm1_0
+      on_value:
+        - lvgl.label.update:
+            id: num_pm1_0_val
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+    pm_2_5um:
+      name: "2.5 μm particle count"
+      id: sensor_num_pm2_5
+      on_value:
+        - lvgl.label.update:
+            id: num_pm2_5_val
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+    pm_5_0um:
+      name: "5.0 μm particle count"
+      id: sensor_num_pm5_0
+      on_value:
+        - lvgl.label.update:
+            id: num_pm_5_0_val
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+    pm_10_0um:
+      name: "10.0 μm particle count"
+      id: sensor_num_pm10_0
+      on_value:
+        - lvgl.label.update:
+            id: num_pm_10_val
+            text:
+              format: "%.0f"
+              args: [ 'x' ]
+    update_interval: 60s
+
+# GPIO pin of the display backlight
+output:
+  - platform: ledc
+    pin: 32
+    id: gpio_32_backlight_pwm
+    
+light:
+  - platform: monochromatic
+    output: gpio_32_backlight_pwm
+    name: "Display Backlight"
+    id: display_backlight
+    restore_mode: ALWAYS_ON
+
+# Home Assistant time
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time:
+      # Update once ready
+      - seconds: /3
+        then:
+          - lvgl.label.update:
+              id: time_label
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                return t.strftime("%H:%M").c_str();
+
+          - lvgl.label.update:
+              id: date_label
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                return t.strftime("%Y-%m-%d %a").c_str();
+
+display:
+  - platform: mipi_spi
+    model: M5CORE
+    invert_colors: true
+
+font:
+  - file: "gfonts://Montserrat@600"
+    id: montserrat_special
+    size: 12
+    bpp: 4
+    glyphs: ["0123456789μg/m³.: "]
+
+  - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/fonts/materialdesignicons-webfont.ttf"
+    id: extra_icon
+    size: 20
+    bpp: 4
+    glyphs: [
+      "\U000F050F", # mdi:thermometer
+      "\U000F058E", # mdi:water-percent
+      "\U000F0F30", # mdi:weather-hazy
+      ]
+
+
+lvgl:
+  style_definitions:
+    - id: header_footer
+      bg_color: 0xFFFFFF
+      bg_grad_color: 0xFFFFFF
+      bg_grad_dir: VER
+      bg_opa: COVER
+      border_opa: TRANSP
+      radius: 0
+      pad_all: 0
+      pad_row: 0
+      pad_column: 0
+      border_color: 0x000000
+      text_color: 0xCECECE
+      width: 100%
+      height: 30
+  # Navigation buttons
+  top_layer:
+    widgets:
+      - buttonmatrix:
+          align: bottom_mid
+          styles: header_footer
+          pad_all: 0
+          outline_width: 0
+          id: top_layer
+          items:
+            styles: header_footer
+          rows:
+            - buttons:
+              - id: page_prev
+                text: "\uF053"
+                on_press:
+                  then:
+                    lvgl.page.previous:
+                
+                  
+              - id: page_home
+                text: "\uF015"
+                on_press:
+                  then:
+                    lvgl.page.show: main_page
+              - id: page_next
+                text: "\uF054"
+                on_press:
+                  then:
+                    lvgl.page.next:
+
+  pages:
+      - id: main_page
+        widgets:
+          - label:
+              id: time_label
+              text: "00:00"
+              align: CENTER
+              y: -60
+              text_font: montserrat_48
+          - label:
+              id: date_label
+              text: "1978-01-01 Thu"
+              align: CENTER
+              y: 0
+              text_font: montserrat_24
+
+          - obj:
+              align: CENTER
+              width: 320
+              bg_opa: TRANSP
+              border_opa: TRANSP
+              y: 20
+              layout:
+                type: flex
+                pad_row: 4
+                flex_align_main: center
+                flex_align_cross: center
+                flex_align_track: end
+              widgets:
+                - label:
+                    text_font: extra_icon
+                    text: "\U000F050F"
+                - label:
+                    id: temp_val
+                    text: "-.-°C"
+                - label:
+                    text_font: extra_icon
+                    text: "\U000F058E"
+                - label:
+                    id: humi_val
+                    text: "_%"
+                - label:
+                    text_font: extra_icon
+                    text: "\U000F0F30"
+                - label:
+                    id: pm_2_5_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+      - id: meter_page
+        widgets:
+          - meter:
+              align: TOP_MID
+              y: 20
+              height: 180
+              width: 180
+              scales:
+                - range_from: -100 # scale for the needle value
+                  range_to: 400
+                  angle_range: 240
+                  rotation: 150
+                  indicators:
+                    - line:
+                        id: temperature_needle
+                        width: 2
+                        color: 0xFF0000
+                        r_mod: -4
+                    - tick_style:
+                        start_value: -10
+                        end_value: 40
+                        color_start: 0x0000bd
+                        color_end: 0xbd0000
+                        width: 1
+                - range_from: -10 # scale for the value labels
+                  range_to: 40
+                  angle_range: 240
+                  rotation: 150
+                  ticks:
+                    width: 1
+                    count: 51
+                    length: 10
+                    color: 0x000000
+                    major:
+                      stride: 5
+                      width: 2
+                      length: 10
+                      color: 0x404040
+                      label_gap: 10
+              widgets:
+                - label:
+                    id: temperature_text
+                    text: "-.-°C"
+                    align: CENTER
+                    y: 45
+                - label:
+                    text: "Humi"
+                    align: LEFT_MID
+                    x: 40
+                    y: 65
+                - label: 
+                    id: humidity_text
+                    text: "48%"
+                    align: CENTER
+                    x: 30
+                    y: 65
+      - id: air_quality_page
+        widgets:
+          - obj:
+              id: page_container
+              align: TOP_MID
+              width: 320
+              height: 220
+
+              bg_opa: TRANSP
+              border_opa: TRANSP
+              layout:
+                type: grid
+                grid_columns: [FR(1), FR(1), FR(1), FR(1)]   # two columns
+                grid_rows: [FR(1), FR(1), FR(1), FR(1), FR(1), FR(1), FR(1), FR(1) ] # 8 rows
+              widgets:
+                - label:
+                    text: "Realtime"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 0
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                    grid_cell_column_span: 2
+                - label:
+                    text: "Standard"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 0
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                    grid_cell_column_span: 2
+                
+                - label:
+                    text: "PM1.0:"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 1
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: pm1_rt_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 1
+
+                - label:
+                    text: "PM1.0:"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 1
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: pm1_std_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+                    grid_cell_column_pos: 3
+                    grid_cell_row_pos: 1
+
+                - label:
+                    text: "PM2.5:"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 2
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: pm2_5_rt_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 2
+
+                - label:
+                    text: "PM2.5:"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 2
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: pm2_5_std_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+                    grid_cell_column_pos: 3
+                    grid_cell_row_pos: 2
+
+
+                - label:
+                    text: "PM10:"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 3
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: pm10_rt_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 3
+
+                - label:
+                    text: "PM10:"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 3
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: pm10_0_std_val
+                    text_font: montserrat_special
+                    text: "0 μg/m³"
+                    grid_cell_column_pos: 3
+                    grid_cell_row_pos: 3
+
+                - label:
+                    id: particle_text
+                    text: "Number of particles"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 4
+                    grid_cell_column_span: 2
+
+                - label:
+                    text_font: montserrat_special
+                    text: "0.3 μm:"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 5
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: num_pm0_3_val
+                    text: "0"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 5
+                
+                - label:
+                    text_font: montserrat_special
+                    text: "0.5 μm:"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 6
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: num_pm0_5_val
+                    text: "0"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 6
+
+                - label:
+                    text_font: montserrat_special
+                    text: "1.0 μm:"
+                    grid_cell_column_pos: 0
+                    grid_cell_row_pos: 7
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+                - label:
+                    id: num_pm1_0_val
+                    text: "0"
+                    grid_cell_column_pos: 1
+                    grid_cell_row_pos: 7
+
+                - label:
+                    text_font: montserrat_special
+                    text: "2.5 μm:"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 5
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+
+                - label:
+                    id: num_pm2_5_val
+                    text: "0"
+                    grid_cell_column_pos: 3
+                    grid_cell_row_pos: 5
+                - label:
+                    text_font: montserrat_special
+                    text: "5.0 μm:"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 6
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+
+                - label:
+                    id: num_pm_5_0_val
+                    text: "0"
+                    grid_cell_column_pos: 3
+                    grid_cell_row_pos: 6
+                - label:
+                    text_font: montserrat_special
+                    text: "10 μm:"
+                    grid_cell_column_pos: 2
+                    grid_cell_row_pos: 7
+                    grid_cell_x_align: STRETCH
+                    grid_cell_y_align: STRETCH
+
+                - label:
+                    id: num_pm_10_val
+                    text: "0"
+                    grid_cell_column_pos: 3
+                    grid_cell_row_pos: 7
+                    
+      - id: about_page
+        widgets:
+          - qrcode:
+              id: m5stack_qr
+              align: TOP_MID
+              y: 40
+              size: 100
+              text: m5stack.com
+          - label:
+              align: BOTTOM_MID
+              text: "m5stack.com"
+              y: -40
