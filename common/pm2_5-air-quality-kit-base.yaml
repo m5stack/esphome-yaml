@@ -281,6 +281,7 @@ display:
   - platform: mipi_spi
     model: M5CORE
     invert_colors: true
+    data_rate: 40MHz
 
 font:
   - file: "gfonts://Montserrat@600"

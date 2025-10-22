@@ -566,6 +566,7 @@ display:
       aw9523b: aw9523b_hub
       number: 9
     cs_pin: GPIO3
+    data_rate: 40MHz
     update_interval: never
     invert_colors: true
     id: m5cores3_lcd
