@@ -23,6 +23,8 @@ As of now the below devices/functionalities are supported:
 
 - [Atom EchoS3R Voice Assistant](https://docs.m5stack.com/en/homeassistant/voice_assistant/atom_echos3r_voice_assistant)
 - [M5Stack CoreS3 Voice Assistant](https://docs.m5stack.com/en/homeassistant/voice_assistant/cores3_voice_assistant)
+- [PM2.5 Air Quality Kit-SHT30](https://docs.m5stack.com/en/homeassistant/kit/pm2_5_air_quality_kit_sht30)
+
 
 ## ❤️ Feature Request & Contributing
 
