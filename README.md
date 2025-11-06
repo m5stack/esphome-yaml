@@ -1,9 +1,8 @@
-<div align="center">
+<div align="center" style="margin: 20px 0;">
   <img src="https://docs.m5stack.com/assets/m5logo2022.svg" width="128" />
 </div>
 
-
-<div align="center">
+<div align="center" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;">
   <img src="https://img.shields.io/badge/home%20assistant-%2341BDF5.svg?style=for-the-badge&logo=home-assistant&logoColor=white">
   <img src="https://img.shields.io/badge/ESPHome-000000.svg?style=for-the-badge&logo=ESPHome&logoColor=white">
   <img src="https://img.shields.io/badge/espressif-E7352C.svg?style=for-the-badge&logo=espressif&logoColor=white">

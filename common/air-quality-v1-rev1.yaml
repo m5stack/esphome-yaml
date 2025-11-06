@@ -1,0 +1,253 @@
+esphome:
+  name: air-quality-v1-rev1
+  friendly_name: Air Quality V1.1 Kit
+  project: m5stack.air-quality-v1-rev1
+  on_boot:
+    then:
+      # read the RTC time once when the system boots
+      pcf8563.read_time:
+
+esp32:
+  board: m5stack-stamps3
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+  level: DEBUG
+# Enable Home Assistant API
+api:
+  id: airq_api
+
+
+ota:
+  - platform: esphome
+
+
+wifi:
+  id: airq_wifi
+  ap:
+
+captive_portal:
+
+i2c:
+  sda: GPIO11
+  scl: GPIO12
+
+spi:
+  clk_pin: GPIO5
+  mosi_pin: GPIO6
+
+
+output:
+  - platform: gpio
+    pin: GPIO10
+    id: sens_power
+  
+  - platform: gpio
+    pin: GPIO46
+    id: hold
+  
+binary_sensor:
+  - platform: gpio
+    pin: GPIO0
+    name: "USER_A"
+    on_press:
+      - display.page.show_previous: epaper_disp
+      - component.update: epaper_disp
+
+  - platform: gpio
+    pin: 
+      number: GPIO8
+      mode:
+        input: true
+        pullup: true # Required
+    name: "USER_B"
+    on_press:
+      - display.page.show_next: epaper_disp
+      - component.update: epaper_disp
+
+  - platform: gpio
+    pin: GPIO42
+    name: "WAKE"
+  
+  - platform: gpio
+    id: buzzer
+    pin: GPIO9
+    name: "BEEP"
+  
+time:
+  - platform: pcf8563
+    id: rtc_time
+    address: 0x51
+    # repeated synchronization is not necessary unless the external RTC
+    # is much more accurate than the internal clock
+    update_interval: never
+  - platform: homeassistant
+    id: ha_time
+    # instead try to synchronize via network repeatedly ...
+    on_time_sync:
+      then:
+        # ... and update the RTC when the synchronization was successful
+        pcf8563.write_time:
+
+sensor:
+  - platform: scd4x
+    co2:
+      id: "scd40_co2"
+      name: "CO2"
+    temperature:
+      id: scd40_temp
+      name: "SCD40 Temperature"
+    humidity:
+      id: scd40_humi
+      name: "SCD40 Humidity"
+
+  - platform: sen5x
+    id: sen55
+    pm_1_0:
+      id: sen55_pm_1_0
+      name: "PM <1µm Weight concentration"
+    pm_2_5:
+      id: sen55_pm_2_0
+      name: "PM <2.5µm Weight concentration"
+    pm_4_0:
+      id: sen55_pm_4_0
+      name: "PM <4µm Weight concentration"
+    pm_10_0:
+      id: sen55_pm_10_0
+      name: "PM <10µm Weight concentration"
+    temperature:
+      id: sen55_temp
+      name: "SEN55 Temperature"
+    humidity:
+      id: sen55_humi
+      name: "SEN55 Humidity"
+    voc:
+      name: "VOC"
+      id: sen55_voc
+      algorithm_tuning:
+        index_offset: 100
+        learning_time_offset_hours: 12
+        learning_time_gain_hours: 12
+        gating_max_duration_minutes: 180
+        std_initial: 50
+        gain_factor: 230
+    nox:
+      id: sen55_nox
+      name: "NOX"
+
+  - platform: adc
+    id: battery
+    pin: GPIO14
+    name: "Battery Voltage"
+    attenuation: 12db
+    accuracy_decimals: 2
+    filters:
+      - multiply: 2
+
+
+font:
+  - file: "gfonts://Montserrat@500"
+    id: montserrat_sm
+    size: 12
+    bpp: 4
+
+  - file: "gfonts://Montserrat@600"
+    id: montserrat
+    size: 18
+    bpp: 4
+
+  - file: "gfonts://Montserrat@600"
+    id: montserrat_md
+    size: 48
+    bpp: 4
+
+  # Special characters
+  - file: "gfonts://Montserrat@600"
+    id: montserrat_special
+    size: 18
+    bpp: 4
+    glyphs: ["0123456789μµg/na.m³:pPM "]
+
+  - file: "gfonts://Open+Sans@500"
+    id: open_sans_special_sm
+    size: 14
+    bpp: 4
+    glyphs: ["0123456789μµg/na.m³:pPMxNXoVCvOcTteEHhuUiI°% "]
+
+  - file: "./fonts/materialdesignicons-webfont.ttf"
+    id: extra_icon
+    size: 24
+    bpp: 4
+    glyphs: [
+      "\U000F050F", # mdi:thermometer
+      "\U000F058E", # mdi:water-percent
+      "\U000F07E4", # mdi:CO2
+      "\U000F0F30", # mdi:weather-hazy
+      "\U000F0E0A", # mdi:water-outline
+      "\U000F013B", # mdi:chemical-weapon
+      "\U000F0438", # mdi:radiator
+      "\U000F05A9", # mdi:wifi
+      "\U000F05AA", # mdi:wifi-off
+      "\U000F109B", # mdi:api
+      "\U000F1257", # mdi:api-off
+      "\U000F00E6", # mdi:bullhorn
+      "\U000F0079", # mdi:battery
+    ]
+
+display:
+  - platform: waveshare_epaper
+    id: epaper_disp
+    cs_pin: GPIO4
+    dc_pin: GPIO3
+    busy_pin: GPIO1
+    reset_pin: GPIO2
+    data_rate: 40000000
+    model: 1.54inv2   # support black/white
+    full_update_every: 360  # frequent refresh could damage the display
+    update_interval: 3s
+    pages:
+      - id: main_page
+        lambda: |-
+          it.strftime(5, 5, id(montserrat_md), "%H:%M", id(rtc_time).now());
+          it.strftime(10, 68, id(montserrat), "%Y-%m-%d %a", id(rtc_time).now());
+          it.print(5, 100, id(extra_icon), "\U000F050F");
+          // Average temperature/humidity calculated from two temperature/humidity sensors
+          auto temp = (id(sen55_temp).state + id(scd40_temp).state) / 2;
+          auto humi = (id(sen55_humi).state + id(scd40_humi).state) / 2;
+          it.printf(30, 100, id(montserrat), "%.1f °C", temp);
+          it.print(105, 100, id(extra_icon), "\U000F0E0A");
+          it.printf(135, 100, id(montserrat), "%.1f% %", humi);
+          it.print(5, 128, id(extra_icon), "\U000F07E4");
+          it.printf(35, 128, id(montserrat), "%.0f ppm", id(scd40_co2).state);
+          it.print(5, 158, id(extra_icon), "\U000F0F30");
+          it.printf(35, 158, id(montserrat_special), "%.1f µg/m³", id(sen55_pm_2_0).state);
+      - id: detail_page
+        lambda: |-
+          // This page display the single sensor readings
+          it.print(5, 5, id(montserrat), "SDC40");
+          it.print(5, 25, id(extra_icon), "\U000F050F");
+          it.printf(35, 25, id(montserrat), "%.1f °C", id(scd40_temp).state);
+          it.print(95, 25, id(extra_icon), "\U000F0E0A");
+          it.printf(125, 25, id(montserrat), "%.1f% %", id(scd40_humi).state);
+          it.print(5, 50, id(extra_icon), "\U000F07E4");
+          it.printf(35, 50, id(montserrat), "%.0f ppm", id(scd40_co2).state);
+          it.print(5, 70, id(montserrat), "SEN55");
+          it.printf(5, 95, id(open_sans_special_sm), "Temp: %.1f °C  Humi: %.1f%%", id(sen55_temp).state, id(sen55_humi).state);
+          it.printf(5, 115, id(open_sans_special_sm), "VOC:   %.0f    NOX:   %.0f", id(sen55_voc).state, id(sen55_nox).state);
+          it.printf(5, 135, id(open_sans_special_sm), "PM1:   %.0f µg/m³ PM2.5: %.0f µg/m³", id(sen55_pm_1_0).state, id(sen55_pm_2_0).state);
+          it.printf(5, 155, id(open_sans_special_sm), "PM4:   %.0f µg/m³", id(sen55_pm_4_0).state);
+          it.printf(5, 175, id(open_sans_special_sm), "PM10:  %.0f µg/m³", id(sen55_pm_10_0).state);
+
+      - id: about_page
+        lambda: |-
+          it.print(10, 10, id(montserrat), "Air Quality V1.1");
+          it.printf(10, 35, id(extra_icon), "%s", id(airq_wifi).is_connected() ? "\U000F05A9" : "\U000F05AA");
+          it.printf(40, 35, id(montserrat), "%s", id(airq_wifi).is_connected() ? id(airq_wifi).wifi_ssid().c_str() : "Not Connected");
+          it.printf(10, 65, id(extra_icon), "%s", id(airq_api).is_connected() ? "\U000F109B" : "\U000F109B");
+          it.printf(40, 65, id(montserrat), "%s", id(airq_api).is_connected() ? "Connected" : "Not connected");
+          it.print(10, 95, id(extra_icon), "\U000F00E6");
+          it.printf(40, 95, id(montserrat), "%s", id(buzzer).state ? "ON" : "OFF");
+          it.print(8, 128, id(extra_icon), "\U000F0079");
+          it.printf(40, 128, id(montserrat), "%.2f V", id(battery).state);
