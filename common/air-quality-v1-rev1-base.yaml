@@ -1,7 +1,10 @@
 esphome:
   name: air-quality-v1-rev1
   friendly_name: Air Quality V1.1 Kit
-  project: m5stack.air-quality-v1-rev1
+  project: 
+    name: m5stack.echo-s3r-satellite
+    version: 2025.10.3
+  min_version: 2025.5.0
   on_boot:
     then:
       # read the RTC time once when the system boots
