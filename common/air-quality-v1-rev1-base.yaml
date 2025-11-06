@@ -48,12 +48,16 @@ output:
     id: sens_power
   
   - platform: gpio
-    pin: GPIO46
+    pin:
+      number: GPIO46
+      inverted: true
     id: hold
   
 binary_sensor:
   - platform: gpio
-    pin: GPIO0
+    pin:
+      number: GPIO0
+      inverted: true
     name: "USER_A"
     on_press:
       - display.page.show_previous: epaper_disp
@@ -62,6 +66,7 @@ binary_sensor:
   - platform: gpio
     pin: 
       number: GPIO8
+      inverted: true
       mode:
         input: true
         pullup: true # Required
