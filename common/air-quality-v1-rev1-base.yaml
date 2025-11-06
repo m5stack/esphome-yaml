@@ -2,7 +2,7 @@ esphome:
   name: air-quality-v1-rev1
   friendly_name: Air Quality V1.1 Kit
   project: 
-    name: m5stack.echo-s3r-satellite
+    name: m5stack.air-quality-v1-rev1-kit
     version: 2025.10.3
   min_version: 2025.5.0
   on_boot:
