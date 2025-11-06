@@ -176,7 +176,7 @@ font:
     bpp: 4
     glyphs: ["0123456789μµg/na.m³:pPMxNXoVCvOcTteEHhuUiI°% "]
 
-  - file: "./fonts/materialdesignicons-webfont.ttf"
+  - file: "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/fonts/materialdesignicons-webfont.ttf"
     id: extra_icon
     size: 24
     bpp: 4
