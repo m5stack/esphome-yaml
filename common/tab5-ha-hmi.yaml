@@ -13,8 +13,8 @@ esp32:
 
 packages:
   remote_package_files:
-      url: https://github.com/m5stack/esphome-yaml/common
-      files: [tab5-globals.yaml, tab5-lvgl.yaml, tab5-scripts.yaml]
+      url: https://github.com/m5stack/esphome-yaml
+      files: [ common/tab5-globals.yaml, common/tab5-lvgl.yaml, common/tab5-scripts.yaml]
       refresh: 1d
 
 external_components:
