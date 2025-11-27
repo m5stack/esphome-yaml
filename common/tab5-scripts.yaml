@@ -1,0 +1,473 @@
+
+script:
+  - id: expand_nav_btn_click_area
+    # Expand the clickable area for the main navigation buttons so
+    # that touches near the icons are also registered. This improves
+    # usability of the side navigation rail on small touch targets.
+    then:
+      - lambda: |-
+          std::vector<lv_obj_t*> btns = {
+            id(dash_panel_btn),
+            id(climate_panel_btn),
+            id(light_panel_btn)
+          };
+          for (auto* btn : btns) {
+            lv_obj_set_ext_click_area(btn, 180);
+          }
+  - id: nav_rail_update
+    # Update the navigation rail UI to reflect the current page
+    # selection. This sets the checked state on the correct nav button,
+    # updates the icon to the active/inactive glyph, and applies the
+    # appropriate label style (active/inactive color).
+    then:
+      - lambda: |-
+          const int active = id(page_num);
+          lv_obj_t* buttons[] = { 
+              id(dash_panel_btn), 
+              id(light_panel_btn), 
+              id(climate_panel_btn), 
+          };
+          lv_obj_t* icons[] = { 
+              id(dash_btn_icon), 
+              id(light_btn_icon), 
+              id(climate_btn_icon), 
+          };
+          lv_obj_t* labels[] = { 
+              id(dash_btn_label), 
+              id(light_btn_label), 
+              id(climate_btn_label), 
+          };
+          const char* icon_unchecked[] = {
+              "\U000F0A1D", // dashboard-outline
+              "\U000F0336", // lightbulb-outline
+              "\U000F0F55", // thermometer
+          };
+          const char* icon_checked[] = {
+              "\U000F056E", // dashboard
+              "\U000F0335", // lightbulb
+              "\U000F0F54", // thermometer
+          };
+
+          const int count = sizeof(buttons) / sizeof(buttons[0]);
+          
+          // Update button UI
+          for (int i = 0; i < count; i++) {
+              if (i == id(page_num)) {
+                lv_obj_add_state(buttons[i], LV_STATE_CHECKED);
+              } else {
+                lv_obj_clear_state(buttons[i], LV_STATE_CHECKED);
+              }
+              bool selected = (i == active);
+              lv_obj_add_style(labels[i], selected ? id(nav_label_activate) : id(nav_label_inactivate), LV_PART_MAIN);
+              lv_label_set_text(icons[i], selected ? icon_checked[i] : icon_unchecked[i]);
+          }
+    
+  # The below script was used to sync home assistant
+  # entity states with our LVGL UI when UI is drawn on screen.
+  - id: sync_ha
+    then:
+      - logger.log: "Sync with Home Assistant"
+
+  # This script was used to draw a custom 'indicator' on color palette
+  # It used a canvas and allow us to fill pixels with different color
+  - id: draw_color_palette
+    # Draw a circular HSV color wheel on the canvas widget.
+    # This lambda computes hue from angle and saturation from distance
+    # to center, converts HSV to RGB and sets each canvas pixel.
+    then:
+      - lambda: |-
+          const int W = 320;
+          const int H = 320;
+          const int cx = W / 2;
+          const int cy = H / 2;
+          const int radius = 160;
+
+          auto canvas = id(color_palette_canvas);
+
+          // HSV to RGB helper
+          auto hsv_to_rgb = [](float h, float s, float v) -> lv_color_t {
+            float r, g, b;
+
+            int i = (int)(h / 60.0f) % 6;
+            float f = h / 60.0f - i;
+            float p = v * (1.0f - s);
+            float q = v * (1.0f - f * s);
+            float t = v * (1.0f - (1.0f - f) * s);
+
+            switch (i) {
+              case 0: r=v; g=t; b=p; break;
+              case 1: r=q; g=v; b=p; break;
+              case 2: r=p; g=v; b=t; break;
+              case 3: r=p; g=q; b=v; break;
+              case 4: r=t; g=p; b=v; break;
+              case 5: r=v; g=p; b=q; break;
+            }
+
+            uint8_t R = (uint8_t)(r * 255);
+            uint8_t G = (uint8_t)(g * 255);
+            uint8_t B = (uint8_t)(b * 255);
+
+            return lv_color_make(R, G, B);
+          };
+
+          // Draw HSV color wheel
+          for (int y = 0; y < H; y++) {
+            for (int x = 0; x < W; x++) {
+
+              int dx = x - cx;
+              int dy = y - cy;
+              int dist2 = dx*dx + dy*dy;
+
+              if (dist2 > radius * radius) continue;
+
+              float angle = atan2f(dy, dx);  // -π ~ π
+              float hue = fmodf((angle + M_PI) * 180.0f / M_PI + 180.0f, 360.0f);
+
+              float dist = sqrtf(dist2);  // 0 ~ 160
+              float sat = dist / radius;  // 0.0 ~ 1.0
+
+              float val = 1.0f;  // fixed brightness
+
+              lv_color_t c = hsv_to_rgb(hue, sat, val);
+              lv_canvas_set_px(canvas, x, y, c);
+            }
+          };
+  # This script was used to draw a custom 'indicator' on color palette
+  # using the object widget
+  # and calculate the selected color with positions
+  # meanwhile 
+  # 1. setting the background color of the object
+  # 2. store the r, g, b value separately in global variables
+  - id: draw_color_palette_indicator
+    # Make the small draggable indicator respond to touch/move
+    # events on the color palette. The callback computes the indicator
+    # position, clamps it to the palette radius, converts the (x,y)
+    # position to an HSV color, converts HSV to RGB and then updates
+    # the indicator background and global RGB variables for use when
+    # sending the selected color to Home Assistant.
+    then:
+      - lambda: |-
+          lv_obj_add_event_cb(id(color_palette_indicator), [](lv_event_t * e){
+            lv_obj_t * obj = lv_event_get_target(e);
+
+            lv_indev_t * indev = lv_indev_get_act();
+            if(indev == NULL)  return;
+
+            lv_point_t vect;
+            lv_indev_get_vect(indev, &vect);
+
+            lv_coord_t x = lv_obj_get_x_aligned(obj) + vect.x;
+            lv_coord_t y = lv_obj_get_y_aligned(obj) + vect.y;
+
+            int radius = 160;
+
+            float angle = atan2f(y, x);
+
+            if( x * x + y * y > radius * radius ){
+                x = cosf(angle) * radius;
+                y = sinf(angle) * radius;
+            }
+
+            float hue, saturation, dist, value;
+
+            hue = angle * 180.0f / M_PI;
+
+            if (hue < 0) hue += 360.0f;
+
+            dist = sqrtf( x * x + y * y );
+
+            saturation = dist / radius;
+
+            if (saturation > 1) saturation = 1;
+
+            value = 1.0f;
+
+            auto hsv_to_rgb888 = [](float h, float s, float v,
+              uint8_t &r, uint8_t &g, uint8_t &b){
+                float c = v * s;
+                float h_prime = h / 60.0f;
+                float x = c * (1 - fabsf(fmodf(h_prime, 2) - 1));
+                float m = v - c;
+
+                float r1=0, g1=0, b1=0;
+                if(h_prime >=0 && h_prime <1){ r1=c; g1=x; b1=0; }
+                else if(h_prime >=1 && h_prime <2){ r1=x; g1=c; b1=0; }
+                else if(h_prime >=2 && h_prime <3){ r1=0; g1=c; b1=x; }
+                else if(h_prime >=3 && h_prime <4){ r1=0; g1=x; b1=c; }
+                else if(h_prime >=4 && h_prime <5){ r1=x; g1=0; b1=c; }
+                else{ r1=c; g1=0; b1=x; }
+
+                r = (uint8_t)((r1 + m) * 255);
+                g = (uint8_t)((g1 + m) * 255);
+                b = (uint8_t)((b1 + m) * 255);
+            };
+
+            uint8_t r, g, b;
+            hsv_to_rgb888(hue, saturation, value, r, g, b);
+
+            lv_color_t update_color = lv_color_make(r, g, b);
+
+            lv_obj_set_pos(obj, x, y);
+
+            // Set the indicator's background color
+            lv_obj_set_style_bg_color(obj, update_color, LV_STATE_DEFAULT);
+
+            // Give the slider proper color like in the Home Assistant
+            float brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            // If it's too close to white, we use gray for substitution
+            if (brightness > 235) {
+                lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xE1E1E1), LV_PART_INDICATOR);
+                lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xF9F9F9), LV_PART_MAIN);
+            } else {
+              lv_obj_set_style_bg_color(id(light_slider), update_color, LV_PART_INDICATOR);
+              // a fade background
+              float factor = 0.85;
+              uint8_t bg_r = r + (255 - r) * factor;
+              uint8_t bg_g = g + (255 - g) * factor;
+              uint8_t bg_b = b + (255 - b) * factor;
+              lv_color_t bar_bg = lv_color_make(bg_r, bg_g, bg_b);
+              lv_obj_set_style_bg_color(id(light_slider), bar_bg, LV_PART_MAIN);
+            }
+
+            // Set the current light color
+            id(light_r) = r;
+            id(light_g) = g;
+            id(light_b) = b;
+
+          }, LV_EVENT_PRESSING, NULL);
+    
+
+  - id: move_color_palette_indicator
+    # Brief: Move color palette indicator script
+    # This script reads the current input device touch coordinates and computes
+    # the local position relative to the color canvas. It clamps the position
+    # inside the circular palette radius, converts the position to HSV
+    # (hue/saturation) and then to RGB, updates the indicator position and
+    # its background color, and stores the resulting R/G/B values into global
+    # variables for use when sending the selected color to Home Assistant.
+    then:
+      - lambda: |-
+          lv_indev_t * indev = lv_indev_get_act();
+          if(indev == NULL)  return;
+
+          lv_point_t p;
+          lv_indev_get_point(indev, &p);
+
+          lv_area_t area;
+          lv_obj_get_coords(id(color_palette_canvas), &area);
+          
+          int radius = 160;
+
+          int local_x = p.x - area.x1 - radius;
+          int local_y = p.y - area.y1 - radius;
+
+          float angle = atan2f(local_y, local_x);
+
+          // restrict the click area inside the circle
+          if ( local_x * local_x + local_y * local_y > radius * radius ) {
+              local_x = cosf(angle) * radius;
+              local_y = sinf(angle) * radius;
+          }
+
+          float hue, saturation, dist, value;
+
+          hue = angle * 180.0f / M_PI;
+
+          if (hue < 0) hue += 360.0f;
+
+          dist = sqrtf( local_x * local_x + local_y * local_y );
+
+          saturation = dist / radius;
+
+          if (saturation > 1) saturation = 1;
+
+          value = 1.0f;
+
+          auto hsv_to_rgb888 = [](float h, float s, float v,
+            uint8_t &r, uint8_t &g, uint8_t &b){
+              float c = v * s;
+              float h_prime = h / 60.0f;
+              float x = c * (1 - fabsf(fmodf(h_prime, 2) - 1));
+              float m = v - c;
+
+              float r1=0, g1=0, b1=0;
+              if(h_prime >=0 && h_prime <1){ r1=c; g1=x; b1=0; }
+              else if(h_prime >=1 && h_prime <2){ r1=x; g1=c; b1=0; }
+              else if(h_prime >=2 && h_prime <3){ r1=0; g1=c; b1=x; }
+              else if(h_prime >=3 && h_prime <4){ r1=0; g1=x; b1=c; }
+              else if(h_prime >=4 && h_prime <5){ r1=x; g1=0; b1=c; }
+              else{ r1=c; g1=0; b1=x; }
+
+              r = (uint8_t)((r1 + m) * 255);
+              g = (uint8_t)((g1 + m) * 255);
+              b = (uint8_t)((b1 + m) * 255);
+          };
+
+          uint8_t r, g, b;
+          hsv_to_rgb888(hue, saturation, value, r, g, b);
+
+          lv_color_t update_color = lv_color_make(r, g, b);
+
+          lv_obj_set_pos(id(color_palette_indicator), local_x, local_y);
+
+          lv_obj_set_style_bg_color(id(color_palette_indicator), update_color, LV_STATE_DEFAULT);
+
+          // Give the slider proper color like in the Home Assistant
+          float brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+
+          // If it's too close to white, we use gray for subsititution
+          if (brightness > 235) {
+              lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xE1E1E1), LV_PART_INDICATOR);
+              lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xF9F9F9), LV_PART_MAIN);
+          } else {
+            lv_obj_set_style_bg_color(id(light_slider), update_color, LV_PART_INDICATOR);
+            // a fade background
+            float factor = 0.85;
+            uint8_t bg_r = r + (255 - r) * factor;
+            uint8_t bg_g = g + (255 - g) * factor;
+            uint8_t bg_b = b + (255 - b) * factor;
+            lv_color_t bar_bg = lv_color_make(bg_r, bg_g, bg_b);
+            lv_obj_set_style_bg_color(id(light_slider), bar_bg, LV_PART_MAIN);
+          }
+          
+
+          // Set the current light color
+          id(light_r) = r;
+          id(light_g) = g;
+          id(light_b) = b;
+
+  - id: sync_ha_palette
+    parameters:
+      color_str: string
+    then:
+      - lambda: |-
+          if (color_str.empty() || color_str == "None" 
+              || color_str == "null" || color_str == "unknown" 
+              || color_str == "unavailable" ) {
+            lv_obj_set_pos(id(color_palette_indicator), 0, 0);
+            lv_obj_set_style_bg_color(id(color_palette_indicator), lv_color_hex(0xFFFFFF), LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xECECEC), LV_PART_MAIN);
+            return;
+          }
+          int r, g, b;
+          // remove '(' and ')' in string, obtain r, g, b value
+          color_str.erase(std::remove(color_str.begin(), color_str.end(), '('), color_str.end());
+          color_str.erase(std::remove(color_str.begin(), color_str.end(), ')'), color_str.end());
+          sscanf(color_str.c_str(), "%d,%d,%d", &r, &g, &b);
+          lv_color_t update_color = lv_color_make(r, g, b);
+          lv_color_hsv_t hsv = lv_color_rgb_to_hsv(r, g, b);
+          int radius = 160;
+
+          float rad = hsv.h * M_PI / 180.0f;
+          float s = hsv.s / 100.0f;
+
+          int x = (int)(cosf(rad) * s * radius);
+          int y = (int)(sinf(rad) * s * radius);
+
+          lv_obj_set_pos(id(color_palette_indicator), x, y);
+          // Set the indicator's background color
+          lv_obj_set_style_bg_color(id(color_palette_indicator), update_color, LV_STATE_DEFAULT);
+          
+          // Give the slider proper color like in the Home Assistant
+          float brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+
+          // If it's too close to white, we use gray for subsititution
+          if (brightness > 235) {
+              lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xE1E1E1), LV_PART_INDICATOR);
+              lv_obj_set_style_bg_color(id(light_slider), lv_color_hex(0xF9F9F9), LV_PART_MAIN);
+          } else {
+            lv_obj_set_style_bg_color(id(light_slider), update_color, LV_PART_INDICATOR);
+            // a fade background
+            float factor = 0.85;
+            uint8_t bg_r = r + (255 - r) * factor;
+            uint8_t bg_g = g + (255 - g) * factor;
+            uint8_t bg_b = b + (255 - b) * factor;
+            lv_color_t bar_bg = lv_color_make(bg_r, bg_g, bg_b);
+            lv_obj_set_style_bg_color(id(light_slider), bar_bg, LV_PART_MAIN);
+          }
+
+          
+          id(light_r) = r;
+          id(light_g) = g;
+          id(light_b) = b;
+
+  - id: update_arc_color
+    parameters:
+      ac_mode_index: int
+    then:
+      - lambda: |-
+          switch ( ac_mode_index ) {
+            /* Heat/Cool */
+            case 0:
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xFAE19D), LV_PART_MAIN);
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xFAE19D), LV_PART_INDICATOR);
+              lv_obj_set_style_outline_color(id(ac_arc), lv_color_hex(0xF5C23B), LV_PART_KNOB);
+              break;
+            /* Heat */
+            case 1:
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xEBEBEB), LV_PART_MAIN);
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xEC7636), LV_PART_INDICATOR);
+              lv_obj_set_style_outline_color(id(ac_arc), lv_color_hex(0xEC7636), LV_PART_KNOB);
+              break;
+            /* Cool */
+            case 2:
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0x4C96EE), LV_PART_MAIN);
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xEBEBEB), LV_PART_INDICATOR);
+              lv_obj_set_style_outline_color(id(ac_arc), lv_color_hex(0x4C96EE), LV_PART_KNOB);
+              break;
+            /* Dry */
+            case 3:
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xF7CD98), LV_PART_MAIN);
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xF7CD98), LV_PART_INDICATOR);
+              lv_obj_set_style_outline_color(id(ac_arc), lv_color_hex(0xF09C31), LV_PART_KNOB);
+              break;
+            /* Fan */
+            case 4:
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xABDDE8), LV_PART_MAIN);
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xABDDE8), LV_PART_INDICATOR);
+              lv_obj_set_style_outline_color(id(ac_arc), lv_color_hex(0x58BAD2), LV_PART_KNOB);
+              break;
+            /* Off */
+            case 5:
+            /* fallthrough */
+            default:
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xEBEBEB), LV_PART_MAIN);
+              lv_obj_set_style_arc_color(id(ac_arc), lv_color_hex(0xEBEBEB), LV_PART_INDICATOR);
+              lv_obj_set_style_outline_color(id(ac_arc), lv_color_hex(0x9E9E9E), LV_PART_KNOB);
+              break;
+          }
+  # This script was used on dropdown widget
+  # to set ac state (ON/OFF/COOL/HEAT, etc)
+  - id: set_ac_state
+    parameters:
+      ac_mode_idx: int
+    then:
+      - homeassistant.action:
+          action: climate.set_hvac_mode
+          data:
+            entity_id: climate.unit_neo_hex_central_ac
+            hvac_mode: !lambda return id(hvac_state_table)[ac_mode_idx];
+  - id: set_ac_fan_mode
+    parameters:
+      ac_fan_mode_idx: int
+    then:
+      - homeassistant.action:
+          action: climate.set_fan_mode
+          data:
+            entity_id: climate.unit_neo_hex_central_ac
+            fan_mode: !lambda return id(fan_modes_table)[ac_fan_mode_idx];
+  # This script was used on spinbox/arc widget
+  # to set the temperature to climate entity
+  # it doesn't turn on/off, use the dropdown instead
+  - id: set_ac_temp
+    parameters:
+      temp_value: float
+    then:
+      - homeassistant.action:
+          action: climate.set_temperature
+          data:
+            entity_id: climate.unit_neo_hex_central_ac
+            temperature: !lambda return temp_value;
+
+

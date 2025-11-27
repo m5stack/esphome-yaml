@@ -1,0 +1,526 @@
+esphome:
+  name: tab5-ha-hmi
+  friendly_name: M5Stack Tab5 Home Assistant HMI
+  min_version: 2025.9.3
+
+esp32:
+  board: esp32-p4-evboard
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    advanced:
+      enable_idf_experimental_features: true
+
+packages:
+  remote_package_files:
+      url: https://github.com/m5stack/esphome-yaml/common
+      files: [tab5-globals.yaml, tab5-lvgl.yaml, tab5-scripts.yaml]
+      refresh: 1d
+
+external_components:
+  - source: github://pr#10511
+    components: [rx8130]
+    refresh: 1h
+
+esp32_hosted:
+  variant: esp32c6
+  active_high: true
+  clk_pin: GPIO12
+  cmd_pin: GPIO13
+  d0_pin: GPIO11
+  d1_pin: GPIO10
+  d2_pin: GPIO9
+  d3_pin: GPIO8
+  reset_pin: GPIO15
+  slot: 1
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+psram:
+  mode: hex
+  speed: 200MHz
+
+api:
+  on_client_connected: 
+    then:
+      - lvgl.widget.show: api_icon_label
+  on_client_disconnected: 
+    then:
+      - lvgl.widget.hide: api_icon_label
+
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  on_connect: 
+    then:
+      - lvgl.widget.show: wifi_icon_label
+  on_disconnect: 
+    then:
+      - lvgl.widget.hide: wifi_icon_label
+
+i2c:
+  - id: bsp_bus
+    sda: GPIO31
+    scl: GPIO32
+    frequency: 400kHz
+
+pi4ioe5v6408:
+  - id: pi4ioe1
+    address: 0x43
+    # 0: O - wifi_antenna_int_ext
+    # 1: O - speaker_enable
+    # 2: O - external_5v_power
+    # 3: NC
+    # 4: O - lcd reset
+    # 5: O - touch panel reset
+    # 6: O - camera reset
+    # 7: I - headphone detect
+  - id: pi4ioe2
+    address: 0x44
+    # 0: O - wifi_power
+    # 1: NC
+    # 2: NC
+    # 3: O - usb_5v_power
+    # 4: O - poweroff pulse
+    # 5: O - quick charge enable (inverted)
+    # 6: I - charging status
+    # 7: O - charge enable
+
+switch:
+  - platform: gpio
+    id: wifi_power
+    name: "WiFi Power"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 0
+    restore_mode: ALWAYS_ON
+  - platform: gpio
+    id: usb_5v_power
+    name: "USB Power"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 3
+  - platform: gpio
+    id: quick_charge
+    name: "Quick Charge"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 5
+      inverted: true
+  - platform: gpio
+    id: charge_enable
+    name: "Charge Enable"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 7
+
+  - platform: gpio
+    id: wifi_antenna_int_ext
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 0
+  - platform: gpio
+    id: speaker_enable
+    name: "Speaker Enable"
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 1
+    restore_mode: ALWAYS_ON
+  - platform: gpio
+    id: external_5v_power
+    name: "External 5V Power"
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 2
+
+binary_sensor:
+  - platform: gpio
+    id: charging
+    name: "Charging Status"
+    pin:
+      pi4ioe5v6408: pi4ioe2
+      number: 6
+      mode: INPUT_PULLDOWN
+
+  - platform: gpio
+    id: headphone_detect
+    name: "Headphone Detect"
+    pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 7
+
+select:
+# The DAC Output select needs to be manually 
+# (or with an automation) changed to `LINE1` for the onboard speaker
+  - platform: es8388
+    dac_output:
+      name: DAC Output
+    adc_input_mic:
+      name: ADC Input Mic
+
+  - platform: template
+    id: wifi_antenna_select
+    name: "WiFi Antenna"
+    options:
+      - "Internal"
+      - "External"
+    optimistic: true
+    on_value:
+      - if:
+          condition:
+            lambda: return i == 0;
+          then:
+            - switch.turn_off: wifi_antenna_int_ext
+          else:
+            - switch.turn_on: wifi_antenna_int_ext
+
+sensor:
+  - platform: ina226
+    address: 0x41
+    adc_averaging: 16
+    max_current: 8.192A
+    shunt_resistance: 0.005ohm
+    bus_voltage:
+      name: Battery Voltage
+    current:
+      name: Battery Current
+      # Positive means discharging
+      # Negative means charging
+  
+  - platform: homeassistant
+    id: cur_temp
+    entity_id: sensor.temperature
+    on_value:
+      - lvgl.label.update:
+          id: temp_label
+          text:
+            format: "%.1f °C"
+            args: [ 'x' ]
+  
+  - platform: homeassistant
+    id: cur_humi
+    entity_id: sensor.env_iv_kit_humidity
+    on_value:
+      - lvgl.label.update:
+          id: humi_label
+          text:
+            format: "%.1f %%"
+            args: [ 'x' ]
+
+  - platform: homeassistant
+    id: cur_co2
+    entity_id: sensor.env_iv_kit_co2_equivalent
+    on_value:
+      - lvgl.label.update:
+          id: co2_label
+          text:
+            format: "%.0f ppm"
+            args: [ 'x' ]
+
+  
+touchscreen:
+  - platform: gt911
+    interrupt_pin: GPIO23
+    update_interval: never
+    reset_pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 5
+    transform:
+      swap_xy: true
+      mirror_x: true
+    calibration:
+      x_min: 0
+      x_max: 1280
+      y_min: 0
+      y_max: 720
+    id: touch
+
+      
+esp_ldo:
+  - voltage: 2.5V
+    channel: 3
+
+display:
+  - platform: mipi_dsi
+    dimensions:
+      height: 1280
+      width: 720
+    model: M5Stack-Tab5
+    rotation: 270°
+    reset_pin:
+      pi4ioe5v6408: pi4ioe1
+      number: 4
+
+output:
+  - platform: ledc
+    pin: GPIO22
+    id: backlight_pwm
+    frequency: 1000Hz
+
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    name: "Display Backlight"
+    id: backlight
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 250ms
+
+i2s_audio:
+  - id: mic_bus
+    i2s_lrclk_pin: GPIO29
+    i2s_bclk_pin: GPIO27
+    i2s_mclk_pin: GPIO30
+
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    bits_per_sample: 16bit
+    sample_rate: 16000
+
+microphone:
+  - platform: i2s_audio
+    id: tab5_microphone
+    i2s_din_pin: GPIO28
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    adc_type: external
+
+audio_dac:
+  - platform: es8388
+    id: es8388_dac
+
+speaker:
+  - platform: i2s_audio
+    id: tab5_speaker
+    i2s_dout_pin: GPIO26
+    audio_dac: es8388_dac
+    dac_type: external
+    channel: mono
+    buffer_duration: 100ms
+    bits_per_sample: 16bit
+    sample_rate: 48000
+
+media_player:
+  - platform: speaker
+    name: tab5_media_player
+    id: speaker_player
+    announcement_pipeline:
+      speaker: tab5_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      then:
+        rx8130.write_time:
+  - platform: rx8130
+    id: rx8130_time
+    update_interval: never
+    on_time:
+      # Update once ready
+      - seconds: /3
+        then:
+          - lvgl.label.update:
+              id: time_label
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                return t.strftime("%H:%M").c_str();
+
+          - lvgl.label.update:
+              id: date_label
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                return t.strftime("%Y-%m-%d %a").c_str();
+
+text_sensor:
+  - platform: homeassistant
+    id: demo_light
+    entity_id: light.unit_neo_hex_unit_neohex
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: demo_light_btn
+            state:
+              checked: !lambda return x == "on";
+              disabled: !lambda return ( x == "unavailable" ) or ( x == "unknown" );
+        - lvgl.widget.update:
+            id: demo_light_click_area
+            clickable: !lambda return !((x == "unavailable") || (x == "unknown"));
+        - lvgl.label.update:
+            id: demo_light_label
+            text_color: !lambda |-
+              if ( x == "on" ) {
+                  return lv_color_hex(0xF5C23B);
+              } else {
+                  return lv_color_hex(0x9E9E9E);
+              }
+            text: !lambda |-
+                static char buf[10];
+                std::string icon;
+                if ( x == "on" ) {
+                    icon = "\U000F18DD";
+                } else {
+                    icon = "\U000F18DE";
+                }
+                snprintf(buf, sizeof(buf), "%s", icon.c_str());
+                return buf;
+        - lvgl.label.update:
+            id: demo_light_status
+            text: !lambda |-
+                static char buf[10];
+                std::string text;
+                if ( x == "on" ) {
+                    text = "ON";
+                } 
+                else if ( x == "unavailable" ||  x == "unknown" ) {
+                    text = "UNKNOWN";
+                }
+                else {
+                    text = "OFF";
+                }
+                snprintf(buf, sizeof(buf), "%s", text.c_str());
+                return buf;
+
+  - platform: homeassistant
+    id: demo_light_brightness
+    entity_id: light.unit_neo_hex_unit_neohex
+    attribute: brightness
+    on_value:
+      - lvgl.slider.update:
+          id: light_slider
+          value: !lambda |-
+            if (x.empty() || x == "None" || 
+                x == "null" || x == "unknown" 
+                || x == "unavailable") 
+                return 0;
+
+            return std::stoi(x);
+
+      - lvgl.label.update:
+          id: light_bright_label
+          text: !lambda |-
+            if ( x.empty() || x == "None" || x == "null" ) {
+                return std::string("off");
+            } 
+            else if ( x == "unknown" || x == "unavailable" ) {
+              return std::string("unavailable");
+            }
+            else {
+              int percent = std::stoi(x) * 100 / 255;
+              return std::to_string(percent) + " %";
+            }
+  
+  - platform: homeassistant
+    id: demo_light_color
+    entity_id: light.unit_neo_hex_unit_neohex
+    attribute: rgb_color
+    on_value:
+      - lambda: id(sync_ha_palette)->execute(x);
+
+  - platform: homeassistant
+    id: iqa_text_value
+    entity_id: sensor.env_iv_kit_bme68x_iaq_classification
+    on_value:
+      - lvgl.label.update:
+          id: iaq_label
+          text:
+            format: "%s"
+            args: [ 'x.c_str()' ]
+  
+  # AC Information
+  - platform: homeassistant
+    id: ac_state
+    entity_id: climate.unit_neo_hex_central_ac
+    on_value:
+      - lvgl.label.update:
+          id: ac_state_label
+          text:
+            format: "%s"
+            args: [ 'str_upper_case(x).c_str()' ]
+
+      - lvgl.label.update:
+          id: demo_ac_state
+          text:
+            format: "%s"
+            args: [ 'str_upper_case(x).c_str()' ]
+
+      - lambda: |-
+          if ( x.empty() || x == "None" || x == "unavailable" || x == "unknown" ) {
+              // disable some UI widgets
+              lv_obj_add_state(id(ac_container), LV_STATE_DISABLED);
+              lv_obj_add_state(id(temp_spin_down), LV_STATE_DISABLED);
+              lv_obj_clear_flag(id(temp_spin_down), LV_OBJ_FLAG_CLICKABLE);
+              lv_obj_add_state(id(temp_spin_up), LV_STATE_DISABLED);
+              lv_obj_clear_flag(id(temp_spin_up), LV_OBJ_FLAG_CLICKABLE);
+          } else {
+              // restore UI widgets
+              lv_obj_clear_state(id(ac_container), LV_STATE_DISABLED);
+              lv_obj_clear_state(id(temp_spin_down), LV_STATE_DISABLED);
+              lv_obj_add_flag(id(temp_spin_down), LV_OBJ_FLAG_CLICKABLE);
+              lv_obj_clear_state(id(temp_spin_up), LV_STATE_DISABLED);
+              lv_obj_add_flag(id(temp_spin_up), LV_OBJ_FLAG_CLICKABLE);
+          }
+      - lvgl.dropdown.update:
+          id: ac_mode_dd
+          selected_index: !lambda |-
+            int index = -1;
+            for (int i = 0; i < 6; i++) {
+              if (x == id(hvac_state_table)[i]) {
+                index = i;
+                break;
+              }
+            }
+            if ( index >= 0 ) return index;
+            else return 5; // Off
+      # Update arc colors
+      - lambda: |-
+          int index = -1;
+            for (int i = 0; i < 6; i++) {
+              if (x == id(hvac_state_table)[i]) {
+                index = i;
+                break;
+              }
+            }
+            if ( index >= 0 ) id(update_arc_color)->execute(index);
+            else id(update_arc_color)->execute(5);
+        
+  - platform: homeassistant
+    id: ac_fan_mode
+    entity_id: climate.unit_neo_hex_central_ac
+    attribute: fan_mode
+    on_value:
+      - lvgl.label.update:
+          id: ac_fan_mode_label
+          text:
+            format: "%s"
+            args: [ 'str_upper_case(x).c_str()' ]
+      - lvgl.dropdown.update:
+          id: fan_mode_dd
+          selected_index: !lambda |-
+            int index = -1;
+            for (int i = 0; i < 4; i++) {
+              if (x == id(fan_modes_table)[i]) {
+                index = i;
+                break;
+              }
+            }
+            if ( index >= 0 ) return index;
+            else return 3; // Auto
+  
+  - platform: homeassistant
+    id: ac_temp
+    entity_id: climate.unit_neo_hex_central_ac
+    attribute: temperature
+    on_value:
+      - lvgl.spinbox.update:
+          id: temp_spin_box
+          value: !lambda |-
+            return std::stof(x) * 10;
