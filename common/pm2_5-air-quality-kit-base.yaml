@@ -43,21 +43,27 @@ uart:
 
 binary_sensor:
   - platform: gpio
-    pin: GPIO39
+    pin: 
+      number: GPIO39
+      inverted: true
     name: "Button A"
     on_press:
       then:
         - lvgl.page.previous
 
   - platform: gpio
-    pin: GPIO38
+    pin: 
+      number: GPIO38
+      inverted: true
     name: "Button B"
     on_press:
       then:
         - lvgl.page.show: main_page
         
   - platform: gpio
-    pin: GPIO37
+    pin: 
+      number: GPIO37
+      inverted: true
     name: "Button C"
     on_press:
       then:

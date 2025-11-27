@@ -76,10 +76,13 @@ binary_sensor:
       - component.update: epaper_disp
 
   - platform: gpio
-    pin: GPIO42
+    pin: 
+      number: GPIO42
+      inverted: true
     name: "WAKE"
-  
-  - platform: gpio
+
+output:
+  - platform: ledc
     id: buzzer
     pin: GPIO9
     name: "BEEP"
