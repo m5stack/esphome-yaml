@@ -25,6 +25,8 @@ As of now the below devices/functionalities are supported:
 - [PM2.5 Air Quality Kit-SHT30](https://docs.m5stack.com/en/homeassistant/kit/pm2_5_air_quality_kit_sht30)
 - [Unit PoE CAM-W v1.1](https://docs.m5stack.com/en/homeassistant/kit/unit_poe_cam_w_v1.1)
 
+- [Tab5 Home Assistant HMI](https://docs.m5stack.com/en/homeassistant/kit/tab5_ha_hmi)
+
 [More](https://docs.m5stack.com/en/homeassistant/overview)
 
 ## ❤️ Feature Request & Contributing
