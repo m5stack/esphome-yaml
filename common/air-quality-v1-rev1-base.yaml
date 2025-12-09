@@ -53,6 +53,11 @@ output:
       inverted: true
     id: hold
   
+  - platform: ledc
+    id: buzzer
+    pin: GPIO9
+    name: "BEEP"
+  
 binary_sensor:
   - platform: gpio
     pin:
@@ -81,12 +86,6 @@ binary_sensor:
       inverted: true
     name: "WAKE"
 
-output:
-  - platform: ledc
-    id: buzzer
-    pin: GPIO9
-    name: "BEEP"
-  
 time:
   - platform: pcf8563
     id: rtc_time
