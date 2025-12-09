@@ -56,7 +56,6 @@ output:
   - platform: ledc
     id: buzzer
     pin: GPIO9
-    name: "BEEP"
   
 binary_sensor:
   - platform: gpio
