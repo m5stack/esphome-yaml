@@ -53,6 +53,16 @@ output:
       inverted: true
     id: hold
   
+  - platform: ledc
+    id: buzzer
+    pin: GPIO9
+
+switch:
+  - platform: output
+    name: "BEEP"
+    id: beep_switch
+    output: buzzer
+
 binary_sensor:
   - platform: gpio
     pin:
@@ -81,12 +91,6 @@ binary_sensor:
       inverted: true
     name: "WAKE"
 
-output:
-  - platform: ledc
-    id: buzzer
-    pin: GPIO9
-    name: "BEEP"
-  
 time:
   - platform: pcf8563
     id: rtc_time
@@ -259,6 +263,6 @@ display:
           it.printf(10, 65, id(extra_icon), "%s", id(airq_api).is_connected() ? "\U000F109B" : "\U000F109B");
           it.printf(40, 65, id(montserrat), "%s", id(airq_api).is_connected() ? "Connected" : "Not connected");
           it.print(10, 95, id(extra_icon), "\U000F00E6");
-          it.printf(40, 95, id(montserrat), "%s", id(buzzer).state ? "ON" : "OFF");
+          it.printf(40, 95, id(montserrat), "%s", id(beep_switch).state ? "ON" : "OFF");
           it.print(8, 128, id(extra_icon), "\U000F0079");
           it.printf(40, 128, id(montserrat), "%.2f V", id(battery).state);
