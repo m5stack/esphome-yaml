@@ -9,3 +9,5 @@ __pycache__/
 .esphome
 
 secrets.yaml
+# some todo files
+TODO
