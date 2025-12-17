@@ -8,7 +8,6 @@ namespace esphome {
 namespace powerhub {
 
 class USBModeSelect : public select::Select,
-                       public Component,
                        public Parented<PowerHub>
 {
 
