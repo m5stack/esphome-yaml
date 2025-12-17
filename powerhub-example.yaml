@@ -1,0 +1,209 @@
+esphome:
+  name: powerhub
+  friendly_name: M5Stack PowerHub
+  min_version: 2025.5.0
+  on_boot:
+    then:
+      # read the RTC time once when the system boots
+      powerhub.read_time:
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "powerhub"
+    password: ""
+
+api:
+  encryption:
+    # Replace the key by your API key
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    # Replace the key by your OTA key
+    password: !secret ota_passwd
+
+i2c:
+  sda: GPIO45
+  scl: GPIO48
+
+
+uart:
+  - id: rs485_bus
+    tx_pin: GPIO8
+    rx_pin: GPIO17
+    baud_rate: 115200
+  - id: can_bus
+    tx_pin: GPIO39
+    rx_pin: GPIO40
+    baud_rate: 115200
+
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: powerhub
+    refresh: 0s
+
+powerhub:
+
+
+time:
+  - platform: powerhub
+    # repeated synchronization is not necessary unless the external RTC
+    # is much more accurate than the internal clock
+    update_interval: never
+  
+  - platform: homeassistant
+    # instead try to synchronize via network repeatedly ...
+    on_time_sync:
+      then:
+        # ... and update the RTC when the synchronization was successful
+        powerhub.write_time:
+
+binary_sensor:
+  - platform: gpio
+    name: "USER Button"
+    id: usr_sw2_binary_sensor
+    pin:
+      number: GPIO11
+      inverted: true
+  - platform: powerhub
+    button: 
+      name: "Top PMU Button"
+
+text_sensor:
+  - platform: powerhub
+    charge_status:
+      name: "Battery Charge Status"
+      id: bat_charge_status_text_sensor
+    vin_status:
+      name: "External Input Power Status"
+      id: ext_vin_status_text_sensor
+    firmware_ver:
+      name: "Internal Firmware Version"
+      id: int_firm_ver_text_sensor
+    bootloader_ver:
+      name: "Bootloader Version"
+      id: boot_ver_text_sensor
+  
+  - platform: version
+    name: "ESPHome Version"
+
+sensor:
+  - platform: powerhub
+    battery_voltage:
+      name: "Battery Voltage"
+      id: bat_volt_sensor
+    battery_current:
+      name: "Battery Current"
+      id: bat_curr_sensor
+    battery_level:
+      name: "Battery Percentage"
+      id: bat_level_sensor
+    grove_red_voltage:
+      name: "Port.A Voltage"
+      id: grove_red_volt_sensor
+    grove_red_current:
+      name: "Port.A Current"
+      id: grove_red_curr_sensor
+    grove_blue_voltage:
+      name: "Port.C Voltage"
+      id: grove_blue_volt_sensor
+    grove_blue_current:
+      name: "Port.C Current"
+      id: grove_blue_curr_sensor
+    can_voltage:
+      name: "CAN Voltage"
+      id: can_volt_sensor
+    can_current:
+      name: "CAN Current"
+      id: can_curr_sensor
+    rs485_voltage:
+      name: "RS485 Voltage"
+      id: rs485_volt_sensor
+    rs485_current:
+      name: "RS485 Current"
+      id: rs485_curr_sensor
+    usb_voltage:
+      name: "USB Voltage"
+      id: usb_volt_sensor
+    usb_current:
+      name: "USB  Current"
+      id: usb_curr_sensor
+
+
+switch:
+  - platform: powerhub
+    led_pwr:
+      name: "LED Power"
+      id: led_pwr_switch
+    usb_pwr:
+      name: "USB Power"
+      id: usb_pwr_switch
+    grove_red_pwr:
+      name: "Port.A Power"
+      id: grove_red_pwr_switch
+    grove_blue_pwr:
+      name: "Port.C Power"
+      id: grove_blue_pwr_switch
+    rs485_can_pwr:
+      name: "RS485&CAN Power"
+      id: rs485_can_pwr_switch
+    vameter_pwr:
+      name: "VAMeter Power"
+      id: vameter_pwr_switch
+    charge_pwr:
+      name: "Charge Power"
+      id: charge_pwr_switch
+    rs485_can_direction:
+      name: "RS485&CAN Power Output"
+      id: rs485_can_direction_switch
+
+
+select:
+  - platform: powerhub
+    usb_mode:
+      name: "USB Mode"
+      id: usb_mode_select
+
+number:
+  - platform: powerhub
+    rs485_can_output_voltage:
+      name: "RS485&CAN Output Voltage"
+    rs485_can_current_limit:
+      name: "RS485&CAN Output Current Limit"
+
+light:
+  - platform: powerhub
+    usb_c_rgb:
+      name: "USB C Light"
+    usb_a_rgb:
+      name: "USB A Light"
+    grove_blue_rgb:
+      name: "Port.C Light"
+    grove_red_rgb:
+      name: "Port.A Light"
+    rs485_can_rgb:
+      name: "RS485&CAN Light"
+    bat_charge_rgb:
+      name: "Battery Charge Light"
+    pwr_l_rgb:
+      name: "Power L Light"
+    pwr_r_rgb:
+      name: "Power R Light"
