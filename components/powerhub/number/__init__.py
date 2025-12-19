@@ -19,8 +19,8 @@ CONF_RS485_CAN_OUTPUT_VOLTAGE = "rs485_can_output_voltage"
 CONF_RS485_CAN_CURRENT_LIMIT  = "rs485_can_current_limit"
 
 
-RS485CANVoltageNumber = powerhub_ns.class_("RS485CANOutputVoltageNumber", number.Number)
-RS485CANCurrentNumber = powerhub_ns.class_("RS485CANOutputCurrentNumber", number.Number)
+RS485CANVoltageNumber = powerhub_ns.class_("RS485CANOutputVoltageNumber", number.Number, cg.Component)
+RS485CANCurrentNumber = powerhub_ns.class_("RS485CANOutputCurrentNumber", number.Number, cg.Component)
 
 ICON_CURRENT_DC = "mdi:current-dc"
 
@@ -48,24 +48,25 @@ async def to_code(config):
     
     powerhub = await cg.get_variable(config[CONF_POWER_HUB_ID])
 
-    if CONF_RS485_CAN_OUTPUT_VOLTAGE in config:
+    if rs485_can_output_voltage_conf := config.get(CONF_RS485_CAN_OUTPUT_VOLTAGE):
         var = await number.new_number(
-            config[CONF_RS485_CAN_OUTPUT_VOLTAGE],
+            rs485_can_output_voltage_conf,
             min_value=3000.0,
             max_value=20000.0,
             step=20.0
         )
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
+        await cg.register_component(var, rs485_can_output_voltage_conf)
+        await cg.register_parented(var, powerhub)
         cg.add(powerhub.set_rs485_can_output_voltage_number(var))
-        cg.add(var.publish_state(3000.0))
-    
-    if CONF_RS485_CAN_CURRENT_LIMIT in config:
+
+    if rs485_can_current_limit_conf := config.get(CONF_RS485_CAN_CURRENT_LIMIT):
         var = await number.new_number(
-            config[CONF_RS485_CAN_CURRENT_LIMIT],
+            rs485_can_current_limit_conf,
             min_value=13.0,
             max_value=3000.0,
-            step=20.0
+            step=13.0
         )
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
+        await cg.register_component(var, rs485_can_current_limit_conf)
+        await cg.register_parented(var, powerhub)
         cg.add(powerhub.set_rs485_can_current_limit_number(var))
-        cg.add(var.publish_state(13.0))
+    

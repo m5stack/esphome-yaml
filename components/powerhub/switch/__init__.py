@@ -33,23 +33,23 @@ ICON_EXPORT = "mdi:export"
 ICON_BED_CLOCK = "mdi:bed-clock"
 
 # power channel
-LEDSwitch = powerhub_ns.class_("LEDSwitch", switch.Switch)
-USBSwitch = powerhub_ns.class_("USBSwitch", switch.Switch)
-GroveRedSwitch = powerhub_ns.class_("GroveRedSwitch", switch.Switch)
-GroveBlueSwitch = powerhub_ns.class_("GroveBlueSwitch", switch.Switch)
-RS485CANSwitch = powerhub_ns.class_("RS485CANSwitch", switch.Switch)
-VAmeterSwitch = powerhub_ns.class_("VAMeterSwitch", switch.Switch)
-ChargeSwitch = powerhub_ns.class_("ChargeSwitch", switch.Switch)
+LEDSwitch = powerhub_ns.class_("LEDSwitch", cg.Component, switch.Switch)
+USBSwitch = powerhub_ns.class_("USBSwitch", switch.Switch, cg.Component)
+GroveRedSwitch = powerhub_ns.class_("GroveRedSwitch", switch.Switch, cg.Component)
+GroveBlueSwitch = powerhub_ns.class_("GroveBlueSwitch", switch.Switch, cg.Component)
+RS485CANSwitch = powerhub_ns.class_("RS485CANSwitch", switch.Switch, cg.Component)
+VAmeterSwitch = powerhub_ns.class_("VAMeterSwitch", switch.Switch, cg.Component)
+ChargeSwitch = powerhub_ns.class_("ChargeSwitch", switch.Switch, cg.Component)
 
 # RS485 CAN interface power direction control
 # ON:  RS485 / CAN interface will power the external device
 # OFF: RS485 / CAN interface won't power the external device
-DirectionSwitch = powerhub_ns.class_("DirectionSwitch", switch.Switch)
+DirectionSwitch = powerhub_ns.class_("DirectionSwitch", switch.Switch, cg.Component)
 
 # wake up source
-RTCWakeUpSwitch = powerhub_ns.class_("RTCWakeUpSwitch", switch.Switch)
-VINWakeUpSwitch = powerhub_ns.class_("VINWakeUpSwitch", switch.Switch)
-VUSBWakeUpSwitch = powerhub_ns.class_("VUSBWakeUpSwitch", switch.Switch)
+RTCWakeUpSwitch = powerhub_ns.class_("RTCWakeUpSwitch", switch.Switch, cg.Component)
+VINWakeUpSwitch = powerhub_ns.class_("VINWakeUpSwitch", switch.Switch, cg.Component)
+VUSBWakeUpSwitch = powerhub_ns.class_("VUSBWakeUpSwitch", switch.Switch, cg.Component)
 
 
 CONFIG_SCHEMA = cv.Schema(
@@ -58,7 +58,7 @@ CONFIG_SCHEMA = cv.Schema(
             LEDSwitch,
             device_class=DEVICE_CLASS_SWITCH,
             icon=ICON_POWER,
-            default_restore_mode="RESTORE_DEFAULT_OFF"
+            default_restore_mode="RESTORE_DEFAULT_ON"
         ),
         cv.Optional(CONF_USB_PWR): switch.switch_schema(
             USBSwitch,
@@ -111,49 +111,18 @@ async def to_code(config):
 
     powerhub = await cg.get_variable(config[CONF_POWER_HUB_ID])
 
-    if CONF_LED_PWR in config:
-        var = await switch.new_switch(config[CONF_LED_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_led_pwr_switch(var))
-        cg.add(var.publish_state(True))
-
-    if CONF_USB_PWR in config:
-        var = await switch.new_switch(config[CONF_USB_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_usb_pwr_switch(var))
-
-    if CONF_GROVE_RED_PWR in config:
-        var = await switch.new_switch(config[CONF_GROVE_RED_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_grove_red_pwr_switch(var))
-
-    if CONF_GROVE_BLUE_PWR in config:
-        var = await switch.new_switch(config[CONF_GROVE_BLUE_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_grove_blue_pwr_switch(var))
-
-    if CONF_RS485_CAN_PWR in config:
-        var = await switch.new_switch(config[CONF_RS485_CAN_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_rs485_can_pwr_switch(var))
-
-    if CONF_VAMETER_PWR in config:
-        var = await switch.new_switch(config[CONF_VAMETER_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_vameter_pwr_switch(var))
-        cg.add(var.publish_state(True))
-
-    if CONF_CHARGE_PWR in config:
-        var = await switch.new_switch(config[CONF_CHARGE_PWR])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_charge_pwr_switch(var))
-        cg.add(var.publish_state(True))
-
-    if CONF_RS485_CAN_DIRECTION in config:
-        var = await switch.new_switch(config[CONF_RS485_CAN_DIRECTION])
-        await cg.register_parented(var, config[CONF_POWER_HUB_ID])
-        cg.add(powerhub.set_rs485_can_direction_switch(var))
-        
-
-
-
+    for switch_type in [
+        CONF_LED_PWR, 
+        CONF_USB_PWR, 
+        CONF_GROVE_RED_PWR, 
+        CONF_GROVE_BLUE_PWR, 
+        CONF_RS485_CAN_PWR, 
+        CONF_VAMETER_PWR, 
+        CONF_CHARGE_PWR,
+        CONF_RS485_CAN_DIRECTION
+    ]:
+        if conf := config.get(switch_type):
+            var = await switch.new_switch(conf)
+            await cg.register_component(var, conf)
+            await cg.register_parented(var, powerhub)
+            cg.add(getattr(powerhub, f"set_{switch_type}_switch")(var))
