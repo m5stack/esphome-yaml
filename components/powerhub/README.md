@@ -336,9 +336,13 @@ sensor:
         - lambda: |-
             auto call_1 = id(led_pwr_l).turn_on();
             auto call_2 = id(led_pwr_r).turn_on();
+            auto call_off_1 = id(led_pwr_l).turn_off();
+            auto call_off_2 = id(led_pwr_r).turn_off();
             call_1.set_transition_length(1000);
-            call_1.set_color_mode(ColorMode::RGB);
             call_2.set_transition_length(1000);
+            call_off_1.set_transition_length(1000);
+            call_off_2.set_transition_length(1000);
+            call_1.set_color_mode(ColorMode::RGB);
             call_2.set_color_mode(ColorMode::RGB);
             // if read battery level is unknown
             // set the LED color to white
@@ -351,12 +355,6 @@ sensor:
               call_2.perform();
               return;
             }
-            // avoid frequent changes
-            // store the value and compare
-            // only changes led when values are not equal
-            static float last_level = 0.0f;
-            if ( last_level == x ) return; 
-            last_level = x;
 
             if ( x > 80.0f && x <= 100.0f ) {
                 call_1.set_rgb(0, 1.0, 0);
@@ -373,19 +371,18 @@ sensor:
                 call_1.perform();
                 call_2.perform();
             } else if ( x > 20.0f && x <= 50.0f ) {
-                id(led_pwr_r).turn_off();
                 call_1.set_rgb(1.0, 0.95, 0.19); // left only one LED on with YELLOW color suggest low power
-                call_1.set_brightness(1.0);
                 call_1.perform();
+                call_off_2.perform();
             } else if ( x > 5.0f && x <= 20.0f ){
-                id(led_pwr_r).turn_off();
                 call_1.set_rgb(1.0, 0.43, 0.32); // left only one LED on with RED color suggest extremely low power
-                call_1.set_brightness(0.8);
                 call_1.perform();
+                call_off_2.perform();
             } else {
-                // empty battery, turn off the light
-                id(led_pwr_l).turn_off(); 
-                id(led_pwr_r).turn_off();
+                call_1.set_rgb(1.0, 0.43, 0.32);
+                call_1.set_brightness(0.8); // almost empty
+                call_1.perform();
+                call_off_2.perform();
             }
     ...
 ```

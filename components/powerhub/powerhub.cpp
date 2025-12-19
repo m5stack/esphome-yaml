@@ -467,8 +467,8 @@ float PowerHub::calc_battery_level() {
     }
 
     // read voltage lower than 't_volt'
-    if ( voltage < t_volt + 1e-6f) {
-        return NAN;
+    if ( voltage < t_volt + 1e-6f && current != 0) {
+        return 0;
     }
 
     // Apply min-max normalization
