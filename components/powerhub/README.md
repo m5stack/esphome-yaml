@@ -21,7 +21,7 @@ The [I2C](https://esphome.io/components/i2c/) is required to configure the devic
 powerhub:
 ```
 
-### Configuration variables variables
+### Configuration variables
 
 - **id** (*Optional*, [ID](/guides/configuration-types#id)): Specify an ID for PowerHub component.
 - **update_interval** (*Optional*, [Time](/guides/configuration-types#time)): The interval to check the sensor. Set to never to disable updates. Defaults to `10s`.
@@ -88,9 +88,10 @@ sensor:
       name: "USB Voltage"
       id: usb_volt_sensor
     usb_current:
-      name: "USB  Current"
+      name: "USB Current"
       id: usb_curr_sensor
 ```
+
 ### Configuration variables
 
 - **battery_voltage** (*Optional*): The voltage of the battery. 
@@ -120,6 +121,12 @@ sensor:
 - **usb_current** (*Optional*): The current of USB interface. 
   All options from [Sensor](/components/sensor)
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
+
+
+> [!NOTE]
+> Consider these readings valid only when:
+> - `VAMeter Power` switch and corresponding power channel switch are enabled
+> - The corresponding load has been connected (like a battery, a USB device etc).
 
 ## Text Sensor
 
@@ -293,6 +300,213 @@ light:
 - **pwr_r_rgb** (*Optional*): Turn on/off RGB LED for right power indicator. This LED is located inside the right half of the Top PMU button (rectangular shape).
   All other options from [Light](/components/light#config-light).
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
+
+
+The RGB LED is designed to conveniently indicate the power status of each channel, with the readings of Sensors, you can update your Light component accordingly. 
+
+For an example, turn on the LEDs inside the Top PMU button when boot:
+
+```yaml
+esphome:
+  ...
+  on_boot:
+    then:
+      # Turn on the power (L/R) light
+      # default color is white
+      - light.turn_on:
+          id: led_pwr_l
+          brightness: 100%
+
+      - light.turn_on:
+          id: led_pwr_r
+          brightness: 100%
+```
+
+
+Update the PMU LEDs when battery level changed:
+
+```yaml
+sensor:
+  - platform: powerhub
+    ...
+    battery_level:
+      name: "Battery Percentage"
+      id: bat_level_sensor
+      on_value:
+        - lambda: |-
+            auto call_1 = id(led_pwr_l).turn_on();
+            auto call_2 = id(led_pwr_r).turn_on();
+            call_1.set_transition_length(1000);
+            call_1.set_color_mode(ColorMode::RGB);
+            call_2.set_transition_length(1000);
+            call_1.set_color_mode(ColorMode::RGB);
+            // if read battery level is unknown
+            // set the LED color to white
+            if ( x == NAN ) {
+              call_1.set_rgb(1.0, 1.0, 1.0);
+              call_2.set_rgb(1.0, 1.0, 1.0);
+              call_1.set_brightness(1.0);
+              call_2.set_brightness(1.0);
+              call_1.perform();
+              call_2.perform();
+            }
+            // avoid frequent changes
+            // store the value and compare
+            // only changes led when values are not equal
+            static float last_level = 0.0f;
+            if ( last_level == x ) return; 
+            last_level = x;
+
+            if ( x >= 80.0f && x < 100.0f ) {
+                call_1.set_rgb(0, 1.0, 0);
+                call_2.set_rgb(0, 1.0, 0);
+                call_1.set_brightness(1.0);
+                call_2.set_brightness(1.0);
+                call_1.perform();
+                call_2.perform();
+            } else if ( x > 50.0f && x < 80.0f ) {
+                call_1.set_rgb(0, 1.0, 0);
+                call_2.set_rgb(0, 1.0, 0);
+                call_1.set_brightness(1.0);
+                call_2.set_brightness(0.8);
+                call_1.perform();
+                call_2.perform();
+            } else if ( x <= 50.0f ) {
+                id(led_pwr_r).turn_off();  // turn off a LED when battery is lower than 50%
+            } else if ( x >= 20.0f && x < 50.0f ) {
+                call_1.set_rgb(1.0, 0.95, 0.19); // left only one LED on with YELLOW color suggest low power
+                call_1.perform();
+            } else if ( x >= 1.0f && x < 20.0f ){
+                call_1.set_rgb(1.0, 0.43, 0.32); // left only one LED on with RED color suggest extremely low power
+                call_1.perform();
+            } else {
+                id(led_pwr_l).turn_off(); // empty battery, turn off the light
+            }
+    ...
+```
+
+
+or turn on/off the corresponding LEDs when turn on/off the power switches.
+
+```yaml
+switch:
+  - platform: powerhub
+    ...
+    usb_pwr:
+      name: "USB Power"
+      id: usb_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_usb_a
+            brightness: 90%
+            # Color maybe
+            # red: 100%
+            # green: 100%
+            # blue: 100%
+        - light.turn_on:
+            id: led_usb_c
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_usb_a
+        - light.turn_off:
+            id: led_usb_c
+
+    grove_red_pwr:
+      name: "Port.A Power"
+      id: grove_red_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_grove_red
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_grove_red
+
+    grove_blue_pwr:
+      name: "Port.C Power"
+      id: grove_blue_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_grove_blue
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_grove_blue
+
+    rs485_can_pwr:
+      name: "RS485&CAN Power"
+      id: rs485_can_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_rs485_can
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_rs485_can
+
+    charge_pwr:
+      name: "Charge Power"
+      id: charge_pwr_switch
+      restore_mode: RESTORE_DEFAULT_ON
+      on_turn_on:
+        - light.turn_on:
+            id: led_bat_charge
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_bat_charge
+    ...
+```
+
+You can also add some special effects to the light, for an example, when battery is charging we use a `pulse` effect to indicate:
+
+```yaml
+light:
+  - platform: powerhub
+    ...
+    bat_charge_rgb:
+      id: led_bat_charge
+      name: "Battery Charge Light"
+      effects:
+        - pulse:
+            name: "Slow Pulse"
+            transition_length: 500ms
+            update_interval: 2s
+    ...
+```
+
+```yaml
+text_sensor:
+  - platform: powerhub
+    charge_status:
+      name: "Battery Charge Status"
+      id: bat_charge_status_text_sensor
+      on_value:
+        - lambda: |-
+            static std::string last_state = "";
+            if (last_state == x) return; 
+            last_state = x;
+
+            auto call = id(led_bat_charge).turn_on();
+            call.set_brightness(0.9);
+            call.set_color_mode(ColorMode::RGB);
+
+            if (x == "Charging") {
+              // Pulse green
+              call.set_rgb(0, 1.0, 0);
+              call.set_effect("Slow Pulse");
+            } else if (x == "Discharging") {
+              // Solid green
+              call.set_rgb(0, 1.0, 0);
+              call.set_effect("None");
+            } else {
+              // Solid white
+              call.set_rgb(1.0, 1.0, 1.0);
+              call.set_effect("None");
+            }
+            call.perform();
+```
 
 
 ## Time
