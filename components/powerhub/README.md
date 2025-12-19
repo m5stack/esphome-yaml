@@ -13,7 +13,7 @@ PowerHub is a programmable controller integrating multi-channel power management
 The [I2C](https://esphome.io/components/i2c/) is required to configure the device. 
 
 - The device offered a RS485 and CAN interface, if you wish to use RS485 and CAN interface, additional configurations for components like [Modbus Controller](https://esphome.io/components/modbus_controller/) and [CAN Bus](https://esphome.io/components/canbus/#sidebar) are required.
-- You can set the set the USB mode for USB Type A or USB Type C on the device, if you wish to operate the USB interfaces for communications, [USB Host Interface](https://esphome.io/components/usb_host/) and [TinyUSB](https://esphome.io/components/tinyusb/) may required.
+- You can set the USB mode for USB Type A or USB Type C on the device, if you wish to operate the USB interfaces for communications, [USB Host Interface](https://esphome.io/components/usb_host/) and [TinyUSB](https://esphome.io/components/tinyusb/) may required.
 
 
 ```yaml
@@ -251,7 +251,7 @@ number:
 - **rs485_can_output_voltage** (*Optional*): Set the output voltage of the RS485 & CAN interface. Defaults to `3000` mV.
   The switch `rs485_can_direction` needs to be enabled for this to take effect.
   All options from [Number](/components/number#config-number).
-- **rs485_can_current_limit** (*Optional*): Set the output current limit of the RS485 & CAN interface. Defaults to `12` mA. 
+- **rs485_can_current_limit** (*Optional*): Set the output current limit of the RS485 & CAN interface. Defaults to `13` mA. 
   The switch `rs485_can_direction` needs to be enabled for this to take effect.
   All options from [Number](/components/number#config-number).
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
@@ -339,16 +339,17 @@ sensor:
             call_1.set_transition_length(1000);
             call_1.set_color_mode(ColorMode::RGB);
             call_2.set_transition_length(1000);
-            call_1.set_color_mode(ColorMode::RGB);
+            call_2.set_color_mode(ColorMode::RGB);
             // if read battery level is unknown
             // set the LED color to white
-            if ( x == NAN ) {
+            if ( std::isnan(x) ) {
               call_1.set_rgb(1.0, 1.0, 1.0);
               call_2.set_rgb(1.0, 1.0, 1.0);
               call_1.set_brightness(1.0);
               call_2.set_brightness(1.0);
               call_1.perform();
               call_2.perform();
+              return;
             }
             // avoid frequent changes
             // store the value and compare
@@ -357,30 +358,34 @@ sensor:
             if ( last_level == x ) return; 
             last_level = x;
 
-            if ( x >= 80.0f && x < 100.0f ) {
+            if ( x > 80.0f && x <= 100.0f ) {
                 call_1.set_rgb(0, 1.0, 0);
                 call_2.set_rgb(0, 1.0, 0);
                 call_1.set_brightness(1.0);
                 call_2.set_brightness(1.0);
                 call_1.perform();
                 call_2.perform();
-            } else if ( x > 50.0f && x < 80.0f ) {
+            } else if ( x > 50.0f && x <= 80.0f ) {
                 call_1.set_rgb(0, 1.0, 0);
                 call_2.set_rgb(0, 1.0, 0);
                 call_1.set_brightness(1.0);
                 call_2.set_brightness(0.8);
                 call_1.perform();
                 call_2.perform();
-            } else if ( x <= 50.0f ) {
-                id(led_pwr_r).turn_off();  // turn off a LED when battery is lower than 50%
-            } else if ( x >= 20.0f && x < 50.0f ) {
+            } else if ( x > 20.0f && x <= 50.0f ) {
+                id(led_pwr_r).turn_off();
                 call_1.set_rgb(1.0, 0.95, 0.19); // left only one LED on with YELLOW color suggest low power
+                call_1.set_brightness(1.0);
                 call_1.perform();
-            } else if ( x >= 1.0f && x < 20.0f ){
+            } else if ( x > 5.0f && x <= 20.0f ){
+                id(led_pwr_r).turn_off();
                 call_1.set_rgb(1.0, 0.43, 0.32); // left only one LED on with RED color suggest extremely low power
+                call_1.set_brightness(0.8);
                 call_1.perform();
             } else {
-                id(led_pwr_l).turn_off(); // empty battery, turn off the light
+                // empty battery, turn off the light
+                id(led_pwr_l).turn_off(); 
+                id(led_pwr_r).turn_off();
             }
     ...
 ```
