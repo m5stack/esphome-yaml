@@ -163,12 +163,6 @@ sensor:
               call_2.perform();
               return;
             }
-            // avoid frequent changes
-            // store the value and compare
-            // only changes led when values are not equal
-            static float last_level = 0.0f;
-            if ( last_level == x ) return; 
-            last_level = x;
 
             if ( x > 80.0f && x <= 100.0f ) {
                 call_1.set_rgb(0, 1.0, 0);
@@ -195,8 +189,9 @@ sensor:
                 call_1.perform();
                 call_off_2.perform();
             } else {
-                // empty battery, turn off the light
-                call_off_1.perform();
+                call_1.set_rgb(1.0, 0.43, 0.32);
+                call_1.set_brightness(0.8); // almost empty
+                call_1.perform();
                 call_off_2.perform();
             }
 
