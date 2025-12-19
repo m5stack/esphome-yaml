@@ -1,7 +1,8 @@
 // Copyright (c) M5Stack. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 // Original register reference:
-// https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1183/PwoerHub-STM32-Protocol-CN-V1.0-20251024.pdf
+// https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1183/PowerHub-STM32-Protocol-CN-V1.0-20251024.pdf
+// https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1183/PowerHub_Register-Table-V2.pdf
 
 #pragma once
 #include "esphome/core/defines.h"
@@ -72,6 +73,33 @@ typedef struct RTC_Alarm {
     uint8_t alarm_hour;
     uint8_t alarm_day;
 } RTC_Alarm_t;
+
+typedef struct Raw_Power {
+    uint16_t bat_volt;
+    int16_t  bat_curr;
+
+    uint16_t can_volt;
+    int16_t  can_curr;
+
+    uint16_t rs485_volt;
+    int16_t  rs485_curr;
+
+    uint16_t usb_volt;
+    int16_t  usb_curr;
+
+    uint16_t grove_red_volt;
+    int16_t  grove_red_curr;
+
+    uint16_t grove_blue_volt;
+    int16_t  grove_blue_curr;
+
+} Raw_Power_t;
+
+typedef struct Channel_Sample {
+    uint16_t voltage{0};
+    int16_t  current{0};
+} Channel_Sample_t;
+
 
 class PowerHub :  public PollingComponent, public i2c::I2CDevice {
 
@@ -162,23 +190,19 @@ public:
     void set_rs485_can_pwr_direction(bool direction);
 
     // INA266 VAMeters
-    uint16_t read_battery_voltage();
-    int16_t read_battery_current();
+    void read_power_channel();
+    void update_vameter_sensor();
+
     float calc_battery_level();
-    uint16_t read_pwr_can_voltage();
-    int16_t read_pwr_can_current();
-    uint16_t read_pwr_485_voltage();
-    int16_t read_pwr_485_current();
-    uint16_t read_usb_voltage();
-    int16_t read_usb_current();
-    uint16_t read_grove_red_voltage();
-    int16_t read_grove_red_current();
-    uint16_t read_grove_blue_voltage();
-    int16_t read_grove_blue_current();
 
     // Status detect
     uint8_t read_charge_status();
     uint8_t read_vin_status();
+
+    // text sensor values used to indicate
+    // if the battery is charging and
+    // external input power is connected
+    void update_charge_vin_sensor();
 
     // LED colors
     BGR_t get_led_usb_c_color() const { return this->led_usb_c_color_; }
@@ -235,7 +259,8 @@ public:
 
     // To separate from other sensors
     // Because we need to get the button status fast
-    void poll_pmu_button();
+    void update_pmu_button_sensor();
+
 
     // RTC related
     // Wakeup getters/setters
@@ -291,6 +316,17 @@ protected:
     bool  rs485_can_power_output_ctrl_;
     bool  rs485_can_power_direction_;
 
+    // voltage / current readings from all power channel
+    Raw_Power_t power_;
+
+    // voltage / current sample from channel
+    Channel_Sample_t usb_;
+    Channel_Sample_t grove_red_;
+    Channel_Sample_t grove_blue_;
+    Channel_Sample_t can_;
+    Channel_Sample_t rs485_;
+    Channel_Sample_t battery_;
+
     // Status
     uint8_t charge_status_;
     uint8_t vin_status_;
@@ -340,6 +376,5 @@ protected:
 };
 
 
-
-}
-}
+} // namespace powerhub
+} // namespace esphome

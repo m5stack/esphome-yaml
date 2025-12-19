@@ -26,19 +26,6 @@ enum Register : uint8_t {
     REG_PWR_OUTPUT_CTRL        = 0x23,
     REG_PWR_DIR                = 0x24,
 
-    // SC8721 config (read only)
-    REG_GET_SC8721_CFG = 0x90,
-    REG_SC8721_CSO = 0x91,
-    REG_SC8721_VOUT_SET_MSB  = 0x93,
-    REG_SC8721_VOUT_SET_LSB = 0x94,
-    REG_SC8721_GLOBAL_CTRL = 0x95,
-    REG_SC8721_SYS_SET = 0x96,
-    // 0x97 RESERVED
-    REG_SC8721_FREQ_SET = 0x98,
-    REG_SC8721_STATUS_1 = 0x99,
-    REG_SC8721_STATUS_2 = 0x9A,
-
-
     // VAMeter monitor
     REG_V_BAT_LSB              = 0x30,
     REG_V_BAT_MSB              = 0x31,
@@ -105,6 +92,18 @@ enum Register : uint8_t {
     REG_LED_PWR_L_BRIGHTNESS      = 0x86,
     REG_LED_PWR_R_BRIGHTNESS      = 0x87,
 
+    // SC8721 config (read only)
+    REG_GET_SC8721_CFG = 0x90,
+    REG_SC8721_CSO = 0x91,
+    REG_SC8721_VOUT_SET_MSB  = 0x93,
+    REG_SC8721_VOUT_SET_LSB = 0x94,
+    REG_SC8721_GLOBAL_CTRL = 0x95,
+    REG_SC8721_SYS_SET = 0x96,
+    // 0x97 RESERVED
+    REG_SC8721_FREQ_SET = 0x98,
+    REG_SC8721_STATUS_1 = 0x99,
+    REG_SC8721_STATUS_2 = 0x9A,
+
     // Button
     REG_BTN                    = 0xA0,
 
@@ -155,8 +154,8 @@ const char* vin_status_to_string(uint8_t status) {
 
 const char* charge_status_to_string(uint8_t status) {
     switch (status) {
-        case 0: return "No Input";
-        case 1: return "Input present";
+        case 0: return "Discharging";
+        case 1: return "Charging";
         default: return "Unknown";
     }
 }
@@ -179,18 +178,24 @@ void PowerHub::setup() {
     // software reset, default behavior of powerhub
     
     // enable Charge, LED, VAMeter channels, disable other channel
-    this->charge_power_enabled_ = true;
-    this->led_power_enabled_ = true;
-    this->vameter_power_enabled_ = true;
     uint8_t pwr_en[7] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01 }; 
     RETURN_IF_ERROR(this->write_register(Register::REG_LED_PWR_EN, 
                                          pwr_en, 
                                          sizeof(pwr_en)));
 
+#ifdef USE_SWITCH
+    this->charge_power_enabled_ = true;
+    this->led_power_enabled_ = true;
+    this->vameter_power_enabled_ = true;
+#endif
+
     // USB Slave mode
     uint8_t mode = 0x00;
     RETURN_IF_ERROR(this->write_register(Register::REG_USB_MODE, &mode, 1)); 
-    
+
+#ifdef USE_SELECT
+    // this->usb_mode_select_->publish_state("Default");
+#endif
     /* 
      * RS485 & CAN Voltage, current limit and power direction
      * Default 3.0 V ( minimal voltage ) / 12.9 mA (13 mA, minimal current)
@@ -207,7 +212,10 @@ void PowerHub::setup() {
     RETURN_IF_ERROR(this->write_register(Register::REG_VOLT_LSB, 
                                          rs485_can_config, 
                                          sizeof(rs485_can_config)));
-    
+#ifdef USE_NUMBER
+    // this->rs485_can_output_voltage_number_->publish_state(3000.0f);
+    // this->rs485_can_current_limit_number_->publish_state(13.0f);
+#endif
     // enable all wakeup source
     // Note: At least one of the three wake sources must be enabled. 
     // If all three wake sources are disabled, hibernation will not be permitted.
@@ -230,95 +238,36 @@ void PowerHub::setup() {
     uint8_t alarm_en = 0;
     WARN_IF(this->write_register(Register::REG_ALARM_EN, &alarm_en, 1));
 
-    ESP_LOGD(TAG, "Setup powerhub finished...");
 
-    // A special inteval used to poll PMU button status
+
+#ifdef USE_BINARY_SENSOR
+    // Inteval used to read PMU button status
+    // polling every 20ms
+    this->button_binary_sensor_->publish_initial_state(false);
     this->set_interval("pmu_button", 20, [this]() {
-        this->poll_pmu_button();
+        this->update_pmu_button_sensor();
     });
+#endif
+
+#ifdef USE_TEXT_SENSOR
+    // Interval used to read charge/vin status
+    // polling every 500 ms (0.5s)
+    this->set_interval("charge_vin_status", 500, [this]() {
+        this->update_charge_vin_sensor();
+    });
+#endif
+
+    ESP_LOGD(TAG, "Setup powerhub finished...");
 }
 
 
 void PowerHub::update() {
 
 #ifdef USE_SENSOR
-    if(this->battery_level_sensor_) {
-        float p = this->calc_battery_level();
-        this->battery_level_sensor_->publish_state(p);
-    }
-
-    if(this->battery_voltage_sensor_) {
-        uint16_t mv = this->read_battery_voltage();
-        this->battery_voltage_sensor_->publish_state(static_cast<float>(mv));
-    }
-
-    if(this->battery_current_sensor_) {
-        int16_t ma = this->read_battery_current();
-        this->battery_current_sensor_->publish_state(static_cast<float>(ma));
-    }
-
-    if (this->can_voltage_sensor_) {
-        uint16_t mv = this->read_pwr_can_voltage();
-        this->can_voltage_sensor_->publish_state(static_cast<float>(mv));
-    }
-
-    if (this->can_current_sensor_) {
-        int16_t ma = this->read_pwr_can_current();
-        this->can_current_sensor_->publish_state(static_cast<float>(ma));
-    }
-
-    if (this->rs485_voltage_sensor_) {
-        uint16_t mv = this->read_pwr_485_voltage();
-        this->rs485_voltage_sensor_->publish_state(static_cast<float>(mv));
-    }
-
-    if (this->rs485_current_sensor_) {
-        int16_t ma = this->read_pwr_485_current();
-        this->rs485_current_sensor_->publish_state(static_cast<float>(ma));
-    }
-
-    if (this->usb_voltage_sensor_) {
-        uint16_t mv = this->read_usb_voltage();
-        this->usb_voltage_sensor_->publish_state(static_cast<float>(mv));
-    }
-
-    if (this->usb_current_sensor_) {
-        int16_t ma = this->read_usb_current();
-        this->usb_current_sensor_->publish_state(static_cast<float>(ma));
-    }
-
-    if (this->grove_red_voltage_sensor_) {
-        uint16_t mv = this->read_grove_red_voltage();
-        this->grove_red_voltage_sensor_->publish_state(static_cast<float>(mv));
-    }
-
-    if (this->grove_red_current_sensor_) {
-        int16_t ma = this->read_grove_red_current();
-        this->grove_red_current_sensor_->publish_state(static_cast<float>(ma));
-    }
-
-    if (this->grove_blue_voltage_sensor_) {
-        uint16_t mv = this->read_grove_blue_voltage();
-        this->grove_blue_voltage_sensor_->publish_state(static_cast<float>(mv));
-    }
-
-    if (this->grove_blue_current_sensor_) {
-        int16_t ma = this->read_grove_blue_current();
-        this->grove_blue_current_sensor_->publish_state(static_cast<float>(ma));
-    }
+   this->update_vameter_sensor();
 #endif
 
 #ifdef USE_TEXT_SENSOR
-    if (this->charge_status_text_sensor_) {
-        std::string status = charge_status_to_string(this->read_charge_status());
-        this->charge_status_text_sensor_->publish_state(status);
-    }
-
-    if (this->vin_status_text_sensor_) {
-        std::string status = vin_status_to_string(this->read_vin_status());
-        this->vin_status_text_sensor_->publish_state(status);
-    }
-
     if (this->firmware_ver_text_sensor_) {
         this->firmware_ver_text_sensor_->publish_state(std::to_string(this->get_firmware_ver()));
     }
@@ -458,11 +407,12 @@ void PowerHub::set_rs485_can_voltage(uint16_t mv) {
 
 void PowerHub::set_rs485_can_current(uint16_t limit) {
 
-    uint8_t val = limit * 0.62 / 8 - 1;
+    uint8_t val = static_cast<uint8_t>(limit * 0.62 / 8 - 1);
 
     // 0 - 232, corresponding limits 12 mA - 3000 mA
-    if ( val < 0 || val > 232 ) {
-        val = 0;
+    if ( val > 232 ) {
+        ESP_LOGW(TAG, "RS485 & CAN output current limit exceed the maximum value!");
+        val = 232;
     }
     
     WARN_IF(this->write_register(Register::REG_CURRENT_LIMIT, &val, 1));
@@ -488,109 +438,152 @@ void PowerHub::set_rs485_can_pwr_output(bool output) {
     this->rs485_can_power_output_ctrl_ = output;
 }
 
-// measuring values are valid only
-// vameter is enabled
-// corresponding channel is enabled
-// otherwise the value is set to 0
-uint16_t PowerHub::read_battery_voltage() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_V_BAT_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return this->get_vameter_pwr_en() ? val : 0;
-}
-
-int16_t PowerHub::read_battery_current() {
-    int16_t val;
-    WARN_IF(this->read_register(Register::REG_I_BAT_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return this->get_vameter_pwr_en() ? val : 0;
-}
-
 float PowerHub::calc_battery_level() {
 
-    float voltage = static_cast<float>(this->read_battery_voltage());
+    const float offset = 100.0f;
+
+    float voltage = this->battery_.voltage;
+    int16_t current = this->battery_.current;
 
     // Maximum voltage is typically 8.4 V
-    const float m_volt = 8400.0f;
+    // normal case the battery usually stop charging
+    // at around 8.3 V
+    const float m_volt = 8400.0f - offset;
     // Nominal (rated) voltage is 7.4 V 
     const float n_volt = 7400.0f;
     // Battery termination voltage 6V
-    const float t_volt = 6000.0f;
+    // when near this value, battery is almost depleted
+    const float t_volt = 6000.0f + offset;
+
+    // usually if current is 0
+    // meaning no battery is connected
+    if ( current == 0 ) {
+        return NAN;
+    }
     
     // read voltage is 0, battery may not connected
     if (voltage < 1e-6f ) {
         return NAN;
     }
 
-    // read voltage lower than 6000.0 mv
-    // most battery will enter the protection state (depleted)
-    // reactivate the battery is needed
+    // read voltage lower than 't_volt'
     if ( voltage < t_volt + 1e-6f) {
-        ESP_LOGW(TAG, "Battery voltage was lower than termination value! Reactivate the battery is required.");
-        return 0.0f;
+        return NAN;
     }
 
     // Apply min-max normalization
     float percent = (voltage - t_volt) / (m_volt - t_volt) * 100;
-    return percent;
+
+    return std::clamp(percent, 0.0f, 100.0f);
 }
 
-uint16_t PowerHub::read_pwr_can_voltage() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_V_PWR_CAN_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_rs485_can_pwr_en()) ? val : 0;
+// Read and store once depend on the switch values
+void PowerHub::read_power_channel() {
+    Raw_Power_t power;
+
+    // Read once
+    WARN_IF(this->read_register(Register::REG_V_BAT_LSB, reinterpret_cast<uint8_t *>(&power), sizeof(Raw_Power_t)));
+
+    if (!this->vameter_power_enabled_) {
+        ESP_LOGW(TAG, "VAMeter power switch is not enabled, measurements are invalid!");
+        return;
+    }
+
+    if (this->charge_power_enabled_) {
+        this->battery_.voltage = power.bat_volt;
+        this->battery_.current = power.bat_curr;
+    }
+
+    if (this->usb_power_enabled_) {
+        this->usb_.voltage = power.usb_volt;
+        this->usb_.current = power.usb_curr;
+    }
+
+    if (this->grove_red_power_enabled_) {
+        this->grove_red_.voltage = power.grove_red_volt;
+        this->grove_red_.current = power.grove_red_curr;
+    }
+
+    if (this->grove_blue_power_enabled_) {
+        this->grove_blue_.voltage = power.grove_blue_volt;
+        this->grove_blue_.current = power.grove_blue_curr;
+    }
+
+    if (this->rs485_can_power_enabled_) {
+        this->can_.voltage   = power.can_volt;
+        this->can_.current   = power.can_curr;
+        this->rs485_.voltage = power.rs485_volt;
+        this->rs485_.current = power.rs485_curr;
+    }
 }
 
-int16_t PowerHub::read_pwr_can_current() {
-    int16_t val;
-    WARN_IF(this->read_register(Register::REG_I_PWR_CAN_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_rs485_can_pwr_en()) ? val : 0;
-}
+void PowerHub::update_vameter_sensor() {
 
-uint16_t PowerHub::read_pwr_485_voltage() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_V_PWR_485_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_rs485_can_pwr_en()) ? val : 0;
-}
+    this->read_power_channel();
 
-int16_t PowerHub::read_pwr_485_current() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_I_PWR_485_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_rs485_can_pwr_en()) ? val : 0;
-}
+    if (this->battery_level_sensor_) {
+        this->battery_level_sensor_->publish_state(this->calc_battery_level());
+    }
 
-uint16_t PowerHub::read_usb_voltage() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_V_USB_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_usb_pwr_en()) ? val : 0;
-}
+    if(this->battery_voltage_sensor_) {
+        uint16_t mv = this->battery_.voltage;
+        this->battery_voltage_sensor_->publish_state(static_cast<float>(mv));
+    }
 
-int16_t PowerHub::read_usb_current() {
-    int16_t val;
-    WARN_IF(this->read_register(Register::REG_I_USB_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_usb_pwr_en()) ? val : 0;
-}
+    if(this->battery_current_sensor_) {
+        int16_t ma = this->battery_.current;
+        this->battery_current_sensor_->publish_state(static_cast<float>(ma));
+    }
 
-uint16_t PowerHub::read_grove_red_voltage() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_V_GROVE_RED_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_grove_red_pwr_en()) ? val : 0;
-}
+    if (this->can_voltage_sensor_) {
+        uint16_t mv = this->can_.voltage;
+        this->can_voltage_sensor_->publish_state(static_cast<float>(mv));
+    }
 
-int16_t PowerHub::read_grove_red_current() {
-    int16_t val;
-    WARN_IF(this->read_register(Register::REG_I_GROVE_RED_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_grove_red_pwr_en()) ? val : 0;
-}
+    if (this->can_current_sensor_) {
+        int16_t ma = this->can_.current;
+        this->can_current_sensor_->publish_state(static_cast<float>(ma));
+    }
 
-uint16_t PowerHub::read_grove_blue_voltage() {
-    uint16_t val;
-    WARN_IF(this->read_register(Register::REG_V_GROVE_BLUE_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_grove_blue_pwr_en()) ? val : 0;
-}
+    if (this->rs485_voltage_sensor_) {
+        uint16_t mv = this->rs485_.voltage;
+        this->rs485_voltage_sensor_->publish_state(static_cast<float>(mv));
+    }
 
-int16_t PowerHub::read_grove_blue_current() {
-    int16_t val;
-    WARN_IF(this->read_register(Register::REG_I_GROVE_BLUE_LSB, reinterpret_cast<uint8_t *>(&val), 2));
-    return (this->get_vameter_pwr_en() && this->get_grove_blue_pwr_en()) ? val : 0;
+    if (this->rs485_current_sensor_) {
+        int16_t ma = this->rs485_.current;
+        this->rs485_current_sensor_->publish_state(static_cast<float>(ma));
+    }
+
+    if (this->usb_voltage_sensor_) {
+        uint16_t mv = this->usb_.voltage;
+        this->usb_voltage_sensor_->publish_state(static_cast<float>(mv));
+    }
+
+    if (this->usb_current_sensor_) {
+        int16_t ma = this->usb_.current;
+        this->usb_current_sensor_->publish_state(static_cast<float>(ma));
+    }
+
+    if (this->grove_red_voltage_sensor_) {
+        uint16_t mv = this->grove_red_.voltage;
+        this->grove_red_voltage_sensor_->publish_state(static_cast<float>(mv));
+    }
+
+    if (this->grove_red_current_sensor_) {
+        int16_t ma = this->grove_red_.current;
+        this->grove_red_current_sensor_->publish_state(static_cast<float>(ma));
+    }
+
+    if (this->grove_blue_voltage_sensor_) {
+        uint16_t mv = this->grove_blue_.voltage;
+        this->grove_blue_voltage_sensor_->publish_state(static_cast<float>(mv));
+    }
+
+    if (this->grove_blue_current_sensor_) {
+        int16_t ma = this->grove_blue_.current;
+        this->grove_blue_current_sensor_->publish_state(static_cast<float>(ma));
+    }
 }
 
 uint8_t PowerHub::read_charge_status() {
@@ -600,12 +593,17 @@ uint8_t PowerHub::read_charge_status() {
     // return val;
 
     // temporary solution is to read the current direction to determine the charging
-    int16_t val = this->read_battery_current();
+    int16_t val = this->battery_.current;
+    // if measured current is 0
+    // indicating the battery may not connected
+    // or battery is entering the protect state
+    // thus no power
     if ( val == 0 ) {
         return 2;
     }
-
+    // positive current suggest the battery is powering the device (discharging)
     if ( val > -10 ) return 0;
+    // negative current suggest external input is charging the battery
     else if ( val < -10 ) return 1;
     else return 2;
 }
@@ -614,6 +612,20 @@ uint8_t PowerHub::read_vin_status() {
     uint8_t val = 0;
     WARN_IF(this->read_register(Register::REG_VIN_STATUS, &val, 1));
     return val;
+}
+
+void PowerHub::update_charge_vin_sensor() {
+#ifdef USE_TEXT_SENSOR
+    if (this->charge_status_text_sensor_) {
+        std::string status = charge_status_to_string(this->read_charge_status());
+        this->charge_status_text_sensor_->publish_state(status);
+    }
+
+    if (this->vin_status_text_sensor_) {
+        std::string status = vin_status_to_string(this->read_vin_status());
+        this->vin_status_text_sensor_->publish_state(status);
+    }
+#endif 
 }
 
 void PowerHub::set_led_usb_a_color(const BGR_t &c) {
@@ -683,7 +695,7 @@ void PowerHub::set_brightness_grove_blue(uint8_t b) {
 void PowerHub::set_brightness_rs485_can(uint8_t b)
 {
     WARN_IF(this->write_register(Register::REG_LED_485_CAN_BRIGHTNESS, &b, 1));
-    this->brightness_grove_blue_ = b;
+    this->brightness_rs485_can_ = b;
 }
 
 void PowerHub::set_brightness_grove_red(uint8_t b) {
@@ -717,7 +729,7 @@ bool PowerHub::read_pmu_btn_status() {
     return !static_cast<bool>(val);
 }
 
-void PowerHub::poll_pmu_button() {
+void PowerHub::update_pmu_button_sensor() {
 #ifdef USE_BINARY_SENSOR
     // publish only when value changes?
     if (this->button_binary_sensor_) {
@@ -757,7 +769,7 @@ void PowerHub::set_rtc_time(const RTC_t &t) {
 
 void PowerHub::set_rtc_alarm(const RTC_Alarm_t &t) {
     const uint8_t *data = reinterpret_cast<const uint8_t*>(&t);
-    size_t len = sizeof(RTC_t);
+    size_t len = sizeof(RTC_Alarm_t);
     WARN_IF(this->write_register(Register::REG_ALARM_MIN, data , len));
     this->rtc_alarm_ = t;
 }
