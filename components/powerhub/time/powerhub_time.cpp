@@ -17,7 +17,7 @@ const LogString *reg_val_to_weekday(uint8_t val) {
     case 10: return LOG_STR("Thursday");
     case 20: return LOG_STR("Friday");
     case 40: return LOG_STR("Saturday");
-    default: return LOG_STR("Unkown");
+    default: return LOG_STR("Unknown");
   }
 }
 
@@ -68,7 +68,7 @@ void PowerHubTime::read_time() {
         .day_of_month  = time.rtc_day,
         .day_of_year   = 1,                                 // ignored by recalc_timestamp_utc(false)
         .month         = time.rtc_month,
-        .year          = time.rtc_year,
+        .year          = static_cast<uint16_t>(time.rtc_year + 2000),
         .is_dst        = false,                             // not used
         .timestamp     = 0                                  // overwritten by recalc_timestamp_utc(false)
     };
