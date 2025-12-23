@@ -186,8 +186,10 @@ sensor:
     max_current: 8.192A
     shunt_resistance: 0.005ohm
     bus_voltage:
+      id: battery_voltage
       name: Battery Voltage
     current:
+      id: battery_current
       name: Battery Current
       # Positive means discharging
       # Negative means charging
