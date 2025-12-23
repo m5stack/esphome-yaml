@@ -241,6 +241,77 @@ sensor:
       float percent = ((voltage - min_voltage) / (max_voltage - min_voltage)) * 100.0;
       return percent;
     update_interval: 10s
+    on_value:
+      - lvgl.label.update:
+          id: pwr_bat_icon_label
+          text: !lambda |-
+            float voltage = id(battery_voltage).state;
+            float current = id(battery_current).state;
+            bool charging_pin = id(charging).state;
+            int level = int(x);
+            
+            // No battery detected
+            if (voltage < 5.0) {
+              return "\U000F06A5";  // Plug icon
+            }
+            
+            // Determine which icon set to use based on charging status
+            bool is_charging = (current < -0.1 || charging_pin);
+            
+            // Use level/10 to create brackets: 0-9=0, 10-19=1, 20-29=2, etc.
+            int bracket = level / 10;
+            
+            if (is_charging) {
+              // Charging icons
+              switch (bracket) {
+                case 10:
+                case 9:
+                  return "\U000F0085";  // charging-100
+                case 8:
+                  return "\U000F008B";  // charging-90
+                case 7:
+                  return "\U000F008A";  // charging-80
+                case 6:
+                  return "\U000F089E";  // charging-70
+                case 5:
+                  return "\U000F0089";  // charging-60
+                case 4:
+                  return "\U000F089D";  // charging-50
+                case 3:
+                  return "\U000F0088";  // charging-40
+                case 2:
+                  return "\U000F0087";  // charging-30
+                case 1:
+                  return "\U000F0086";  // charging-20
+                default:
+                  return "\U000F089C";  // charging-10
+              }
+            } else {
+              // Regular battery icons
+              switch (bracket) {
+                case 10:
+                case 9:
+                  return "\U000F0079";  // battery-100
+                case 8:
+                  return "\U000F0082";  // battery-90
+                case 7:
+                  return "\U000F0081";  // battery-80
+                case 6:
+                  return "\U000F0080";  // battery-70
+                case 5:
+                  return "\U000F007F";  // battery-60
+                case 4:
+                  return "\U000F007E";  // battery-50
+                case 3:
+                  return "\U000F007D";  // battery-40
+                case 2:
+                  return "\U000F007C";  // battery-30
+                case 1:
+                  return "\U000F007B";  // battery-20
+                default:
+                  return "\U000F007A";  // battery-10
+              }
+            }
 
   
 touchscreen:
