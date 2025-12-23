@@ -146,6 +146,10 @@ binary_sensor:
       pi4ioe5v6408: pi4ioe2
       number: 6
       mode: INPUT_PULLDOWN
+    on_press:
+      - lambda: id(battery_percent).update();
+    on_release:
+      - lambda: id(battery_percent).update();
 
   - platform: gpio
     id: headphone_detect
