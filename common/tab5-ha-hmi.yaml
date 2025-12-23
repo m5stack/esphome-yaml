@@ -224,6 +224,24 @@ sensor:
             format: "%.0f ppm"
             args: [ 'x' ]
 
+  - platform: template
+    id: battery_percent
+    name: "Battery Percentage"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: |-
+      float voltage = id(battery_voltage).state;
+      float min_voltage = 6.0;
+      float max_voltage = 8.4;
+      
+      if (voltage < 5.0) return 0.0;
+      if (voltage <= min_voltage) return 0.0;
+      if (voltage >= max_voltage) return 100.0;
+      
+      float percent = ((voltage - min_voltage) / (max_voltage - min_voltage)) * 100.0;
+      return percent;
+    update_interval: 10s
+
   
 touchscreen:
   - platform: gt911
