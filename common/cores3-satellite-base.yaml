@@ -11,7 +11,7 @@ substitutions:
 
 
   loading_illustration_background_color: '000000'
-  idle_illustration_background_color: '0F0F0F' #000000
+  idle_illustration_background_color: 'FFFF00' #000000
   listening_illustration_background_color: 'FFFFFF'
   thinking_illustration_background_color: 'FFFFFF'
   replying_illustration_background_color: 'FFFFFF'
