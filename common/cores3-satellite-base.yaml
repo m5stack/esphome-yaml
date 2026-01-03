@@ -575,6 +575,7 @@ display:
         lambda: |-
           it.fill(id(idle_color));
           it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_idle), ImageAlign::CENTER);
+          it.printf(30, 225, id(font_response), Color::Red, "%s", "Battery");
       - id: listening_page
         lambda: |-
           it.fill(id(listening_color));
