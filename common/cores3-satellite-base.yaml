@@ -613,7 +613,7 @@ display:
       - id: muted_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.printf(30, 195, id(font_response), Color::WHITE, "%s", "Software muted.");
+          it.printf(30, 195, id(font_response), Color::WHITE, "%s", "Nabu is muted.");
           it.printf(30, 225, id(font_response), Color::WHITE, "%s", "Unmute to continue with Voice Assistant.");
 
 
