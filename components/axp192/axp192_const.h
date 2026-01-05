@@ -52,6 +52,32 @@
 
 #define XPOWERS_AXP192_ADC_CHANNEL_CTRL1                 (0x82) //was 0x30
 #define XPOWERS_AXP192_ADC_CHANNEL_CTRL2                 (0x83) //new register in AXP192
+#define XPOWERS_AXP192_ADC_DATA_ACINVH                  (0x56)
+#define XPOWERS_AXP192_ADC_DATA_ACINVL                  (0x57)
+#define XPOWERS_AXP192_ADC_DATA_ACINIH                  (0x58)
+#define XPOWERS_AXP192_ADC_DATA_ACINIL                  (0x59)
+#define XPOWERS_AXP192_ADC_DATA_VBUSVH                  (0x5A)
+#define XPOWERS_AXP192_ADC_DATA_VBUSVL                  (0x5B)
+#define XPOWERS_AXP192_ADC_DATA_VBUSIH                  (0x5C)
+#define XPOWERS_AXP192_ADC_DATA_VBUSIL                  (0x5D)
+#define XPOWERS_AXP192_ADC_DATA_INTTH                   (0x5E)
+#define XPOWERS_AXP192_ADC_DATA_INTTL                   (0x5F)
+#define XPOWERS_AXP192_ADC_DATA_TSPINH                  (0x62) //Not used shorted to GNDin Core 2
+#define XPOWERS_AXP192_ADC_DATA_TSPINL                  (0x63) //Not used shorted to GNDin Core 2
+#define XPOWERS_AXP192_ADC_DATA_BATTPH                  (0x70)
+#define XPOWERS_AXP192_ADC_DATA_BATTPM                  (0x71)
+#define XPOWERS_AXP192_ADC_DATA_BATTPL                  (0x72)
+#define XPOWERS_AXP192_ADC_DATA_APSVH                   (0x7E)
+#define XPOWERS_AXP192_ADC_DATA_BATTVH                  (0x78)
+#define XPOWERS_AXP192_ADC_DATA_BATTVL                  (0x79)
+#define XPOWERS_AXP192_ADC_DATA_BATTCHGH                (0x7A)
+#define XPOWERS_AXP192_ADC_DATA_BATTCHGL                (0x7B)
+#define XPOWERS_AXP192_ADC_DATA_BATTDCHGH               (0x7C)
+#define XPOWERS_AXP192_ADC_DATA_BATTDCHGL               (0x7D)
+#define XPOWERS_AXP192_ADC_DATA_APSVL                   (0x7F)
+
+
+//next block are old code, remove when possible
 #define XPOWERS_AXP192_ADC_DATA_RELUST0                 (0x34)
 #define XPOWERS_AXP192_ADC_DATA_RELUST1                 (0x35)
 #define XPOWERS_AXP192_ADC_DATA_RELUST2                 (0x36)
@@ -156,6 +182,19 @@
 #define XPOWERS_AXP192_DCDC2_VOL_STEPS1_BASE            (0u)
 #define XPOWERS_AXP192_DCDC2_VOL_STEPS2_BASE            (71)
 
+//ADC scales for each step in reading
+#define XPOWERS_AXP192_ADC_SCALE_BATTV                  1.1 //mV
+#define XPOWERS_AXP192_ADC_SCALE_BATTI                  0.5 //mA
+#define XPOWERS_AXP192_ADC_SCALE_BATTCHGI               0.5 //mA
+#define XPOWERS_AXP192_ADC_SCALE_ACINV                  1.7 //mV
+#define XPOWERS_AXP192_ADC_SCALE_ACINI                  0.625 //mA
+#define XPOWERS_AXP192_ADC_SCALE_VBUSV                  1.7 //mV
+#define XPOWERS_AXP192_ADC_SCALE_VBUSI                  0.375 //mA
+#define XPOWERS_AXP192_ADC_SCALE_INTT                   0.1 //degC
+#define XPOWERS_AXP192_ADC_OFFSET_INTT                  -144.7 //degC
+#define XPOWERS_AXP192_ADC_SCALE_APSV                   1.4 //mV
+#define XPOWERS_AXP192_ADC_SCALE_TSPINV                 0.8 //mV
+#define XPOWERS_AXP192_ADC_SCALE_GPIOV                  0.5 //mV
 
 // #define XPOWERS_AXP192_DCDC3_VOL1_MIN                  (700u)
 // #define XPOWERS_AXP192_DCDC3_VOL1_MAX                  (3500u)

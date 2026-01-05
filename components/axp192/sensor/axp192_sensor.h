@@ -20,12 +20,31 @@ public:
     float get_setup_priority() const override { return setup_priority::DATA; }
     // Sensors
     void set_battery_level_sensor(sensor::Sensor *battery_level_sensor) { this->battery_level_sensor_ = battery_level_sensor; }
-    void set_axp_temperature_sensor(sensor::Sensor *axp_temperature_sensor) { this->axp_temperature_sensor_ = axp_temperature_sensor; }
     void set_battery_voltage_sensor(sensor::Sensor *battery_voltage_sensor) { this->battery_voltage_sensor_ = battery_voltage_sensor; }
+    void set_usb_voltage_sensor(sensor::Sensor *usb_voltage_sensor) { this->usb_voltage_sensor_ = usb_voltage_sensor; }
+    void set_usb_current_sensor(sensor::Sensor *usb_current_sensor) { this->usb_current_sensor_ = usb_current_sensor; }
+    void set_vbus_voltage_sensor(sensor::Sensor *vbus_voltage_sensor) { this->vbus_voltage_sensor_ = vbus_voltage_sensor; }
+    void set_vbus_current_sensor(sensor::Sensor *vbus_current_sensor) { this->vbus_current_sensor_ = vbus_current_sensor; }
+    void set_internal_temperature_sensor(sensor::Sensor *internal_temperature_sensor) { this->internal_temperature_sensor_ = internal_temperature_sensor; }
+    void set_battery_power_sensor(sensor::Sensor *battery_power_sensor) { this->battery_power_sensor_ = battery_power_sensor; }
+    void set_battery_charge_current_sensor(sensor::Sensor *battery_charge_current_sensor) { this->battery_charge_current_sensor_ = battery_charge_current_sensor; }
+    void set_battery_discharge_current_sensor(sensor::Sensor *battery_discharge_current_sensor) { this->battery_discharge_current_sensor_ = battery_discharge_current_sensor; }
+    void set_aps_voltage_sensor(sensor::Sensor *aps_voltage_sensor) { this->aps_voltage_sensor_ = aps_voltage_sensor; }
     void set_battery_charging_binary_sensor(binary_sensor::BinarySensor *battery_charging_binary_sensor) { this->battery_charging_binary_sensor_ = battery_charging_binary_sensor; }
 
 private:
     sensor::Sensor *battery_level_sensor_{nullptr};
+
+    sensor::Sensor *usb_voltage_sensor_{nullptr};
+    sensor::Sensor *usb_current_sensor_{nullptr};
+    sensor::Sensor *vbus_voltage_sensor_{nullptr};
+    sensor::Sensor *vbus_current_sensor_{nullptr};
+    sensor::Sensor *internal_temperature_sensor_{nullptr};
+    sensor::Sensor *battery_power_sensor_{nullptr};
+    sensor::Sensor *battery_charge_current_sensor_{nullptr};
+    sensor::Sensor *battery_discharge_current_sensor_{nullptr};
+    sensor::Sensor *aps_voltage_sensor_{nullptr};
+
     sensor::Sensor *battery_voltage_sensor_{nullptr};
     sensor::Sensor *axp_temperature_sensor_{nullptr};
     binary_sensor::BinarySensor *battery_charging_binary_sensor_{nullptr};

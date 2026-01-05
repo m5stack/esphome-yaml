@@ -7,20 +7,67 @@ static const char *TAG = "axp192.sensor";
 
 void AXP192Sensor::update() {
 
+    float reading = 0;
     int percent = this->parent_->getBatteryPercent();
     
     if (battery_level_sensor_ != nullptr) {
         battery_level_sensor_->publish_state(percent == -1 ? NAN : percent);
     }
-    
-    if(axp_temperature_sensor_ != nullptr) {
-        axp_temperature_sensor_->publish_state(this->parent_->getTemperature());
+
+    if(battery_voltage_sensor_ != nullptr) {
+        reading = this->parent_->getBattVoltage();
+        battery_voltage_sensor_->publish_state(reading == 0 ? NAN : reading);
     }
 
-    uint16_t voltage = this->parent_->getBattVoltage();
-    if(battery_voltage_sensor_ != nullptr) {
-        battery_voltage_sensor_->publish_state(voltage == 0 ? NAN : voltage);
+    if(usb_voltage_sensor_ != nullptr) {
+        reading = this->parent_->getACINVoltage();
+        usb_voltage_sensor_->publish_state(reading == 0 ? NAN : reading);
     }
+
+    if(usb_current_sensor_ != nullptr) {
+        reading = this->parent_->getACINCurrent();
+        usb_current_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(vbus_voltage_sensor_ != nullptr) {
+        reading = this->parent_->getACINVoltage();
+        vbus_voltage_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(vbus_current_sensor_ != nullptr) {
+        reading = this->parent_->getACINCurrent();
+        vbus_current_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(internal_temperature_sensor_ != nullptr) {
+        reading = this->parent_->getInternalTemperature();
+        internal_temperature_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(battery_power_sensor_ != nullptr) {
+        reading = this->parent_->getBattPower();
+        battery_power_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(battery_charge_current_sensor_ != nullptr) {
+        reading = this->parent_->getBattChargeCurrent();
+        battery_charge_current_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(battery_discharge_current_sensor_ != nullptr) {
+        reading = this->parent_->getBattDischargeCurrent();
+        battery_discharge_current_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    if(aps_voltage_sensor_ != nullptr) {
+        reading = this->parent_->getAPSVoltage();
+        aps_voltage_sensor_->publish_state(reading == 0 ? NAN : reading);
+    }
+
+    // float usb_voltage = this->parent_->getUsbVoltage();
+    // if(usb_voltage_sensor_ != nullptr) {
+    //     usb_voltage_sensor_->publish_state(usb_voltage == 0 ? NAN : usb_voltage);
+    // }
 
     if(battery_charging_binary_sensor_ != nullptr) {
         battery_charging_binary_sensor_->publish_state(this->parent_->isCharging());

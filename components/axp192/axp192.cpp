@@ -35,10 +35,7 @@ void AXP192::AXP192::setup()
 
     this->clearIrqStatus();
 
-    this->enableVbusVoltageMeasure();
-    this->enableBattVoltageMeasure();
-    this->enableSystemVoltageMeasure();
-    this->enableTemperatureMeasure();
+    this->configureAdcMeasure(); //Enable all monitoring except external TS pin and GPIO ADC
 
     // It is necessary to disable the detection function of the TS pin on the board
     // without the battery temperature detection function, otherwise it will cause abnormal charging
@@ -232,6 +229,44 @@ inline bool AXP192::getRegisterBit(uint8_t registers, uint8_t bit)
     return val & _BV(bit);
 }
 
+//new function for ADC reads
+inline uint32_t AXP192::readRegisterH8M8L8(uint8_t highReg, uint8_t medReg, uint8_t lowReg)
+{
+    uint8_t h8, m8, l8;
+    bool ret1 = this->read_byte(highReg, &h8);
+    if (!ret1) {
+        ESP_LOGE(TAG, "I2C read error at reg 0x%02X", highReg);
+        return 0;
+    }
+    bool ret2 = this->read_byte(medReg, &m8);
+    if (!ret2) {
+        ESP_LOGE(TAG, "I2C read error at reg 0x%02X", medReg);
+        return 0;
+    }
+    bool ret3 = this->read_byte(lowReg, &l8);
+    if (!ret3) {
+        ESP_LOGE(TAG, "I2C read error at reg 0x%02X", lowReg);
+        return 0;
+    }
+    return (h8 << 16) | (m8 << 8) | (l8);
+}
+
+inline uint16_t AXP192::readRegisterH8L4(uint8_t highReg, uint8_t lowReg)
+{
+    uint8_t h8, l4;
+    bool ret1 = this->read_byte(highReg, &h8);
+    if (!ret1) {
+        ESP_LOGE(TAG, "I2C write error at reg 0x%02X", highReg);
+        return 0;
+    }
+    bool ret2 = this->read_byte(lowReg, &l4);
+    if (!ret1) {
+        ESP_LOGE(TAG, "I2C write error at reg 0x%02X", lowReg);
+        return 0;
+    }
+    return (h8 << 4) | (l4 & 0x0F);
+}
+
 inline uint16_t AXP192::readRegisterH6L8(uint8_t highReg, uint8_t lowReg)
 {
     uint8_t h6, l8;
@@ -278,8 +313,6 @@ uint16_t AXP192::status()
 }
 
 bool AXP192::isVbusGood(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 4); } //was 5
-
-bool AXP192::getBatfetState(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 4); } //NA
 
 // getBatPresentState
 bool AXP192::isBatteryConnect(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 5); } //was 3
@@ -346,26 +379,6 @@ void AXP192::reset(void){ setRegisterBit(XPOWERS_AXP192_COMMON_CONFIG, 1); }
  * @retval None
  */
 void AXP192::shutdown(void){ setRegisterBit(XPOWERS_AXP192_COMMON_CONFIG, 0); }
-
-/**
- * @brief  BATFET control / REG 12H
- * @note   DIE Over Temperature Protection Level1 Configuration
- * @param  opt: 0:115 , 1:125 , 2:135
- * @retval None
- */
-void AXP192::setBatfetDieOverTempLevel1(uint8_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_BATFET_CTRL);
-    if (val == -1)return;
-    val &= 0xF9;
-    writeRegister(XPOWERS_AXP192_BATFET_CTRL, val | (opt << 1));
-}
-
-uint8_t AXP192::getBatfetDieOverTempLevel1(void) { return (readRegister(XPOWERS_AXP192_BATFET_CTRL) & 0x06); }
-
-void AXP192::enableBatfetDieOverTempDetect(void){ setRegisterBit(XPOWERS_AXP192_BATFET_CTRL, 0); }
-
-void AXP192::disableBatfetDieOverTempDetect(void){ clrRegisterBit(XPOWERS_AXP192_BATFET_CTRL, 0); }
 
 /**
  * @param  opt: 0:115 , 1:125 , 2:135
@@ -1787,6 +1800,7 @@ uint8_t AXP192::getPowerKeyPressOffTime(void) //updated
 /*
  * ADC Control method
  */
+//All this code not reqd, remove
 bool AXP192::enableGeneralAdcChannel(void){ return setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 3); } // GPIO0 ADC, GPIO1, 2, 3 also available but not coded
 
 bool AXP192::disableGeneralAdcChannel(void){ return clrRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 3); }
@@ -1813,15 +1827,95 @@ uint16_t AXP192::getSystemVoltage(void)
 bool AXP192::enableVbusVoltageMeasure(void){ return setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 3); } //was bit 2
 
 bool AXP192::disableVbusVoltageMeasure(void){ return clrRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 3); }
+//end of code remove block
 
-uint16_t AXP192::getVbusVoltage(void)
-{
-    if (!isVbusIn()) {
-        return 0;
-    }
-    return readRegisterH6L8(XPOWERS_AXP192_ADC_DATA_RELUST4, XPOWERS_AXP192_ADC_DATA_RELUST5);
+bool AXP192::configureAdcMeasure(void){
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 7);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 6);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 5);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 4);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 3);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 2);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 1);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL1, 0);
+    setRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 7);
+    clrRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 3);
+    clrRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 2);
+    clrRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 1);
+    return clrRegisterBit(XPOWERS_AXP192_ADC_CHANNEL_CTRL2, 0);
 }
 
+float AXP192::getACINVoltage(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_ACINVH, XPOWERS_AXP192_ADC_DATA_ACINVL)*XPOWERS_AXP192_ADC_SCALE_ACINV/1000.0;
+}
+
+float AXP192::getACINCurrent(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_ACINIH, XPOWERS_AXP192_ADC_DATA_ACINIL)*XPOWERS_AXP192_ADC_SCALE_ACINI/1000.0;
+}
+
+float AXP192::getVBUSVoltage(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_VBUSVH, XPOWERS_AXP192_ADC_DATA_VBUSVL)*XPOWERS_AXP192_ADC_SCALE_VBUSV/1000.0;
+}
+
+float AXP192::getVBUSCurrent(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_VBUSIH, XPOWERS_AXP192_ADC_DATA_VBUSIL)*XPOWERS_AXP192_ADC_SCALE_VBUSI/1000.0;
+}
+
+float AXP192::getInternalTemperature(void)
+{
+    return (readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_INTTH, XPOWERS_AXP192_ADC_DATA_INTTL)*XPOWERS_AXP192_ADC_SCALE_INTT)+XPOWERS_AXP192_ADC_OFFSET_INTT;
+}
+
+float AXP192::getBattPower(void)
+{
+    return readRegisterH8M8L8(XPOWERS_AXP192_ADC_DATA_BATTPH, XPOWERS_AXP192_ADC_DATA_BATTPM, XPOWERS_AXP192_ADC_DATA_BATTPL)/1000000.0;
+}
+
+float AXP192::getBattChargeCurrent(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTCHGH, XPOWERS_AXP192_ADC_DATA_BATTCHGL)*XPOWERS_AXP192_ADC_SCALE_BATTCHGI/1000.0;
+}
+
+float AXP192::getBattDischargeCurrent(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTDCHGH, XPOWERS_AXP192_ADC_DATA_BATTDCHGL)*XPOWERS_AXP192_ADC_SCALE_BATTCHGI/1000.0;
+}
+
+float AXP192::getAPSVoltage(void)
+{
+    // if (!isBatteryConnect()) {
+    //     return 0;
+    // }
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_APSVH, XPOWERS_AXP192_ADC_DATA_APSVL)*XPOWERS_AXP192_ADC_SCALE_APSV/1000.0;
+}
+
+
+
+
+
+// old code remove when possible
 bool AXP192::enableTSPinMeasure(void) //updated
 {
     // TS pin is the battery temperature sensor input and will affect the charger
@@ -1898,12 +1992,12 @@ bool AXP192::enableBattDetection(void){ return setRegisterBit(XPOWERS_AXP192_BAT
 
 bool AXP192::disableBattDetection(void){ return clrRegisterBit(XPOWERS_AXP192_BAT_DET_CTRL, 6); } //was 0
 
-uint16_t AXP192::getBattVoltage(void)
+float AXP192::getBattVoltage(void)
 {
     if (!isBatteryConnect()) {
         return 0;
     }
-    return readRegisterH5L8(XPOWERS_AXP192_ADC_DATA_RELUST0, XPOWERS_AXP192_ADC_DATA_RELUST1);
+    return readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTVH, XPOWERS_AXP192_ADC_DATA_BATTVL)/1000.0;
 }
 
 int AXP192::getBatteryPercent(void)
@@ -2328,15 +2422,6 @@ bool AXP192::isWdtExpireIrq(void)
 bool AXP192::isLdoOverCurrentIrq(void)
 {
     uint8_t mask = XPOWERS_AXP192_LDO_OVER_CURR_IRQ  >> 16;
-    if (intRegister[2] & mask) {
-        return IS_BIT_SET(statusRegister[2], mask);
-    }
-    return false;
-}
-
-bool AXP192::isBatfetOverCurrentIrq(void)
-{
-    uint8_t mask = XPOWERS_AXP192_BATFET_OVER_CURR_IRQ  >> 16;
     if (intRegister[2] & mask) {
         return IS_BIT_SET(statusRegister[2], mask);
     }

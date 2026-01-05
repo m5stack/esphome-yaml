@@ -28,11 +28,12 @@ public:
     bool inline clrRegisterBit(uint8_t registers, uint8_t bit);
     bool inline setRegisterBit(uint8_t registers, uint8_t bit);
     bool inline getRegisterBit(uint8_t registers, uint8_t bit);
+    uint32_t inline readRegisterH8M8L8(uint8_t highReg, uint8_t medReg, uint8_t lowReg);
+    uint16_t inline readRegisterH8L4(uint8_t highReg, uint8_t lowReg);
     uint16_t inline readRegisterH6L8(uint8_t highReg, uint8_t lowReg);
     uint16_t inline readRegisterH5L8(uint8_t highReg, uint8_t lowReg);
     uint16_t status();
     bool isVbusGood(void);
-    bool getBatfetState(void);
     bool isBatteryConnect(void);
     bool isBatInActiveModeState(void);
     bool getThermalRegulationStatus(void);
@@ -45,6 +46,17 @@ public:
     bool isVbusIn(void);
     xpowers_chg_status_t getChargerStatus(void);
 
+    //ADC channels
+    float getACINVoltage(void);
+    float getACINCurrent(void);
+    float getVBUSVoltage(void);
+    float getVBUSCurrent(void);
+    float getInternalTemperature(void);
+    float getBattPower(void);
+    float getBattChargeCurrent(void);
+    float getBattDischargeCurrent(void);
+    float getAPSVoltage(void); 
+
     // PMU common configuration
     void enableInternalDischarge(void);
     void disableInternalDischarge(void);
@@ -54,12 +66,6 @@ public:
     void disablePwronShutPMIC(void);
     void reset(void);
     void shutdown(void);
-
-    // BATFET control
-    void setBatfetDieOverTempLevel1(uint8_t opt);
-    uint8_t getBatfetDieOverTempLevel1(void);
-    void enableBatfetDieOverTempDetect(void);
-    void disableBatfetDieOverTempDetect(void);
 
     // DIE Over Temperature
     void setDieOverTempLevel1(uint8_t opt);
@@ -345,6 +351,7 @@ public:
     bool enableSystemVoltageMeasure(void);
     bool disableSystemVoltageMeasure(void);
     uint16_t getSystemVoltage(void);
+    bool configureAdcMeasure(void);
     bool enableVbusVoltageMeasure(void);
     bool disableVbusVoltageMeasure(void);
     uint16_t getVbusVoltage(void);
@@ -360,7 +367,7 @@ public:
     bool disableBattVoltageMeasure(void);
     bool enableBattDetection(void);
     bool disableBattDetection(void);
-    uint16_t getBattVoltage(void);
+    float getBattVoltage(void);
     int getBatteryPercent(void);
 
     void setChargingLedMode(uint8_t mode);
@@ -404,7 +411,6 @@ public:
     bool isPekeyPositiveIrq(void);
     bool isWdtExpireIrq(void);
     bool isLdoOverCurrentIrq(void);
-    bool isBatfetOverCurrentIrq(void);
     bool isBatChargeDoneIrq(void);
     bool isBatChargeStartIrq(void);
     bool isBatDieOverTemperatureIrq(void);

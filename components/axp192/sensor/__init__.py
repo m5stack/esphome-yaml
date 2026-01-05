@@ -13,6 +13,8 @@ from esphome.const import (
     ICON_THERMOMETER,
     CONF_BATTERY_VOLTAGE,
     DEVICE_CLASS_VOLTAGE,
+    DEVICE_CLASS_CURRENT,
+    DEVICE_CLASS_POWER,
     ENTITY_CATEGORY_DIAGNOSTIC,
     DEVICE_CLASS_BATTERY_CHARGING,
     
@@ -22,8 +24,16 @@ from .. import axp192_ns, BASE_SCHEMA, CONF_AXP192_ID
 
 DEPENDENCIES = ["axp192"]
 
-CONF_AXP_TEMPERATURE = "axp_temperature"
 CONF_BATTERY_CHARGING = "battery_charging"
+CONF_USB_VOLTAGE = "usb_voltage"
+CONF_USB_CURRENT = "usb_current"
+CONF_VBUS_VOLTAGE = "vbus_voltage"
+CONF_VBUS_CURRENT = "vbus_current"
+CONF_BATTERY_POWER = "battery_power"
+CONF_INTERNAL_TEMPERATURE = "internal_temperature"
+CONF_BATTERY_CHARGE_CURRENT = "battery_charge_current"
+CONF_BATTERY_DISCHARGE_CURRENT = "battery_discharge_current"
+CONF_APS_VOLTAGE = "aps_voltage"
 
 AXP192Sensor = axp192_ns.class_("AXP192Sensor", sensor.Sensor, cg.PollingComponent)
 
@@ -38,15 +48,65 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_BATTERY,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
-            cv.Optional(CONF_AXP_TEMPERATURE): sensor.sensor_schema(
+            cv.Optional(CONF_BATTERY_VOLTAGE): sensor.sensor_schema(
+                unit_of_measurement='V',
+                device_class=DEVICE_CLASS_VOLTAGE,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_USB_VOLTAGE): sensor.sensor_schema(
+                unit_of_measurement='V',
+                device_class=DEVICE_CLASS_VOLTAGE,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_USB_CURRENT): sensor.sensor_schema(
+                unit_of_measurement='A',
+                device_class=DEVICE_CLASS_CURRENT,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+           cv.Optional(CONF_VBUS_VOLTAGE): sensor.sensor_schema(
+                unit_of_measurement='V',
+                device_class=DEVICE_CLASS_VOLTAGE,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_VBUS_CURRENT): sensor.sensor_schema(
+                unit_of_measurement='A',
+                device_class=DEVICE_CLASS_CURRENT,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_INTERNAL_TEMPERATURE): sensor.sensor_schema(
                 unit_of_measurement=UNIT_CELSIUS,
+                accuracy_decimals=1,
                 icon=ICON_THERMOMETER,
                 device_class=DEVICE_CLASS_TEMPERATURE,
                 state_class=STATE_CLASS_MEASUREMENT,
             ),
-            cv.Optional(CONF_BATTERY_VOLTAGE): sensor.sensor_schema(
+            cv.Optional(CONF_BATTERY_POWER): sensor.sensor_schema(
+                unit_of_measurement='W',
+                device_class=DEVICE_CLASS_POWER,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_BATTERY_CHARGE_CURRENT): sensor.sensor_schema(
+                unit_of_measurement='A',
+                device_class=DEVICE_CLASS_CURRENT,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_BATTERY_DISCHARGE_CURRENT): sensor.sensor_schema(
+                unit_of_measurement='A',
+                device_class=DEVICE_CLASS_CURRENT,
+                accuracy_decimals=2,
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_APS_VOLTAGE): sensor.sensor_schema(
+                unit_of_measurement='V',
                 device_class=DEVICE_CLASS_VOLTAGE,
-                accuracy_decimals=3,
+                accuracy_decimals=2,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
             ),
             cv.Optional(CONF_BATTERY_CHARGING): binary_sensor.binary_sensor_schema(
@@ -56,7 +116,7 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(BASE_SCHEMA)
-    .extend(cv.polling_component_schema("60s"))
+    .extend(cv.polling_component_schema("15s"))
 )
 
 async def to_code(config):
@@ -67,15 +127,47 @@ async def to_code(config):
     if CONF_BATTERY_LEVEL in config:
         sens = await sensor.new_sensor(config[CONF_BATTERY_LEVEL])
         cg.add(var.set_battery_level_sensor(sens))
-    
-    if CONF_AXP_TEMPERATURE in config:
-        sens = await sensor.new_sensor(config[CONF_AXP_TEMPERATURE])
-        cg.add(var.set_axp_temperature_sensor(sens))
-    
+ 
     if CONF_BATTERY_VOLTAGE in config:
         sens = await sensor.new_sensor(config[CONF_BATTERY_VOLTAGE])
         cg.add(var.set_battery_voltage_sensor(sens))
+
+    if CONF_USB_VOLTAGE in config:
+        sens = await sensor.new_sensor(config[CONF_USB_VOLTAGE])
+        cg.add(var.set_usb_voltage_sensor(sens))
+
+    if CONF_USB_CURRENT in config:
+        sens = await sensor.new_sensor(config[CONF_USB_CURRENT])
+        cg.add(var.set_usb_current_sensor(sens))
+
+    if CONF_VBUS_VOLTAGE in config:
+        sens = await sensor.new_sensor(config[CONF_VBUS_VOLTAGE])
+        cg.add(var.set_vbus_voltage_sensor(sens))
+
+    if CONF_VBUS_CURRENT in config:
+        sens = await sensor.new_sensor(config[CONF_VBUS_CURRENT])
+        cg.add(var.set_vbus_current_sensor(sens))
+
+    if CONF_INTERNAL_TEMPERATURE in config:
+        sens = await sensor.new_sensor(config[CONF_INTERNAL_TEMPERATURE])
+        cg.add(var.set_internal_temperature_sensor(sens))
     
+    if CONF_BATTERY_POWER in config:
+        sens = await sensor.new_sensor(config[CONF_BATTERY_POWER])
+        cg.add(var.set_battery_power_sensor(sens))
+    
+    if CONF_BATTERY_CHARGE_CURRENT in config:
+        sens = await sensor.new_sensor(config[CONF_BATTERY_CHARGE_CURRENT])
+        cg.add(var.set_battery_charge_current_sensor(sens))
+    
+    if CONF_BATTERY_DISCHARGE_CURRENT in config:
+        sens = await sensor.new_sensor(config[CONF_BATTERY_DISCHARGE_CURRENT])
+        cg.add(var.set_battery_discharge_current_sensor(sens))
+
+    if CONF_APS_VOLTAGE in config:
+        sens = await sensor.new_sensor(config[CONF_APS_VOLTAGE])
+        cg.add(var.set_aps_voltage_sensor(sens))
+
     if CONF_BATTERY_CHARGING in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_BATTERY_CHARGING])
         cg.add(var.set_battery_charging_binary_sensor(sens))
