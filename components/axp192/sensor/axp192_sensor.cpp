@@ -64,11 +64,6 @@ void AXP192Sensor::update() {
         aps_voltage_sensor_->publish_state(reading == 0 ? NAN : reading);
     }
 
-    // float usb_voltage = this->parent_->getUsbVoltage();
-    // if(usb_voltage_sensor_ != nullptr) {
-    //     usb_voltage_sensor_->publish_state(usb_voltage == 0 ? NAN : usb_voltage);
-    // }
-
     if(battery_charging_binary_sensor_ != nullptr) {
         battery_charging_binary_sensor_->publish_state(this->parent_->isCharging());
     }
