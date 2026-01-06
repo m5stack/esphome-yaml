@@ -8,7 +8,7 @@ esphome:
   on_boot:
     then:
       # read the RTC time once when the system boots
-      pcf8563.read_time:
+      bm8563.read_time:
 
 esp32:
   board: m5stack-stamps3
@@ -92,7 +92,7 @@ binary_sensor:
     name: "WAKE"
 
 time:
-  - platform: pcf8563
+  - platform: bm8563
     id: rtc_time
     address: 0x51
     # repeated synchronization is not necessary unless the external RTC
@@ -104,7 +104,7 @@ time:
     on_time_sync:
       then:
         # ... and update the RTC when the synchronization was successful
-        pcf8563.write_time:
+        bm8563.write_time:
 
 sensor:
   - platform: scd4x
