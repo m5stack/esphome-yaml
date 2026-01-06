@@ -1,6 +1,6 @@
 Example yaml file
 
-
+```
 substitutions:
   friendly_name: "AXP192_test" #Core2
   esphome_name: "axp192test"
@@ -192,3 +192,4 @@ switch:
 #    name: "Vibration"
 #    output: vibration_motor
 
+```
