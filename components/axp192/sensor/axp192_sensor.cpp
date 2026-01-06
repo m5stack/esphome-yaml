@@ -68,6 +68,42 @@ void AXP192Sensor::update() {
         battery_charging_binary_sensor_->publish_state(this->parent_->isCharging());
     }
 
+    if(usb_present_binary_sensor_ != nullptr) {
+        usb_present_binary_sensor_->publish_state(this->parent_->isACINPresent());
+    }
+
+    if(usb_valid_binary_sensor_ != nullptr) {
+        usb_valid_binary_sensor_->publish_state(this->parent_->isACINValid());
+    }
+
+    if(vbus_present_binary_sensor_ != nullptr) {
+        vbus_present_binary_sensor_->publish_state(this->parent_->isVbusIn());
+    }
+
+    if(vbus_valid_binary_sensor_ != nullptr) {
+        vbus_valid_binary_sensor_->publish_state(this->parent_->isVbusGood());
+    }
+
+    if(battery_discharging_binary_sensor_ != nullptr) {
+        battery_discharging_binary_sensor_->publish_state(this->parent_->isDischarge());
+    }
+
+    if(over_temp_binary_sensor_ != nullptr) {
+        over_temp_binary_sensor_->publish_state(this->parent_->getThermalRegulationStatus());
+    }
+
+    if(battery_connected_binary_sensor_ != nullptr) {
+        battery_connected_binary_sensor_->publish_state(this->parent_->isBatteryConnect());
+    }
+
+    if(battery_active_mode_binary_sensor_ != nullptr) {
+        battery_active_mode_binary_sensor_->publish_state(this->parent_->isBatInActiveModeState());
+    }
+
+    if(low_charge_current_binary_sensor_ != nullptr) {
+        low_charge_current_binary_sensor_->publish_state(this->parent_->isChargingCurrentLessThanExpected());
+    }
+
     this->status_clear_warning();
 }
 

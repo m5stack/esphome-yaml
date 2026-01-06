@@ -33,17 +33,23 @@ public:
     uint16_t inline readRegisterH6L8(uint8_t highReg, uint8_t lowReg);
     uint16_t inline readRegisterH5L8(uint8_t highReg, uint8_t lowReg);
     uint16_t status();
+    bool isACINPresent(void);
+    bool isACINValid(void);
+    bool isVbusIn(void);
     bool isVbusGood(void);
+    bool isDischarge(void);
+    bool getThermalRegulationStatus(void);
+    bool isCharging(void);
     bool isBatteryConnect(void);
     bool isBatInActiveModeState(void);
-    bool getThermalRegulationStatus(void);
+    bool isChargingCurrentLessThanExpected(void);
+
+    //remove these
     bool getCurrentLimitStatus(void);
-    bool isCharging(void);
-    bool isDischarge(void);
     bool isStandby(void);
     bool isPowerOn(void);
     bool isPowerOff(void);
-    bool isVbusIn(void);
+    
     xpowers_chg_status_t getChargerStatus(void);
 
     //ADC channels

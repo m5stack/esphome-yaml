@@ -344,20 +344,29 @@ uint16_t AXP192::status()
     return (status1 << 8) | (status2);
 }
 
-bool AXP192::isVbusGood(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 4); } //was 5
 
 // getBatPresentState
-bool AXP192::isBatteryConnect(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 5); } //was 3
-
-bool AXP192::isBatInActiveModeState(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 3); } // was 2
+bool AXP192::isACINPresent(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 7) == 1; } //new
+bool AXP192::isACINValid(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 6) == 1; } //new
+bool AXP192::isVbusIn(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 5) == 1; } //updated
+bool AXP192::isVbusGood(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 4) == 1; } //was 5
+//bit 3 Vbus above Vhold before insert?
+bool AXP192::isDischarge(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 2) == 0x00; } //updated
+//bit 1 ACIN and VBus pin shorted on PCB
+//bit 0 Trigger boot from ACIN/VBus or not
 
 bool AXP192::getThermalRegulationStatus(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 7); } //was 1
+bool AXP192::isCharging(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 6) == 1; } //updated 1=charging, 0=not charging or finished
+bool AXP192::isBatteryConnect(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 5) == 1; } //was 3
+//bit 4 reserved
+bool AXP192::isBatInActiveModeState(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 3) ==1; } // was 2
+bool AXP192::isChargingCurrentLessThanExpected(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 2) == 1; } //new
+//bit 1 reserved
+//bit 0 reserved
 
-bool AXP192::getCurrentLimitStatus(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 0); } //NA?
 
-bool AXP192::isCharging(void){ return ((readRegister(XPOWERS_AXP192_STATUS2) & 0x40) >> 6) == 0x01; } //updated
-
-bool AXP192::isDischarge(void){ return ((readRegister(XPOWERS_AXP192_STATUS1) & 0x04) >> 2) == 0x00; } //updated
+//Remove these
+bool AXP192::getCurrentLimitStatus(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 0); } //NA, remove?
 
 bool AXP192::isStandby(void){ return (readRegister(XPOWERS_AXP192_STATUS2) >> 5) == 0x00; } //NA?
 
@@ -365,7 +374,6 @@ bool AXP192::isPowerOn(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 4); 
 
 bool AXP192::isPowerOff(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 4); } //NA?
 
-bool AXP192::isVbusIn(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 5) == 0 && isVbusGood(); } //updated
 
 xpowers_chg_status_t AXP192::getChargerStatus(void){ //NA remove
     int val = readRegister(XPOWERS_AXP192_STATUS2);

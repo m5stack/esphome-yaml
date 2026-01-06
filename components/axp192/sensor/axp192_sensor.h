@@ -31,6 +31,15 @@ public:
     void set_battery_discharge_current_sensor(sensor::Sensor *battery_discharge_current_sensor) { this->battery_discharge_current_sensor_ = battery_discharge_current_sensor; }
     void set_aps_voltage_sensor(sensor::Sensor *aps_voltage_sensor) { this->aps_voltage_sensor_ = aps_voltage_sensor; }
     void set_battery_charging_binary_sensor(binary_sensor::BinarySensor *battery_charging_binary_sensor) { this->battery_charging_binary_sensor_ = battery_charging_binary_sensor; }
+    void set_usb_present_binary_sensor(binary_sensor::BinarySensor *usb_present_binary_sensor) { this->usb_present_binary_sensor_ = usb_present_binary_sensor; }
+    void set_usb_valid_binary_sensor(binary_sensor::BinarySensor *usb_valid_binary_sensor) { this->usb_valid_binary_sensor_ = usb_valid_binary_sensor; }
+    void set_vbus_present_binary_sensor(binary_sensor::BinarySensor *vbus_present_binary_sensor) { this->vbus_present_binary_sensor_ = vbus_present_binary_sensor; }
+    void set_vbus_valid_binary_sensor(binary_sensor::BinarySensor *vbus_valid_binary_sensor) { this->vbus_valid_binary_sensor_ = vbus_valid_binary_sensor; }
+    void set_battery_discharging_binary_sensor(binary_sensor::BinarySensor *battery_discharging_binary_sensor) { this->battery_discharging_binary_sensor_ = battery_discharging_binary_sensor; }
+    void set_over_temp_binary_sensor(binary_sensor::BinarySensor *over_temp_binary_sensor) { this->over_temp_binary_sensor_ = over_temp_binary_sensor; }
+    void set_battery_connected_binary_sensor(binary_sensor::BinarySensor *battery_connected_binary_sensor) { this->battery_connected_binary_sensor_ = battery_connected_binary_sensor; }
+    void set_battery_active_mode_binary_sensor(binary_sensor::BinarySensor *battery_active_mode_binary_sensor) { this->battery_active_mode_binary_sensor_ = battery_active_mode_binary_sensor; }
+    void set_low_charge_current_binary_sensor(binary_sensor::BinarySensor *low_charge_current_binary_sensor) { this->low_charge_current_binary_sensor_ = low_charge_current_binary_sensor; }
 
 private:
     sensor::Sensor *battery_level_sensor_{nullptr};
@@ -44,10 +53,19 @@ private:
     sensor::Sensor *battery_charge_current_sensor_{nullptr};
     sensor::Sensor *battery_discharge_current_sensor_{nullptr};
     sensor::Sensor *aps_voltage_sensor_{nullptr};
-
     sensor::Sensor *battery_voltage_sensor_{nullptr};
     sensor::Sensor *axp_temperature_sensor_{nullptr};
+
     binary_sensor::BinarySensor *battery_charging_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *usb_present_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *usb_valid_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *vbus_present_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *vbus_valid_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *battery_discharging_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *over_temp_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *battery_connected_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *battery_active_mode_binary_sensor_{nullptr};
+    binary_sensor::BinarySensor *low_charge_current_binary_sensor_{nullptr};
 };
 
 }

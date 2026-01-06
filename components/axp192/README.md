@@ -51,8 +51,8 @@ spi:
   miso_pin: 38
 
 external_components:
-  # - source: C:\Users\jims9\OneDrive\Documents\ESPComponents\esphome-yaml\components
-  - source: github://jimwsmith/esphome-yaml/components
+  - source: C:\Users\jims9\OneDrive\Documents\ESPComponents\esphome-yaml\components
+  # - source: github://jimwsmith/esphome-yaml/components
     components: [ axp192 ]
     refresh: 0s
 
@@ -61,6 +61,30 @@ axp192:
   i2c_id: bus_internal
 
 binary_sensor:
+#Extends touchscreen area to detect teh 3 extar marked 'button circles' on M5Core 2
+  - platform: touchscreen
+    name: Button A
+    x_min: 10
+    x_max: 120
+    y_min: 240
+    y_max: 280
+    use_raw: true
+
+  - platform: touchscreen
+    name: Button B
+    x_min: 130
+    x_max: 200
+    y_min: 240
+    y_max: 280
+    use_raw: true
+
+  - platform: touchscreen
+    name: Button C
+    x_min: 230
+    x_max: 310
+    y_min: 240
+    y_max: 280
+    use_raw: true
 
 sensor:
 # PMU
@@ -93,6 +117,24 @@ sensor:
     battery_level:
       name: "Battery Level"
       id: battery_percent
+    usb_present:
+      name: "USB Supply Present"
+    usb_valid:
+      name: "USB Supply Valid"
+    vbus_present:
+      name: "VBus Supply Present"
+    vbus_valid:
+      name: "VBus Supply Valid"
+    battery_discharging:
+      name: "Battery Discharging"
+    over_temperature:
+      name: "Over Temperature"
+    battery_connected:
+      name: "Battery Connected"
+    battery_in_active_mode:
+      name: "Battery in Active Mode"
+    low_charge_current:
+      name: "Charge current less than expected"
 
 #Some useful standard sensors
   - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
@@ -120,6 +162,9 @@ text_sensor:
       id: wifi_ip
       name: WiFi IP Address
       entity_category: "diagnostic"
+  - platform: version
+    name: "Firmware Version"
+    id: firmware_version
 
 output:
   - platform: axp192
@@ -183,12 +228,13 @@ light:
   - platform: binary
     name: "LCD Power"
     output: lcd_power
-    restore_mode: ALWAYS_ON #Always want to have a backlight on when we boot up
+    restore_mode: ALWAYS_ON #Always want to have a display on when we boot up
 
 switch:
   - platform: axp192
     led_pwr:
       name: "Green LED"
-#    name: "Vibration"
-#    output: vibration_motor
+    vibration_motor:
+      name: "Vibration Motor"
 
+```
