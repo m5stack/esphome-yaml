@@ -57,6 +57,9 @@ public:
     float getBattDischargeCurrent(void);
     float getAPSVoltage(void); 
 
+    //GPIO pins
+    void setGpioPin(uint8_t gpio, uint8_t pin_state);
+
     // PMU common configuration
     void enableInternalDischarge(void);
     void disableInternalDischarge(void);
@@ -145,10 +148,6 @@ public:
     // DCDC High/Low Voltage Turn Off
     void enableDCHighVoltageTurnOff();
     void disableDCHighVoltageTurnOff();
-    void enableDC5LowVoltageTurnOff();
-    void disableDC5LowVoltageTurnOff();
-    void enableDC4LowVoltageTurnOff();
-    void disableDC4LowVoltageTurnOff();
     void enableDC3LowVoltageTurnOff();
     void disableDC3LowVoltageTurnOff();
     void enableDC2LowVoltageTurnOff();
@@ -182,28 +181,6 @@ public:
     void setOffLevel(uint8_t opt);
     void setOnLevel(uint8_t opt);
 
-    // Fast Power On Sequence
-    void setDc4FastStartSequence(xpower_start_sequence_t opt);
-    void setDc3FastStartSequence(xpower_start_sequence_t opt);
-    void setDc2FastStartSequence(xpower_start_sequence_t opt);
-    void setDc1FastStartSequence(xpower_start_sequence_t opt);
-    void setAldo3FastStartSequence(xpower_start_sequence_t opt);
-    void setAldo2FastStartSequence(xpower_start_sequence_t opt);
-    void setAldo1FastStartSequence(xpower_start_sequence_t opt);
-    void setDc5FastStartSequence(xpower_start_sequence_t opt);
-    void setCpuldoFastStartSequence(xpower_start_sequence_t opt);
-    void setBldo2FastStartSequence(xpower_start_sequence_t opt);
-    void setBldo1FastStartSequence(xpower_start_sequence_t opt);
-    void setAldo4FastStartSequence(xpower_start_sequence_t opt);
-    void setDldo2FastStartSequence(xpower_start_sequence_t opt);
-    void setDldo1FastStartSequence(xpower_start_sequence_t opt);
-    void setFastPowerOnLevel(xpowers_fast_on_opt_t opt, xpower_start_sequence_t seq_level);
-    void disableFastPowerOn(xpowers_fast_on_opt_t opt);
-    void enableFastPowerOn(void);
-    void disableFastPowerOn(void);
-    void enableFastWakeup(void);
-    void disableFastWakeup(void);
-
     // DCDC High/Low Voltage Power Down
     void setDCHighVoltagePowerDown(bool en);
     bool getDCHighVoltagePowerDownEn();
@@ -211,7 +188,6 @@ public:
     void settDC1WorkModeToPwm(uint8_t enable);
     void settDC2WorkModeToPwm(uint8_t enable);
     void settDC3WorkModeToPwm(uint8_t enable);
-    void settDC4WorkModeToPwm(uint8_t enable);
     void setDCFreqSpreadRange(uint8_t opt);
     void setDCFreqSpreadRangeEn(bool en);
 
@@ -250,26 +226,6 @@ public:
     void setDC3LowVoltagePowerDown(bool en);
     bool getDC3LowVoltagePowerDownEn();
 
-    // DCDC4
-    bool isEnableDC4(void);
-    bool enableDC4(void);
-    bool disableDC4(void);
-    bool setDC4Voltage(uint16_t millivolt);
-    uint16_t getDC4Voltage(void);
-    void setDC4LowVoltagePowerDown(bool en);
-    bool getDC4LowVoltagePowerDownEn();
-
-    // DCDC5
-    bool isEnableDC5(void);
-    bool enableDC5(void);
-    bool disableDC5(void);
-    bool setDC5Voltage(uint16_t millivolt);
-    uint16_t getDC5Voltage(void);
-    bool isDC5FreqCompensationEn(void);
-    void enableDC5FreqCompensation();
-    void disableFreqCompensation();
-    void setDC5LowVoltagePowerDown(bool en);
-    bool getDC5LowVoltagePowerDownEn();
 
     // ALDO1
     bool isEnableALDO1(void);
@@ -299,27 +255,6 @@ public:
     bool disableALDO4(void);
     bool setALDO4Voltage(uint16_t millivolt);
     uint16_t getALDO4Voltage(void);
-
-    // BLDO1
-    bool isEnableBLDO1(void);
-    bool enableBLDO1(void);
-    bool disableBLDO1(void);
-    bool setBLDO1Voltage(uint16_t millivolt);
-    uint16_t getBLDO1Voltage(void);
-
-    // BLDO2
-    bool isEnableBLDO2(void);
-    bool enableBLDO2(void);
-    bool disableBLDO2(void);
-    bool setBLDO2Voltage(uint16_t millivolt);
-    uint16_t getBLDO2Voltage(void);
-
-    // CPUSLDO
-    bool isEnableCPUSLDO(void);
-    bool enableCPUSLDO(void);
-    bool disableCPUSLDO(void);
-    bool setCPUSLDOVoltage(uint16_t millivolt);
-    uint16_t getCPUSLDOVoltage(void);
 
     // DLDO3
     bool isEnableDLDO3(void);

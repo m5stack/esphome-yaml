@@ -19,14 +19,6 @@ void AXP192OutputBase::apply_channel(PowerChannel channel, uint16_t voltage) {
     //   this->parent_->setALDO3Voltage(voltage);
     //   this->parent_->enableALDO3();
     //   break;
-    // case PowerChannel::BLDO1:
-    //   this->parent_->setBLDO1Voltage(voltage);
-    //   this->parent_->enableBLDO1();
-    //   break;
-    // case PowerChannel::BLDO2:
-    //   this->parent_->setBLDO2Voltage(voltage);
-    //   this->parent_->enableBLDO2();
-    //   break;
     case PowerChannel::DLDO3:
       this->parent_->setDLDO3Voltage(voltage);
       this->parent_->enableDLDO3();
@@ -35,10 +27,6 @@ void AXP192OutputBase::apply_channel(PowerChannel channel, uint16_t voltage) {
       this->parent_->setDLDO2Voltage(voltage);
       this->parent_->enableDLDO2();
       break;
-    // case PowerChannel::CPUSLDO:
-    //   this->parent_->setCPUSLDOVoltage(voltage);
-    //   this->parent_->enableCPUSLDO();
-    //   break;
     case PowerChannel::DCDC1:
       this->parent_->setDC1Voltage(voltage);
       this->parent_->enableDC1();
@@ -62,11 +50,8 @@ void AXP192OutputBase::disable_channel(PowerChannel channel) {
     // case PowerChannel::ALDO1: this->parent_->disableALDO1(); break;
     // case PowerChannel::ALDO2: this->parent_->disableALDO2(); break;
     // case PowerChannel::ALDO3: this->parent_->disableALDO3(); break;
-    // case PowerChannel::BLDO1: this->parent_->disableBLDO1(); break;
-    // case PowerChannel::BLDO2: this->parent_->disableBLDO2(); break;
     case PowerChannel::DLDO3: this->parent_->disableDLDO3(); break;
     case PowerChannel::DLDO2: this->parent_->disableDLDO2(); break;
-    // case PowerChannel::CPUSLDO: this->parent_->disableCPUSLDO(); break;
     case PowerChannel::DCDC1: this->parent_->disableDC1(); break;
     case PowerChannel::DCDC2: this->parent_->disableDC2(); break;
     case PowerChannel::DCDC3: this->parent_->disableDC3(); break;

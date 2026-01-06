@@ -161,6 +161,11 @@
 #define XPOWERS_AXP192_LDO_VOL7_CTRL                    (0x28) //was 99 LDO3 voltage
 #define XPOWERS_AXP192_LDO_VOL8_CTRL                    (0x28) //was 9A LDO2 voltage
 
+#define XPOWERS_AXP192_GPIO0_MODE                       (0x90)
+#define XPOWERS_AXP192_GPIO1_MODE                       (0x92)
+#define XPOWERS_AXP192_GPIO2_MODE                       (0x93)
+#define XPOWERS_AXP192_GPIO3_MODE                       (0x94)
+#define XPOWERS_AXP192_GPIO4_MODE                       (0x95)
 
 #define XPOWERS_AXP192_BAT_PARAME                       (0xA1)
 #define XPOWERS_AXP192_FUEL_GAUGE_CTRL                  (0xA2)

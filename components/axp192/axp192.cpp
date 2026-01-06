@@ -24,11 +24,8 @@ void AXP192::AXP192::setup()
     //DC1 is MCU supply
     // Disable unused channels
     this->disableDC2(); //Unused?
-//    this->disableDC3(); //LCD Backlight so leave on
-//    this->disableDC4(); //not present, remove
-//    this->disableDC5(); //not present, remove
+    this->enableDC3(); //LCD Backlight so need on
 
-//    this->disableCPUSLDO(); //not present, remove
 //    this->enableDLDO1(); //LDO1 always on anyway, remove
     this->enableDLDO2(); //Periferal VDD & display power
     this->disableDLDO3(); //Vibration Motor VDD
@@ -147,15 +144,10 @@ void AXP192::AXP192::dump_config()
     ESP_LOGCONFIG(TAG, "DC1  : %s   Voltage:%u mV",  this->isEnableDC1()  ? "+" : "-", this->getDC1Voltage());
     ESP_LOGCONFIG(TAG, "DC2  : %s   Voltage:%u mV",  this->isEnableDC2()  ? "+" : "-", this->getDC2Voltage());
     ESP_LOGCONFIG(TAG, "DC3  : %s   Voltage:%u mV",  this->isEnableDC3()  ? "+" : "-", this->getDC3Voltage());
-    // ESP_LOGCONFIG(TAG, "DC4  : %s   Voltage:%u mV",  this->isEnableDC4()  ? "+" : "-", this->getDC4Voltage());
-    // ESP_LOGCONFIG(TAG, "DC5  : %s   Voltage:%u mV",  this->isEnableDC5()  ? "+" : "-", this->getDC5Voltage());
     ESP_LOGCONFIG(TAG, "ALDO1: %s   Voltage:%u mV",  this->isEnableALDO1()  ? "+" : "-", this->getALDO1Voltage());
     ESP_LOGCONFIG(TAG, "ALDO2: %s   Voltage:%u mV",  this->isEnableALDO2()  ? "+" : "-", this->getALDO2Voltage());
     ESP_LOGCONFIG(TAG, "ALDO3: %s   Voltage:%u mV",  this->isEnableALDO3()  ? "+" : "-", this->getALDO3Voltage());
     ESP_LOGCONFIG(TAG, "ALDO4: %s   Voltage:%u mV",  this->isEnableALDO4()  ? "+" : "-", this->getALDO4Voltage());
-    // ESP_LOGCONFIG(TAG, "BLDO1: %s   Voltage:%u mV",  this->isEnableBLDO1()  ? "+" : "-", this->getBLDO1Voltage());
-    // ESP_LOGCONFIG(TAG, "BLDO2: %s   Voltage:%u mV",  this->isEnableBLDO2()  ? "+" : "-", this->getBLDO2Voltage());
-    // ESP_LOGCONFIG(TAG, "CPUSLDO: %s Voltage:%u mV",  this->isEnableCPUSLDO() ? "+" : "-", this->getCPUSLDOVoltage());
     ESP_LOGCONFIG(TAG, "DLDO3: %s   Voltage:%u mV",  this->isEnableDLDO3()  ? "+" : "-", this->getDLDO3Voltage());
     ESP_LOGCONFIG(TAG, "DLDO2: %s   Voltage:%u mV",  this->isEnableDLDO2()  ? "+" : "-", this->getDLDO2Voltage());
 
@@ -299,7 +291,47 @@ inline uint16_t AXP192::readRegisterH5L8(uint8_t highReg, uint8_t lowReg)
     return ((h5 & 0x1F) << 8) | l8;
 }
 
+// GPIO functions
+void AXP192::setGpioPin(uint8_t gpio, uint8_t pin_state){
+    //Assumes GPIO with external pullups, active low
+    uint8_t val=0;
 
+    switch (gpio) {
+    case 0:
+        val = readRegister(XPOWERS_AXP192_GPIO0_MODE);
+        if (val == -1) return;
+        val &= 0xF8;
+        writeRegister(XPOWERS_AXP192_GPIO0_MODE, val | ((pin_state == 1) ? 0x06 : 0x05)); //Floating Output or Low output
+        break;
+    case 1:
+        val = readRegister(XPOWERS_AXP192_GPIO1_MODE);
+        if (val == -1) return;
+        val &= 0xF8;
+        writeRegister(XPOWERS_AXP192_GPIO1_MODE, val | ((pin_state == 1) ? 0x05 : 0x06)); //Low output (on) or Floating output (off)
+        break;
+    case 2:
+        val = readRegister(XPOWERS_AXP192_GPIO2_MODE);
+        if (val == -1) return;
+        val &= 0xF8;
+        writeRegister(XPOWERS_AXP192_GPIO2_MODE, val | ((pin_state == 1) ? 0x06 : 0x05)); //Floating Output or Low output
+        break;
+    case 3:
+        val = readRegister(XPOWERS_AXP192_GPIO3_MODE);
+        if (val == -1) return;
+        val &= 0xF8;
+        writeRegister(XPOWERS_AXP192_GPIO3_MODE, val | (0x06)); //Floating Output
+        break;
+    case 4:
+        val = readRegister(XPOWERS_AXP192_GPIO4_MODE);
+        if (val == -1) return;
+        val &= 0xF8;
+        writeRegister(XPOWERS_AXP192_GPIO4_MODE, val | (0x06)); //Floating Output
+        break;
+    default:
+        break;
+    }
+
+}
 
 
 /*
@@ -691,16 +723,6 @@ void AXP192::enableDCHighVoltageTurnOff(){ setRegisterBit(XPOWERS_AXP192_DC_OVP_
 
 void AXP192::disableDCHighVoltageTurnOff(){ clrRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 5); }
 
-// DCDC5 85% low voltage turn Off PMIC function
-void AXP192::enableDC5LowVoltageTurnOff(){ setRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 4); }
-
-void AXP192::disableDC5LowVoltageTurnOff(){ clrRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 4); }
-
-// DCDC4 85% low voltage turn Off PMIC function
-void AXP192::enableDC4LowVoltageTurnOff(){ setRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 3); }
-
-void AXP192::disableDC4LowVoltageTurnOff(){ clrRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 3); }
-
 // DCDC3 85% low voltage turn Off PMIC function
 void AXP192::enableDC3LowVoltageTurnOff(){ setRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 2); }
 
@@ -831,245 +853,6 @@ void AXP192::setOnLevel(uint8_t opt)
     writeRegister(XPOWERS_AXP192_IRQ_OFF_ON_LEVEL_CTRL, val | opt);
 }
 
-// Fast pwron setting 0  28
-// Fast Power On Start Sequence
-void AXP192::setDc4FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | ((opt & 0x3) << 6));
-}
-
-void AXP192::setDc3FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | ((opt & 0x3) << 4));
-}
-void AXP192::setDc2FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | ((opt & 0x3) << 2));
-}
-void AXP192::setDc1FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | (opt & 0x3));
-}
-
-//  Fast pwron setting 1  29
-void AXP192::setAldo3FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | ((opt & 0x3) << 6));
-}
-void AXP192::setAldo2FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | ((opt & 0x3) << 4));
-}
-void AXP192::setAldo1FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | ((opt & 0x3) << 2));
-}
-
-void AXP192::setDc5FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | (opt & 0x3));
-}
-
-//  Fast pwron setting 2  2A
-void AXP192::setCpuldoFastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | ((opt & 0x3) << 6));
-}
-
-void AXP192::setBldo2FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | ((opt & 0x3) << 4));
-}
-
-void AXP192::setBldo1FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | ((opt & 0x3) << 2));
-}
-
-void AXP192::setAldo4FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | (opt & 0x3));
-}
-
-//  Fast pwron setting 3  2B
-void AXP192::setDldo2FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_CTRL);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_CTRL, val | ((opt & 0x3) << 2));
-}
-
-void AXP192::setDldo1FastStartSequence(xpower_start_sequence_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_FAST_PWRON_CTRL);
-    if (val == -1)return;
-    writeRegister(XPOWERS_AXP192_FAST_PWRON_CTRL, val | (opt & 0x3));
-}
-
-/**
- * @brief   Setting Fast Power On Start Sequence
- */
-void AXP192::setFastPowerOnLevel(xpowers_fast_on_opt_t opt, xpower_start_sequence_t seq_level)
-{
-    uint8_t val = 0;
-    switch (opt) {
-    case XPOWERS_AXP192_FAST_DCDC1:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | seq_level);
-        break;
-    case XPOWERS_AXP192_FAST_DCDC2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | (seq_level << 2));
-        break;
-    case XPOWERS_AXP192_FAST_DCDC3:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | (seq_level << 4));
-        break;
-    case XPOWERS_AXP192_FAST_DCDC4:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val | (seq_level << 6));
-        break;
-    case XPOWERS_AXP192_FAST_DCDC5:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | seq_level);
-        break;
-    case XPOWERS_AXP192_FAST_ALDO1:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | (seq_level << 2));
-        break;
-    case XPOWERS_AXP192_FAST_ALDO2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | (seq_level << 4));
-        break;
-    case XPOWERS_AXP192_FAST_ALDO3:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val | (seq_level << 6));
-        break;
-    case XPOWERS_AXP192_FAST_ALDO4:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | seq_level);
-        break;
-    case XPOWERS_AXP192_FAST_BLDO1:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | (seq_level << 2));
-        break;
-    case XPOWERS_AXP192_FAST_BLDO2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | (seq_level << 4));
-        break;
-    case XPOWERS_AXP192_FAST_CPUSLDO:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val | (seq_level << 6));
-        break;
-    case XPOWERS_AXP192_FAST_DLDO3:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_CTRL);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_CTRL, val | seq_level);
-        break;
-    case XPOWERS_AXP192_FAST_DLDO2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_CTRL);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_CTRL, val | (seq_level << 2));
-        break;
-    default:
-        break;
-    }
-}
-
-void AXP192::disableFastPowerOn(xpowers_fast_on_opt_t opt)
-{
-    uint8_t val = 0;
-    switch (opt) {
-    case XPOWERS_AXP192_FAST_DCDC1:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val & 0xFC);
-        break;
-    case XPOWERS_AXP192_FAST_DCDC2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val & 0xF3);
-        break;
-    case XPOWERS_AXP192_FAST_DCDC3:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val & 0xCF);
-        break;
-    case XPOWERS_AXP192_FAST_DCDC4:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET0);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET0, val & 0x3F);
-        break;
-    case XPOWERS_AXP192_FAST_DCDC5:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val & 0xFC);
-        break;
-    case XPOWERS_AXP192_FAST_ALDO1:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val & 0xF3);
-        break;
-    case XPOWERS_AXP192_FAST_ALDO2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val & 0xCF);
-        break;
-    case XPOWERS_AXP192_FAST_ALDO3:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET1);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET1, val & 0x3F);
-        break;
-    case XPOWERS_AXP192_FAST_ALDO4:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val & 0xFC);
-        break;
-    case XPOWERS_AXP192_FAST_BLDO1:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val & 0xF3);
-        break;
-    case XPOWERS_AXP192_FAST_BLDO2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val & 0xCF);
-        break;
-    case XPOWERS_AXP192_FAST_CPUSLDO:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_SET2);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_SET2, val & 0x3F);
-        break;
-    case XPOWERS_AXP192_FAST_DLDO3:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_CTRL);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_CTRL, val & 0xFC);
-        break;
-    case XPOWERS_AXP192_FAST_DLDO2:
-        val = readRegister(XPOWERS_AXP192_FAST_PWRON_CTRL);
-        writeRegister(XPOWERS_AXP192_FAST_PWRON_CTRL, val & 0xF3);
-        break;
-    default:
-        break;
-    }
-}
-
-void AXP192::enableFastPowerOn(void){ setRegisterBit(XPOWERS_AXP192_FAST_PWRON_CTRL, 7); }
-
-void AXP192::disableFastPowerOn(void){ clrRegisterBit(XPOWERS_AXP192_FAST_PWRON_CTRL, 7); }
-
-void AXP192::enableFastWakeup(void){ setRegisterBit(XPOWERS_AXP192_FAST_PWRON_CTRL, 6); }
-
-void AXP192::disableFastWakeup(void){ clrRegisterBit(XPOWERS_AXP192_FAST_PWRON_CTRL, 6); }
 
 // DCDC 120%(130%) high voltage turn off PMIC function
 void AXP192::setDCHighVoltagePowerDown(bool en)
@@ -1105,21 +888,6 @@ void AXP192::settDC3WorkModeToPwm(uint8_t enable)
     enable ?
     setRegisterBit(XPOWERS_AXP192_DC_FORCE_PWM_CTRL, 4)
     : clrRegisterBit(XPOWERS_AXP192_DC_FORCE_PWM_CTRL, 4);
-}
-
-void AXP192::settDC4WorkModeToPwm( uint8_t enable)
-{
-    enable ?
-    setRegisterBit(XPOWERS_AXP192_DC_FORCE_PWM_CTRL, 5)
-    :  clrRegisterBit(XPOWERS_AXP192_DC_FORCE_PWM_CTRL, 5);
-}
-
-//1 = 100khz 0=50khz
-void AXP192::setDCFreqSpreadRange(uint8_t opt)
-{
-    opt ?
-    setRegisterBit(XPOWERS_AXP192_DC_FORCE_PWM_CTRL, 6)
-    :  clrRegisterBit(XPOWERS_AXP192_DC_FORCE_PWM_CTRL, 6);
 }
 
 void AXP192::setDCFreqSpreadRangeEn(bool en)
@@ -1303,124 +1071,6 @@ void AXP192::setDC3LowVoltagePowerDown(bool en)
 
 bool AXP192::getDC3LowVoltagePowerDownEn(){ return getRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 2); }
 
-
-/*
-* Power control DCDC4 functions
-*/
-/**
-    0.5~1.2V,10mV/step,71steps
-    1.22~1.84V,20mV/step,32steps
- */
-bool AXP192::isEnableDC4(void){ return getRegisterBit(XPOWERS_AXP192_DC_ONOFF_DVM_CTRL, 3); }
-
-bool AXP192::enableDC4(void){ return setRegisterBit(XPOWERS_AXP192_DC_ONOFF_DVM_CTRL, 3); }
-
-bool AXP192::disableDC4(void){ return clrRegisterBit(XPOWERS_AXP192_DC_ONOFF_DVM_CTRL, 3); }
-
-bool AXP192::setDC4Voltage(uint16_t millivolt)
-{
-    int val = readRegister(XPOWERS_AXP192_DC_VOL3_CTRL);
-    if (val == -1)return false;
-    val &= 0x80;
-    if (millivolt >= XPOWERS_AXP192_DCDC4_VOL1_MIN && millivolt <= XPOWERS_AXP192_DCDC4_VOL1_MAX) {
-        if (millivolt % XPOWERS_AXP192_DCDC4_VOL_STEPS1) {
-            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP192_DCDC4_VOL_STEPS1);
-            return false;
-        }
-        return  0 == writeRegister(XPOWERS_AXP192_DC_VOL3_CTRL, val | (millivolt - XPOWERS_AXP192_DCDC4_VOL1_MIN) / XPOWERS_AXP192_DCDC4_VOL_STEPS1);
-
-    } else if (millivolt >= XPOWERS_AXP192_DCDC4_VOL2_MIN && millivolt <= XPOWERS_AXP192_DCDC4_VOL2_MAX) {
-        if (millivolt % XPOWERS_AXP192_DCDC4_VOL_STEPS2) {
-            ESP_LOGE(TAG, "Mistake ! The steps must be %umV", XPOWERS_AXP192_DCDC4_VOL_STEPS2);
-            return false;
-        }
-        val |= (((millivolt - XPOWERS_AXP192_DCDC4_VOL2_MIN) / XPOWERS_AXP192_DCDC4_VOL_STEPS2) + XPOWERS_AXP192_DCDC4_VOL_STEPS2_BASE);
-        return  0 == writeRegister(XPOWERS_AXP192_DC_VOL3_CTRL, val);
-
-    }
-    return false;
-}
-
-uint16_t AXP192::getDC4Voltage(void)
-{
-    int val = readRegister(XPOWERS_AXP192_DC_VOL3_CTRL);
-    if (val == -1)return 0;
-    val &= 0x7F;
-    if (val < XPOWERS_AXP192_DCDC4_VOL_STEPS2_BASE) {
-        return (val  * XPOWERS_AXP192_DCDC4_VOL_STEPS1) +  XPOWERS_AXP192_DCDC4_VOL1_MIN;
-    } else  {
-        return (val  * XPOWERS_AXP192_DCDC4_VOL_STEPS2) - 200;
-    }
-    return 0;
-}
-
-// DCDC4 85% low voltage turn off PMIC function
-void AXP192::setDC4LowVoltagePowerDown(bool en)
-{
-    en ? setRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 3) : clrRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 3);
-}
-
-bool AXP192::getDC4LowVoltagePowerDownEn()
-{
-    return getRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 3);
-}
-
-/*
-* Power control DCDC5 functions,Output to gpio pin
-*/
-bool AXP192::isEnableDC5(void){ return getRegisterBit(XPOWERS_AXP192_DC_ONOFF_DVM_CTRL, 4); }
-
-bool AXP192::enableDC5(void){ return setRegisterBit(XPOWERS_AXP192_DC_ONOFF_DVM_CTRL, 4); }
-
-bool AXP192::disableDC5(void){ return clrRegisterBit(XPOWERS_AXP192_DC_ONOFF_DVM_CTRL, 4); }
-
-bool AXP192::setDC5Voltage(uint16_t millivolt)
-{
-    if (millivolt % XPOWERS_AXP192_DCDC5_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP192_DCDC5_VOL_STEPS);
-        return false;
-    }
-    if (millivolt != XPOWERS_AXP192_DCDC5_VOL_1200MV && millivolt < XPOWERS_AXP192_DCDC5_VOL_MIN) {
-        ESP_LOGE(TAG, "Mistake ! DC5 minimum voltage is %umV ,%umV", XPOWERS_AXP192_DCDC5_VOL_1200MV, XPOWERS_AXP192_DCDC5_VOL_MIN);
-        return false;
-    } else if (millivolt > XPOWERS_AXP192_DCDC5_VOL_MAX) {
-        ESP_LOGE(TAG, "Mistake ! DC5 maximum voltage is %umV", XPOWERS_AXP192_DCDC5_VOL_MAX);
-        return false;
-    }
-
-    int val =  readRegister(XPOWERS_AXP192_DC_VOL4_CTRL);
-    if (val == -1)return false;
-    val &= 0xE0;
-    if (millivolt == XPOWERS_AXP192_DCDC5_VOL_1200MV) {
-        return 0 == writeRegister(XPOWERS_AXP192_DC_VOL4_CTRL, val | XPOWERS_AXP192_DCDC5_VOL_VAL);
-    }
-    val |= (millivolt - XPOWERS_AXP192_DCDC5_VOL_MIN) / XPOWERS_AXP192_DCDC5_VOL_STEPS;
-    return 0 == writeRegister(XPOWERS_AXP192_DC_VOL4_CTRL, val);
-}
-
-uint16_t AXP192::getDC5Voltage(void)
-{
-    int val = readRegister(XPOWERS_AXP192_DC_VOL4_CTRL) ;
-    if (val == -1)return 0;
-    val &= 0x1F;
-    if (val == XPOWERS_AXP192_DCDC5_VOL_VAL)return XPOWERS_AXP192_DCDC5_VOL_1200MV;
-    return  (val * XPOWERS_AXP192_DCDC5_VOL_STEPS) + XPOWERS_AXP192_DCDC5_VOL_MIN;
-}
-
-bool AXP192::isDC5FreqCompensationEn(void){ return getRegisterBit(XPOWERS_AXP192_DC_VOL4_CTRL, 5); }
-
-void AXP192::enableDC5FreqCompensation(){ setRegisterBit(XPOWERS_AXP192_DC_VOL4_CTRL, 5); }
-
-void AXP192::disableFreqCompensation(){ clrRegisterBit(XPOWERS_AXP192_DC_VOL4_CTRL, 5); }
-
-// DCDC4 85% low voltage turn off PMIC function
-void AXP192::setDC5LowVoltagePowerDown(bool en)
-{
-    en ? setRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 4) : clrRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 4);
-}
-
-bool AXP192::getDC5LowVoltagePowerDownEn(){ return getRegisterBit(XPOWERS_AXP192_DC_OVP_UVP_CTRL, 4); }
-
 /*
 * Power control ALDO1 functions
 */
@@ -1551,113 +1201,6 @@ uint16_t AXP192::getALDO4Voltage(void)
 {
     uint16_t val =  readRegister(XPOWERS_AXP192_LDO_VOL3_CTRL) & 0x1F;
     return val * XPOWERS_AXP192_ALDO4_VOL_STEPS + XPOWERS_AXP192_ALDO4_VOL_MIN;
-}
-
-/*
-* Power control BLDO1 functions
-*/
-bool AXP192::isEnableBLDO1(void){ return getRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 4); }
-
-bool AXP192::enableBLDO1(void){ return setRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 4); }
-
-bool AXP192::disableBLDO1(void){ return clrRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 4); }
-
-bool AXP192::setBLDO1Voltage(uint16_t millivolt)
-{
-    if (millivolt % XPOWERS_AXP192_BLDO1_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP192_BLDO1_VOL_STEPS);
-        return false;
-    }
-    if (millivolt < XPOWERS_AXP192_BLDO1_VOL_MIN) {
-        ESP_LOGE(TAG, "Mistake ! BLDO1 minimum output voltage is  %umV", XPOWERS_AXP192_BLDO1_VOL_MIN);
-        return false;
-    } else if (millivolt > XPOWERS_AXP192_BLDO1_VOL_MAX) {
-        ESP_LOGE(TAG, "Mistake ! BLDO1 maximum output voltage is  %umV", XPOWERS_AXP192_BLDO1_VOL_MAX);
-        return false;
-    }
-    int val =  readRegister(XPOWERS_AXP192_LDO_VOL4_CTRL);
-    if (val == -1)return  false;
-    val &= 0xE0;
-    val |= (millivolt - XPOWERS_AXP192_BLDO1_VOL_MIN) / XPOWERS_AXP192_BLDO1_VOL_STEPS;
-    return 0 == writeRegister(XPOWERS_AXP192_LDO_VOL4_CTRL, val);
-}
-
-uint16_t AXP192::getBLDO1Voltage(void)
-{
-    int val =  readRegister(XPOWERS_AXP192_LDO_VOL4_CTRL);
-    if (val == -1)return 0;
-    val &= 0x1F;
-    return val * XPOWERS_AXP192_BLDO1_VOL_STEPS + XPOWERS_AXP192_BLDO1_VOL_MIN;
-}
-
-/*
-* Power control BLDO2 functions
-*/
-bool AXP192::isEnableBLDO2(void){ return getRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 5); }
-
-bool AXP192::enableBLDO2(void){ return setRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 5); }
-
-bool AXP192::disableBLDO2(void){ return clrRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 5); }
-
-bool AXP192::setBLDO2Voltage(uint16_t millivolt)
-{
-    if (millivolt % XPOWERS_AXP192_BLDO2_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP192_BLDO2_VOL_STEPS);
-        return false;
-    }
-    if (millivolt < XPOWERS_AXP192_BLDO2_VOL_MIN) {
-        ESP_LOGE(TAG, "Mistake ! BLDO2 minimum output voltage is  %umV", XPOWERS_AXP192_BLDO2_VOL_MIN);
-        return false;
-    } else if (millivolt > XPOWERS_AXP192_BLDO2_VOL_MAX) {
-        ESP_LOGE(TAG, "Mistake ! BLDO2 maximum output voltage is  %umV", XPOWERS_AXP192_BLDO2_VOL_MAX);
-        return false;
-    }
-    uint16_t val =  readRegister(XPOWERS_AXP192_LDO_VOL5_CTRL) & 0xE0;
-    val |= (millivolt - XPOWERS_AXP192_BLDO2_VOL_MIN) / XPOWERS_AXP192_BLDO2_VOL_STEPS;
-    return 0 == writeRegister(XPOWERS_AXP192_LDO_VOL5_CTRL, val);
-}
-
-uint16_t AXP192::getBLDO2Voltage(void)
-{
-    int val =  readRegister(XPOWERS_AXP192_LDO_VOL5_CTRL);
-    if (val == -1)return 0;
-    val &= 0x1F;
-    return val * XPOWERS_AXP192_BLDO2_VOL_STEPS + XPOWERS_AXP192_BLDO2_VOL_MIN;
-}
-
-/*
-* Power control CPUSLDO functions
-*/
-bool AXP192::isEnableCPUSLDO(void){ return getRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 6); }
-
-bool AXP192::enableCPUSLDO(void){ return setRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 6); }
-
-bool AXP192::disableCPUSLDO(void){ return clrRegisterBit(XPOWERS_AXP192_LDO_ONOFF_CTRL0, 6); }
-
-bool AXP192::setCPUSLDOVoltage(uint16_t millivolt)
-{
-    if (millivolt % XPOWERS_AXP192_CPUSLDO_VOL_STEPS) {
-        ESP_LOGE(TAG, "Mistake ! The steps must be %u mV", XPOWERS_AXP192_CPUSLDO_VOL_STEPS);
-        return false;
-    }
-    if (millivolt < XPOWERS_AXP192_CPUSLDO_VOL_MIN) {
-        ESP_LOGE(TAG, "Mistake ! CPULDO minimum output voltage is  %umV", XPOWERS_AXP192_CPUSLDO_VOL_MIN);
-        return false;
-    } else if (millivolt > XPOWERS_AXP192_CPUSLDO_VOL_MAX) {
-        ESP_LOGE(TAG, "Mistake ! CPULDO maximum output voltage is  %umV", XPOWERS_AXP192_CPUSLDO_VOL_MAX);
-        return false;
-    }
-    uint16_t val =  readRegister(XPOWERS_AXP192_LDO_VOL6_CTRL) & 0xE0;
-    val |= (millivolt - XPOWERS_AXP192_CPUSLDO_VOL_MIN) / XPOWERS_AXP192_CPUSLDO_VOL_STEPS;
-    return 0 == writeRegister(XPOWERS_AXP192_LDO_VOL6_CTRL, val);
-}
-
-uint16_t AXP192::getCPUSLDOVoltage(void)
-{
-    int val =  readRegister(XPOWERS_AXP192_LDO_VOL6_CTRL);
-    if (val == -1)return 0;
-    val &= 0x1F;
-    return val * XPOWERS_AXP192_CPUSLDO_VOL_STEPS + XPOWERS_AXP192_CPUSLDO_VOL_MIN;
 }
 
 
@@ -2005,7 +1548,10 @@ int AXP192::getBatteryPercent(void)
     if (!isBatteryConnect()) {
         return -1;
     }
-    return readRegister(XPOWERS_AXP192_BAT_PERCENT_DATA);
+    // No simple register so we read battery voltage and estimate % charge from that
+    uint16_t batteryVoltage = readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTVH, XPOWERS_AXP192_ADC_DATA_BATTVL);
+    if (batteryVoltage > 3670) return 100; //Consider fully charged, shoudl also check that charging is off
+    return ((batteryVoltage - 3200)/(3670 - 3200))*100;
 }
 
 /*
@@ -2492,11 +2038,7 @@ uint16_t AXP192::getPowerChannelVoltage(uint8_t channel)
         return getDC2Voltage();
     case XPOWERS_DCDC3:
         return getDC3Voltage();
-    case XPOWERS_DCDC4:
-        return getDC4Voltage();
-    case XPOWERS_DCDC5:
-        return getDC5Voltage();
-    case XPOWERS_ALDO1:
+     case XPOWERS_ALDO1:
         return getALDO1Voltage();
     case XPOWERS_ALDO2:
         return getALDO2Voltage();
@@ -2504,10 +2046,6 @@ uint16_t AXP192::getPowerChannelVoltage(uint8_t channel)
         return getALDO3Voltage();
     case XPOWERS_ALDO4:
         return getALDO4Voltage();
-    case XPOWERS_BLDO1:
-        return getBLDO1Voltage();
-    case XPOWERS_BLDO2:
-        return getBLDO2Voltage();
     case XPOWERS_DLDO3:
         return getDLDO3Voltage();
     case XPOWERS_DLDO2:
@@ -2529,10 +2067,6 @@ bool inline AXP192::enablePowerOutput(uint8_t channel)
         return enableDC2();
     case XPOWERS_DCDC3:
         return enableDC3();
-    case XPOWERS_DCDC4:
-        return enableDC4();
-    case XPOWERS_DCDC5:
-        return enableDC5();
     case XPOWERS_ALDO1:
         return enableALDO1();
     case XPOWERS_ALDO2:
@@ -2541,10 +2075,6 @@ bool inline AXP192::enablePowerOutput(uint8_t channel)
         return enableALDO3();
     case XPOWERS_ALDO4:
         return enableALDO4();
-    case XPOWERS_BLDO1:
-        return enableBLDO1();
-    case XPOWERS_BLDO2:
-        return enableBLDO2();
     case XPOWERS_DLDO3:
         return enableDLDO3();
     case XPOWERS_DLDO2:
@@ -2570,10 +2100,6 @@ bool inline AXP192::disablePowerOutput(uint8_t channel)
         return disableDC2();
     case XPOWERS_DCDC3:
         return disableDC3();
-    case XPOWERS_DCDC4:
-        return disableDC4();
-    case XPOWERS_DCDC5:
-        return disableDC5();
     case XPOWERS_ALDO1:
         return disableALDO1();
     case XPOWERS_ALDO2:
@@ -2582,18 +2108,12 @@ bool inline AXP192::disablePowerOutput(uint8_t channel)
         return disableALDO3();
     case XPOWERS_ALDO4:
         return disableALDO4();
-    case XPOWERS_BLDO1:
-        return disableBLDO1();
-    case XPOWERS_BLDO2:
-        return disableBLDO2();
     case XPOWERS_DLDO3:
         return disableDLDO3();
     case XPOWERS_DLDO2:
         return disableDLDO2();
     case XPOWERS_VBACKUP:
         return disableButtonBatteryCharge();
-    case XPOWERS_CPULDO:
-        return disableCPUSLDO();
     default:
         break;
     }
@@ -2609,10 +2129,6 @@ bool inline AXP192::isPowerChannelEnable(uint8_t channel)
         return isEnableDC2();
     case XPOWERS_DCDC3:
         return isEnableDC3();
-    case XPOWERS_DCDC4:
-        return isEnableDC4();
-    case XPOWERS_DCDC5:
-        return isEnableDC5();
     case XPOWERS_ALDO1:
         return isEnableALDO1();
     case XPOWERS_ALDO2:
@@ -2621,18 +2137,12 @@ bool inline AXP192::isPowerChannelEnable(uint8_t channel)
         return isEnableALDO3();
     case XPOWERS_ALDO4:
         return isEnableALDO4();
-    case XPOWERS_BLDO1:
-        return isEnableBLDO1();
-    case XPOWERS_BLDO2:
-        return isEnableBLDO2();
     case XPOWERS_DLDO3:
         return isEnableDLDO3();
     case XPOWERS_DLDO2:
         return isEnableDLDO2();
     case XPOWERS_VBACKUP:
         return isEnableButtonBatteryCharge();
-    case XPOWERS_CPULDO:
-        return isEnableCPUSLDO();
     default:
         break;
     }
@@ -2652,10 +2162,6 @@ bool inline AXP192::setPowerChannelVoltage(uint8_t channel, uint16_t millivolt)
         return setDC2Voltage(millivolt);
     case XPOWERS_DCDC3:
         return setDC3Voltage(millivolt);
-    case XPOWERS_DCDC4:
-        return setDC4Voltage(millivolt);
-    case XPOWERS_DCDC5:
-        return setDC5Voltage(millivolt);
     case XPOWERS_ALDO1:
         return setALDO1Voltage(millivolt);
     case XPOWERS_ALDO2:
@@ -2664,18 +2170,12 @@ bool inline AXP192::setPowerChannelVoltage(uint8_t channel, uint16_t millivolt)
         return setALDO3Voltage(millivolt);
     case XPOWERS_ALDO4:
         return setALDO4Voltage(millivolt);
-    case XPOWERS_BLDO1:
-        return setBLDO1Voltage(millivolt);
-    case XPOWERS_BLDO2:
-        return setBLDO1Voltage(millivolt);
     case XPOWERS_DLDO3:
         return setDLDO3Voltage(millivolt);
     case XPOWERS_DLDO2:
         return setDLDO2Voltage(millivolt);
     case XPOWERS_VBACKUP:
         return setButtonBatteryChargeVoltage(millivolt);
-    case XPOWERS_CPULDO:
-        return setCPUSLDOVoltage(millivolt);
     default:
         break;
     }
