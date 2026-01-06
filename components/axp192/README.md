@@ -192,4 +192,3 @@ switch:
 #    name: "Vibration"
 #    output: vibration_motor
 
-```
