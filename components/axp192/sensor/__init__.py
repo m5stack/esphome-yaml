@@ -43,6 +43,10 @@ CONF_INTERNAL_TEMPERATURE = "internal_temperature"
 CONF_BATTERY_CHARGE_CURRENT = "battery_charge_current"
 CONF_BATTERY_DISCHARGE_CURRENT = "battery_discharge_current"
 CONF_APS_VOLTAGE = "aps_voltage"
+CONF_BATTERY_DISCHARGE_100PC_VOLTAGE = "battery_discharge_100pc_voltage"
+CONF_BATTERY_DISCHARGE_0PC_VOLTAGE = "battery_discharge_0pc_voltage"
+CONF_BATTERY_CHARGE_100PC_CURRENT = "battery_charge_100pc_current"
+CONF_BATTERY_CHARGE_0PC_CURRENT = "battery_charge_0pc_current"
 
 AXP192Sensor = axp192_ns.class_("AXP192Sensor", sensor.Sensor, cg.PollingComponent)
 
@@ -142,7 +146,14 @@ CONFIG_SCHEMA = (
             ),
         }
     )
-    .extend(BASE_SCHEMA)
+    .extend(BASE_SCHEMA).extend(
+        {
+            cv.Optional(CONF_BATTERY_DISCHARGE_0PC_VOLTAGE, default=3000): cv.uint16_t,
+            cv.Optional(CONF_BATTERY_DISCHARGE_100PC_VOLTAGE, default=3700): cv.uint16_t,
+            cv.Optional(CONF_BATTERY_CHARGE_0PC_CURRENT, default=430): cv.uint16_t,
+            cv.Optional(CONF_BATTERY_CHARGE_100PC_CURRENT, default=100): cv.uint16_t,
+        }
+    )
     .extend(cv.polling_component_schema("15s"))
 )
 
@@ -154,6 +165,10 @@ async def to_code(config):
     if CONF_BATTERY_LEVEL in config:
         sens = await sensor.new_sensor(config[CONF_BATTERY_LEVEL])
         cg.add(var.set_battery_level_sensor(sens))
+        cg.add(var.set_battery_discharge_0pc_voltage(config[CONF_BATTERY_DISCHARGE_0PC_VOLTAGE]))
+        cg.add(var.set_battery_discharge_100pc_voltage(config[CONF_BATTERY_DISCHARGE_100PC_VOLTAGE]))
+        cg.add(var.set_battery_charge_0pc_current(config[CONF_BATTERY_CHARGE_0PC_CURRENT]))
+        cg.add(var.set_battery_charge_100pc_current(config[CONF_BATTERY_CHARGE_100PC_CURRENT]))
  
     if CONF_BATTERY_VOLTAGE in config:
         sens = await sensor.new_sensor(config[CONF_BATTERY_VOLTAGE])

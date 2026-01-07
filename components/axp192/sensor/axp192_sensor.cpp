@@ -8,9 +8,11 @@ static const char *TAG = "axp192.sensor";
 void AXP192Sensor::update() {
 
     float reading = 0;
-    int percent = this->parent_->getBatteryPercent();
+    int percent = 0;
     
     if (battery_level_sensor_ != nullptr) {
+        percent = this->parent_->getBatteryPercent();
+        percent = this->parent_->getScaledBatteryPercent(this->battery_discharge_0pc_Voltage_ , this->battery_discharge_100pc_Voltage_ , this->battery_charge_0pc_Current_ , this->battery_charge_100pc_Current_);
         battery_level_sensor_->publish_state(percent == -1 ? NAN : percent);
     }
 

@@ -44,11 +44,11 @@ public:
     bool isBatInActiveModeState(void);
     bool isChargingCurrentLessThanExpected(void);
 
-    //remove these
-    bool getCurrentLimitStatus(void);
-    bool isStandby(void);
-    bool isPowerOn(void);
-    bool isPowerOff(void);
+    // //remove these
+    // bool getCurrentLimitStatus(void);
+    // bool isStandby(void);
+    // bool isPowerOn(void);
+    // bool isPowerOff(void);
     
     xpowers_chg_status_t getChargerStatus(void);
 
@@ -76,11 +76,11 @@ public:
     void reset(void);
     void shutdown(void);
 
-    // DIE Over Temperature
-    void setDieOverTempLevel1(uint8_t opt);
-    uint8_t getDieOverTempLevel1(void);
-    void enableDieOverTempDetect(void);
-    void disableDieOverTempDetect(void);
+    // // DIE Over Temperature
+    // void setDieOverTempLevel1(uint8_t opt);
+    // uint8_t getDieOverTempLevel1(void);
+    // void enableDieOverTempDetect(void);
+    // void disableDieOverTempDetect(void);
 
     // Linear Charger Vsys voltage dpm
     void setLinearChargerVsysDpm(xpower_chg_dpm_t opt);
@@ -105,24 +105,24 @@ public:
     bool setButtonBatteryChargeVoltage(uint16_t millivolt);
     uint16_t getButtonBatteryVoltage(void);
 
-    // Cell Battery charge
-    void enableCellbatteryCharge(void);
-    void disableCellbatteryCharge(void);
+    // // Cell Battery charge
+    // void enableCellbatteryCharge(void);
+    // void disableCellbatteryCharge(void);
 
-    // Watchdog
-    void enableWatchdog(void);
-    void disableWatchdog(void);
-    void setWatchdogConfig(xpowers_wdt_config_t opt);
-    uint8_t getWatchConfig(void);
-    void clrWatchdog(void);
-    void setWatchdogTimeout(xpowers_wdt_timeout_t opt);
-    uint8_t getWatchdogTimerout(void);
+    // // Watchdog
+    // void enableWatchdog(void);
+    // void disableWatchdog(void);
+    // void setWatchdogConfig(xpowers_wdt_config_t opt);
+    // uint8_t getWatchConfig(void);
+    // void clrWatchdog(void);
+    // void setWatchdogTimeout(xpowers_wdt_timeout_t opt);
+    // uint8_t getWatchdogTimerout(void);
 
-    // Low battery warning/shutdown threshold
-    void setLowBatWarnThreshold(uint8_t percentage);
-    uint8_t getLowBatWarnThreshold(void);
-    void setLowBatShutdownThreshold(uint8_t opt);
-    uint8_t getLowBatShutdownThreshold(void);
+    // // Low battery warning/shutdown threshold
+    // void setLowBatWarnThreshold(uint8_t percentage);
+    // uint8_t getLowBatWarnThreshold(void);
+    // void setLowBatShutdownThreshold(uint8_t opt);
+    // uint8_t getLowBatShutdownThreshold(void);
 
     // Power ON/OFF Source
     bool isPoweronAlwaysHighSource();
@@ -310,7 +310,7 @@ public:
     bool disableBattDetection(void);
     float getBattVoltage(void);
     int getBatteryPercent(void);
-
+    int getScaledBatteryPercent(uint16_t min_voltage, uint16_t max_voltage, uint16_t min_current, uint16_t max_current); //New function
     void setChargingLedMode(uint8_t mode);
     uint8_t getChargingLedMode();
     void setPrechargeCurr(xpowers_prechg_t opt);

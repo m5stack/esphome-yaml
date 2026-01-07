@@ -18,6 +18,10 @@ public:
     void update() override;
     void dump_config() override;
     float get_setup_priority() const override { return setup_priority::DATA; }
+    void set_battery_discharge_0pc_voltage(uint16_t voltage) { this->battery_discharge_0pc_Voltage_ = voltage; }
+    void set_battery_discharge_100pc_voltage(uint16_t voltage) { this->battery_discharge_100pc_Voltage_ = voltage; }
+    void set_battery_charge_0pc_current(uint16_t current) { this->battery_charge_0pc_Current_ = current; }
+    void set_battery_charge_100pc_current(uint16_t current) { this->battery_charge_100pc_Current_ = current; }
     // Sensors
     void set_battery_level_sensor(sensor::Sensor *battery_level_sensor) { this->battery_level_sensor_ = battery_level_sensor; }
     void set_battery_voltage_sensor(sensor::Sensor *battery_voltage_sensor) { this->battery_voltage_sensor_ = battery_voltage_sensor; }
@@ -66,6 +70,12 @@ private:
     binary_sensor::BinarySensor *battery_connected_binary_sensor_{nullptr};
     binary_sensor::BinarySensor *battery_active_mode_binary_sensor_{nullptr};
     binary_sensor::BinarySensor *low_charge_current_binary_sensor_{nullptr};
+
+protected:
+    uint16_t battery_discharge_0pc_Voltage_{1005}; //mV Nte these default values are overridden by defaults in _init_py file
+    uint16_t battery_discharge_100pc_Voltage_{3305}; //mV
+    uint16_t battery_charge_0pc_Current_{435}; //mA
+    uint16_t battery_charge_100pc_Current_{105}; //mA
 };
 
 }

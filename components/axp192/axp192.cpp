@@ -124,12 +124,6 @@ void AXP192::AXP192::setup()
     // Enable internal ADC detection
     this->enableBattDetection();
 
-    // Enable Button Battery charge
-    // this->enableButtonBatteryCharge(); //NA remove
-
-    // Set Button Battery charge voltage
-    // this->setButtonBatteryChargeVoltage(3300); //NA remove
-
     ESP_LOGI(TAG, "AXP192 PMU Init Success!");
 }
 
@@ -365,22 +359,22 @@ bool AXP192::isChargingCurrentLessThanExpected(void){ return getRegisterBit(XPOW
 //bit 0 reserved
 
 
-//Remove these
-bool AXP192::getCurrentLimitStatus(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 0); } //NA, remove?
+// //Remove these
+// bool AXP192::getCurrentLimitStatus(void){ return getRegisterBit(XPOWERS_AXP192_STATUS1, 0); } //NA, remove?
 
-bool AXP192::isStandby(void){ return (readRegister(XPOWERS_AXP192_STATUS2) >> 5) == 0x00; } //NA?
+// bool AXP192::isStandby(void){ return (readRegister(XPOWERS_AXP192_STATUS2) >> 5) == 0x00; } //NA?
 
-bool AXP192::isPowerOn(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 4); }  //NA?
+// bool AXP192::isPowerOn(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 4); }  //NA?
 
-bool AXP192::isPowerOff(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 4); } //NA?
+// bool AXP192::isPowerOff(void){ return getRegisterBit(XPOWERS_AXP192_STATUS2, 4); } //NA?
 
 
-xpowers_chg_status_t AXP192::getChargerStatus(void){ //NA remove
-    int val = readRegister(XPOWERS_AXP192_STATUS2);
-    if (val == -1)return XPOWERS_AXP192_CHG_STOP_STATE;
-    val &= 0x07;
-    return (xpowers_chg_status_t)val;
-}
+// xpowers_chg_status_t AXP192::getChargerStatus(void){ //NA remove
+//     int val = readRegister(XPOWERS_AXP192_STATUS2);
+//     if (val == -1)return XPOWERS_AXP192_CHG_STOP_STATE;
+//     val &= 0x07;
+//     return (xpowers_chg_status_t)val;
+// }
 
 /*
  * PMU common configuration
@@ -420,39 +414,39 @@ void AXP192::reset(void){ setRegisterBit(XPOWERS_AXP192_COMMON_CONFIG, 1); }
  */
 void AXP192::shutdown(void){ setRegisterBit(XPOWERS_AXP192_COMMON_CONFIG, 0); }
 
-/**
- * @param  opt: 0:115 , 1:125 , 2:135
- */
-void AXP192::setDieOverTempLevel1(uint8_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_DIE_TEMP_CTRL);
-    if (val == -1)return;
-    val &= 0xF9;
-    writeRegister(XPOWERS_AXP192_DIE_TEMP_CTRL, val | (opt << 1));
-}
+// /**
+//  * @param  opt: 0:115 , 1:125 , 2:135
+//  */
+// void AXP192::setDieOverTempLevel1(uint8_t opt)
+// {
+//     int val = readRegister(XPOWERS_AXP192_DIE_TEMP_CTRL);
+//     if (val == -1)return;
+//     val &= 0xF9;
+//     writeRegister(XPOWERS_AXP192_DIE_TEMP_CTRL, val | (opt << 1));
+// }
 
-uint8_t AXP192::getDieOverTempLevel1(void){ return (readRegister(XPOWERS_AXP192_DIE_TEMP_CTRL) & 0x06); }
+// uint8_t AXP192::getDieOverTempLevel1(void){ return (readRegister(XPOWERS_AXP192_DIE_TEMP_CTRL) & 0x06); }
 
-void AXP192::enableDieOverTempDetect(void){ setRegisterBit(XPOWERS_AXP192_DIE_TEMP_CTRL, 0); }
+// void AXP192::enableDieOverTempDetect(void){ setRegisterBit(XPOWERS_AXP192_DIE_TEMP_CTRL, 0); }
 
-void AXP192::disableDieOverTempDetect(void){ clrRegisterBit(XPOWERS_AXP192_DIE_TEMP_CTRL, 0); }
+// void AXP192::disableDieOverTempDetect(void){ clrRegisterBit(XPOWERS_AXP192_DIE_TEMP_CTRL, 0); }
 
-// Linear Charger Vsys voltage dpm
-void AXP192::setLinearChargerVsysDpm(xpower_chg_dpm_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_MIN_SYS_VOL_CTRL);
-    if (val == -1)return;
-    val &= 0x8F;
-    writeRegister(XPOWERS_AXP192_MIN_SYS_VOL_CTRL, val | (opt << 4));
-}
+// // Linear Charger Vsys voltage dpm
+// void AXP192::setLinearChargerVsysDpm(xpower_chg_dpm_t opt)
+// {
+//     int val = readRegister(XPOWERS_AXP192_MIN_SYS_VOL_CTRL);
+//     if (val == -1)return;
+//     val &= 0x8F;
+//     writeRegister(XPOWERS_AXP192_MIN_SYS_VOL_CTRL, val | (opt << 4));
+// }
 
-uint8_t AXP192::getLinearChargerVsysDpm(void)
-{
-    int val = readRegister(XPOWERS_AXP192_MIN_SYS_VOL_CTRL);
-    if (val == -1)return 0;
-    val &= 0x70;
-    return (val & 0x70) >> 4;
-}
+// uint8_t AXP192::getLinearChargerVsysDpm(void)
+// {
+//     int val = readRegister(XPOWERS_AXP192_MIN_SYS_VOL_CTRL);
+//     if (val == -1)return 0;
+//     val &= 0x70;
+//     return (val & 0x70) >> 4;
+// }
 
 
 /**
@@ -551,105 +545,105 @@ uint16_t AXP192::getButtonBatteryVoltage(void){
 }
 
 
-/**
- * @brief Cell Battery charge
- */
-void AXP192::enableCellbatteryCharge(void){ setRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 1); }
+// /**
+//  * @brief Cell Battery charge
+//  */
+// void AXP192::enableCellbatteryCharge(void){ setRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 1); }
 
-void AXP192::disableCellbatteryCharge(void){ clrRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 1); }
+// void AXP192::disableCellbatteryCharge(void){ clrRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 1); }
 
-/**
- * @brief  Watchdog Module
- */
-void AXP192::enableWatchdog(void){
-    setRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 0);
-    enableIRQ(XPOWERS_AXP192_WDT_EXPIRE_IRQ);
-}
+// /**
+//  * @brief  Watchdog Module
+//  */
+// void AXP192::enableWatchdog(void){
+//     setRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 0);
+//     enableIRQ(XPOWERS_AXP192_WDT_EXPIRE_IRQ);
+// }
 
-void AXP192::disableWatchdog(void)
-{
-    disableIRQ(XPOWERS_AXP192_WDT_EXPIRE_IRQ);
-    clrRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 0);
-}
+// void AXP192::disableWatchdog(void)
+// {
+//     disableIRQ(XPOWERS_AXP192_WDT_EXPIRE_IRQ);
+//     clrRegisterBit(XPOWERS_AXP192_CHARGE_GAUGE_WDT_CTRL, 0);
+// }
 
-/**
- * @brief Watchdog Config
- * @note
- * @param  opt: 0: IRQ Only 1: IRQ and System reset  2: IRQ, System Reset and Pull down PWROK 1s  3: IRQ, System Reset, DCDC/LDO PWROFF & PWRON
- * @retval None
- */
-void AXP192::setWatchdogConfig(xpowers_wdt_config_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_WDT_CTRL);
-    if (val == -1)return;
-    val &= 0xCF;
-    writeRegister(XPOWERS_AXP192_WDT_CTRL, val | (opt << 4));
-}
+// /**
+//  * @brief Watchdog Config
+//  * @note
+//  * @param  opt: 0: IRQ Only 1: IRQ and System reset  2: IRQ, System Reset and Pull down PWROK 1s  3: IRQ, System Reset, DCDC/LDO PWROFF & PWRON
+//  * @retval None
+//  */
+// void AXP192::setWatchdogConfig(xpowers_wdt_config_t opt)
+// {
+//     int val = readRegister(XPOWERS_AXP192_WDT_CTRL);
+//     if (val == -1)return;
+//     val &= 0xCF;
+//     writeRegister(XPOWERS_AXP192_WDT_CTRL, val | (opt << 4));
+// }
 
-uint8_t AXP192::getWatchConfig(void)
-{
-    return (readRegister(XPOWERS_AXP192_WDT_CTRL) & 0x30) >> 4;
-}
+// uint8_t AXP192::getWatchConfig(void)
+// {
+//     return (readRegister(XPOWERS_AXP192_WDT_CTRL) & 0x30) >> 4;
+// }
 
-void AXP192::clrWatchdog(void)
-{
-    setRegisterBit(XPOWERS_AXP192_WDT_CTRL, 3);
-}
+// void AXP192::clrWatchdog(void)
+// {
+//     setRegisterBit(XPOWERS_AXP192_WDT_CTRL, 3);
+// }
 
 
-void AXP192::setWatchdogTimeout(xpowers_wdt_timeout_t opt)
-{
-    int val = readRegister(XPOWERS_AXP192_WDT_CTRL);
-    if (val == -1)return;
-    val &= 0xF8;
-    writeRegister(XPOWERS_AXP192_WDT_CTRL, val | opt);
-}
+// void AXP192::setWatchdogTimeout(xpowers_wdt_timeout_t opt)
+// {
+//     int val = readRegister(XPOWERS_AXP192_WDT_CTRL);
+//     if (val == -1)return;
+//     val &= 0xF8;
+//     writeRegister(XPOWERS_AXP192_WDT_CTRL, val | opt);
+// }
 
-uint8_t AXP192::getWatchdogTimerout(void){ return readRegister(XPOWERS_AXP192_WDT_CTRL) & 0x07; }
+// uint8_t AXP192::getWatchdogTimerout(void){ return readRegister(XPOWERS_AXP192_WDT_CTRL) & 0x07; }
 
-/**
- * @brief  Low battery warning threshold 5-20%, 1% per step
- * @param  percentage:   5 ~ 20
- * @retval None
- */
-void AXP192::setLowBatWarnThreshold(uint8_t percentage)
-{
-    if (percentage < 5 || percentage > 20)return;
-    int val = readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET);
-    if (val == -1)return;
-    val &= 0x0F;
-    writeRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET, val | ((percentage - 5) << 4));
-}
+// /**
+//  * @brief  Low battery warning threshold 5-20%, 1% per step
+//  * @param  percentage:   5 ~ 20
+//  * @retval None
+//  */
+// void AXP192::setLowBatWarnThreshold(uint8_t percentage)
+// {
+//     if (percentage < 5 || percentage > 20)return;
+//     int val = readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET);
+//     if (val == -1)return;
+//     val &= 0x0F;
+//     writeRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET, val | ((percentage - 5) << 4));
+// }
 
-uint8_t AXP192::getLowBatWarnThreshold(void)
-{
-    int val = readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET);
-    if (val == -1)return 0;
-    val &= 0xF0;
-    val >>= 4;
-    return val;
-}
+// uint8_t AXP192::getLowBatWarnThreshold(void)
+// {
+//     int val = readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET);
+//     if (val == -1)return 0;
+//     val &= 0xF0;
+//     val >>= 4;
+//     return val;
+// }
 
-/**
- * @brief  Low battery shutdown threshold 0-15%, 1% per step
- * @param  opt:   0 ~ 15
- * @retval None
- */
-void AXP192::setLowBatShutdownThreshold(uint8_t opt)
-{
-    if (opt > 15) {
-        opt = 15;
-    }
-    int val = readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET);
-    if (val == -1)return;
-    val &= 0xF0;
-    writeRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET, val | opt);
-}
+// /**
+//  * @brief  Low battery shutdown threshold 0-15%, 1% per step
+//  * @param  opt:   0 ~ 15
+//  * @retval None
+//  */
+// void AXP192::setLowBatShutdownThreshold(uint8_t opt)
+// {
+//     if (opt > 15) {
+//         opt = 15;
+//     }
+//     int val = readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET);
+//     if (val == -1)return;
+//     val &= 0xF0;
+//     writeRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET, val | opt);
+// }
 
-uint8_t AXP192::getLowBatShutdownThreshold(void)
-{
-    return (readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET) & 0x0F);
-}
+// uint8_t AXP192::getLowBatShutdownThreshold(void)
+// {
+//     return (readRegister(XPOWERS_AXP192_LOW_BAT_WARN_SET) & 0x0F);
+// }
 
 //!  PWRON statu  20
 // POWERON always high when EN Mode as POWERON Source
@@ -1554,12 +1548,51 @@ float AXP192::getBattVoltage(void)
 int AXP192::getBatteryPercent(void)
 {
     if (!isBatteryConnect()) {
-        return -1;
+        return -1; // Battery not connected so Percent not available
     }
     // No simple register so we read battery voltage and estimate % charge from that
     uint16_t batteryVoltage = readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTVH, XPOWERS_AXP192_ADC_DATA_BATTVL);
-    if (batteryVoltage > 3670) return 100; //Consider fully charged, shoudl also check that charging is off
-    return ((batteryVoltage - 3200)/(3670 - 3200))*100;
+    int batteryPercent = ((batteryVoltage - 3200)*100)/(3670 - 3200);
+ESP_LOGD(TAG, "BattVoltage %u mV, %% %u", batteryVoltage, batteryPercent);
+
+    if (batteryVoltage > 3670) return 100; //Consider fully charged, should also check that charging is off
+    return batteryPercent;
+}
+
+int AXP192::getScaledBatteryPercent(uint16_t discharge_0pc_voltage, uint16_t discharge_100pc_voltage, uint16_t charge_0pc_current, uint16_t charge_100pc_current)
+{
+    int batteryPercent = 0;
+    if (!isBatteryConnect()) {
+        return -1; // Battery not connected so Percent not available
+    }
+    // No simple register so we read battery voltage and estimate % charge from that
+    uint16_t batteryVoltage = readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTVH, XPOWERS_AXP192_ADC_DATA_BATTVL);
+    uint16_t batteryChargeCurrent = readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTCHGH, XPOWERS_AXP192_ADC_DATA_BATTCHGL);
+    if (isCharging()) {
+        // Use charging current as indicator of state of charge
+        if (batteryChargeCurrent <= charge_100pc_current){
+            batteryPercent = 100;
+        } else {
+            if (batteryChargeCurrent >= charge_0pc_current){
+                batteryPercent = 0;
+            } else {
+                batteryPercent = ((batteryChargeCurrent - charge_100pc_current)*100)/(charge_0pc_current - charge_100pc_current);
+            }
+        }
+    } else {
+        if (batteryVoltage >= discharge_100pc_voltage) {
+            batteryPercent = 100; //Consider fully charged, should also check that charging is off
+        } else {
+            if (batteryVoltage <= discharge_0pc_voltage) {
+                batteryPercent = 0;
+            } else {
+                batteryPercent = ((batteryVoltage - discharge_0pc_voltage)*100)/(discharge_100pc_voltage - discharge_0pc_voltage);
+            }
+        }
+    }
+ESP_LOGD(TAG, "BattVoltage %umV, ChgCurrent %umA, 0pcvoltage %umV, 100pc voltage %umV, 0pccurrent %umA, 100pccurrent %umA, Batt%% %u", batteryVoltage, batteryChargeCurrent, discharge_0pc_voltage, discharge_100pc_voltage, charge_0pc_current, charge_100pc_current, batteryPercent);
+
+    return batteryPercent;
 }
 
 /*
@@ -2058,8 +2091,8 @@ uint16_t AXP192::getPowerChannelVoltage(uint8_t channel)
         return getDLDO3Voltage();
     case XPOWERS_DLDO2:
         return getDLDO2Voltage();
-    case XPOWERS_VBACKUP:
-        return getButtonBatteryVoltage();
+    // case XPOWERS_VBACKUP:
+    //     return getButtonBatteryVoltage();
     default:
         break;
     }
@@ -2087,8 +2120,8 @@ bool inline AXP192::enablePowerOutput(uint8_t channel)
         return enableDLDO3();
     case XPOWERS_DLDO2:
         return enableDLDO2();
-    case XPOWERS_VBACKUP:
-        return enableButtonBatteryCharge();
+    // case XPOWERS_VBACKUP:
+    //     return enableButtonBatteryCharge();
     default:
         break;
     }
@@ -2120,8 +2153,8 @@ bool inline AXP192::disablePowerOutput(uint8_t channel)
         return disableDLDO3();
     case XPOWERS_DLDO2:
         return disableDLDO2();
-    case XPOWERS_VBACKUP:
-        return disableButtonBatteryCharge();
+    // case XPOWERS_VBACKUP:
+    //     return disableButtonBatteryCharge();
     default:
         break;
     }
@@ -2149,8 +2182,8 @@ bool inline AXP192::isPowerChannelEnable(uint8_t channel)
         return isEnableDLDO3();
     case XPOWERS_DLDO2:
         return isEnableDLDO2();
-    case XPOWERS_VBACKUP:
-        return isEnableButtonBatteryCharge();
+    // case XPOWERS_VBACKUP:
+    //     return isEnableButtonBatteryCharge();
     default:
         break;
     }
@@ -2182,8 +2215,8 @@ bool inline AXP192::setPowerChannelVoltage(uint8_t channel, uint16_t millivolt)
         return setDLDO3Voltage(millivolt);
     case XPOWERS_DLDO2:
         return setDLDO2Voltage(millivolt);
-    case XPOWERS_VBACKUP:
-        return setButtonBatteryChargeVoltage(millivolt);
+    // case XPOWERS_VBACKUP:
+    //     return setButtonBatteryChargeVoltage(millivolt);
     default:
         break;
     }

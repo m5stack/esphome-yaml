@@ -136,7 +136,7 @@
 #define XPOWERS_AXP192_BTN_VOL_STEPS                    (100)
 
 
-#define XPOWERS_AXP192_BTN_BAT_CHG_VOL_SET              (0x6A)
+#define XPOWERS_AXP192_BTN_BAT_CHG_VOL_SET              (0x35) //was 0x6A
 
 
 #define XPOWERS_AXP192_DC_ONOFF_DVM_CTRL                (0x12) //was 0x80
