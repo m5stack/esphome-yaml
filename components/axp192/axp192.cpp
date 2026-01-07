@@ -1566,8 +1566,8 @@ int AXP192::getScaledBatteryPercent(uint16_t discharge_0pc_voltage, uint16_t dis
         return -1; // Battery not connected so Percent not available
     }
     // No simple register so we read battery voltage and estimate % charge from that
-    uint16_t batteryVoltage = readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTVH, XPOWERS_AXP192_ADC_DATA_BATTVL);
-    uint16_t batteryChargeCurrent = readRegisterH8L4(XPOWERS_AXP192_ADC_DATA_BATTCHGH, XPOWERS_AXP192_ADC_DATA_BATTCHGL);
+    uint16_t batteryVoltage = 1000.0*getBattVoltage(); //mV
+    uint16_t batteryChargeCurrent = 1000.0*getBattChargeCurrent(); //mA
     if (isCharging()) {
         // Use charging current as indicator of state of charge
         if (batteryChargeCurrent <= charge_100pc_current){
@@ -1576,7 +1576,7 @@ int AXP192::getScaledBatteryPercent(uint16_t discharge_0pc_voltage, uint16_t dis
             if (batteryChargeCurrent >= charge_0pc_current){
                 batteryPercent = 0;
             } else {
-                batteryPercent = ((batteryChargeCurrent - charge_100pc_current)*100)/(charge_0pc_current - charge_100pc_current);
+                batteryPercent = ((charge_0pc_current - batteryChargeCurrent)*100)/(charge_0pc_current - charge_100pc_current);
             }
         }
     } else {
@@ -1590,7 +1590,6 @@ int AXP192::getScaledBatteryPercent(uint16_t discharge_0pc_voltage, uint16_t dis
             }
         }
     }
-ESP_LOGD(TAG, "BattVoltage %umV, ChgCurrent %umA, 0pcvoltage %umV, 100pc voltage %umV, 0pccurrent %umA, 100pccurrent %umA, Batt%% %u", batteryVoltage, batteryChargeCurrent, discharge_0pc_voltage, discharge_100pc_voltage, charge_0pc_current, charge_100pc_current, batteryPercent);
 
     return batteryPercent;
 }

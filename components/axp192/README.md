@@ -93,7 +93,7 @@ sensor:
     id: axp192_sensor
     # Optional calibration settings for battery level calculation, suggest chart your own device battery voltage and charge current to configure these
     battery_discharge_100pc_voltage: 3670 #Battery voltage level at which 100% charge is assumed (when not charging, or charging finished) in mV
-    battery_discharge_0pc_voltage: 3000 #Battery voltagelevel at which 0% charge is assumed (when not charging, or charging finished) in mV
+    battery_discharge_0pc_voltage: 3000 #Battery voltage level at which 0% charge is assumed (when not charging, or charging finished) in mV
     battery_charge_100pc_current: 60 #Battery charge current at which 100% charge is assumed (when charging) in mA
     battery_charge_0pc_current: 420 #Battery charge current at which 0% charge is assumed (when charging) in mA
     battery_voltage:

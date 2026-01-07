@@ -60,7 +60,14 @@ CONFIG_SCHEMA = (
                 icon=ICON_BATTERY,
                 device_class=DEVICE_CLASS_BATTERY,
                 state_class=STATE_CLASS_MEASUREMENT,
-            ),
+            )
+            .extend({
+                cv.Optional(CONF_BATTERY_DISCHARGE_0PC_VOLTAGE, default=3000): cv.uint16_t,
+            #     cv.Optional(CONF_BATTERY_DISCHARGE_100PC_VOLTAGE, default=3700): cv.uint16_t,
+            #     cv.Optional(CONF_BATTERY_CHARGE_0PC_CURRENT, default=430): cv.uint16_t,
+            #     cv.Optional(CONF_BATTERY_CHARGE_100PC_CURRENT, default=100): cv.uint16_t,
+            })
+            ,
             cv.Optional(CONF_BATTERY_VOLTAGE): sensor.sensor_schema(
                 unit_of_measurement='V',
                 device_class=DEVICE_CLASS_VOLTAGE,
@@ -146,12 +153,13 @@ CONFIG_SCHEMA = (
             ),
         }
     )
-    .extend(BASE_SCHEMA).extend(
+    .extend(BASE_SCHEMA)
+    .extend(
         {
-            cv.Optional(CONF_BATTERY_DISCHARGE_0PC_VOLTAGE, default=3000): cv.uint16_t,
-            cv.Optional(CONF_BATTERY_DISCHARGE_100PC_VOLTAGE, default=3700): cv.uint16_t,
+            cv.Optional(CONF_BATTERY_DISCHARGE_0PC_VOLTAGE, default=3200): cv.uint16_t,
+            cv.Optional(CONF_BATTERY_DISCHARGE_100PC_VOLTAGE, default=3680): cv.uint16_t,
             cv.Optional(CONF_BATTERY_CHARGE_0PC_CURRENT, default=430): cv.uint16_t,
-            cv.Optional(CONF_BATTERY_CHARGE_100PC_CURRENT, default=100): cv.uint16_t,
+            cv.Optional(CONF_BATTERY_CHARGE_100PC_CURRENT, default=60): cv.uint16_t,
         }
     )
     .extend(cv.polling_component_schema("15s"))
