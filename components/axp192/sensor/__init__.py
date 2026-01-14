@@ -162,7 +162,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_BATTERY_CHARGE_100PC_CURRENT, default=60): cv.uint16_t,
         }
     )
-    .extend(cv.polling_component_schema("15s"))
+    .extend(cv.polling_component_schema("60s"))
 )
 
 async def to_code(config):
