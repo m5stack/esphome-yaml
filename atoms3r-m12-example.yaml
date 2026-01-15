@@ -1,0 +1,91 @@
+esphome:
+  name: atoms3r-m12
+  friendly_name: AtomS3R-M12
+  on_boot:
+    priority: 1200
+    then:
+      - lambda: |-
+          gpio_set_direction(GPIO_NUM_18, GPIO_MODE_OUTPUT);
+          gpio_set_level(GPIO_NUM_18, 0);  
+          vTaskDelay(pdMS_TO_TICKS(1500)); 
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+  level: DEBUG   
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "mLTyVD5L13T7hvkdRr9ardNbXYYWmBOo6l7kjg5OSdI="
+
+ota:
+  - platform: esphome
+    password: "6aacaa1492f5e0eab0b7ce5af43087bc"
+
+wifi:
+  ssid: DeepSpace9
+  password: huxiaochuan
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Camer Fallback Hotspot"
+    password: "nSPRG7FiYdct"
+
+external_components:
+  - source: github://DennisGaida/m5stack-atoms3r-components@main
+    components: [bmi270_bmm150]
+
+captive_portal:
+
+psram:
+  mode: octal
+  speed: 80MHz 
+
+i2c:
+  - id: BMi270
+    sda: GPIO45
+    scl: GPIO0
+  - id: camera_i2c
+    sda: GPIO12
+    scl: GPIO9
+    frequency: 100kHz  
+    timeout: 10ms        
+    scan: true          
+
+# Example configuration entry
+sensor:
+  - platform: bmi270_bmm150
+    i2c_id: BMi270
+    address: 0x68
+    update_interval: 5s
+    acceleration_x:
+      name: "BMI270 Accel X"
+    acceleration_y:
+      name: "BMI270 Accel Y"
+    acceleration_z:
+      name: "BMI270 Accel z"
+    gyroscope_x:
+      name: "BMI270 Gyro X"
+    gyroscope_y:
+      name: "BMI270 Gyro Y"
+    gyroscope_z:
+      name: "BMI270 Gyro z"
+    temperature:
+      name: "BMI270 Temperature"
+
+esp32_camera:
+  name: "OV3660 Camera"
+  external_clock:
+    pin: GPIO21
+    frequency: 20MHz
+  i2c_id: camera_i2c
+  data_pins: [GPIO3, GPIO42, GPIO46, GPIO48, GPIO4, GPIO17, GPIO11, GPIO13]
+  vsync_pin: GPIO10
+  href_pin: GPIO14
+  pixel_clock_pin: GPIO40
+  resolution: 640X480
+  jpeg_quality: 10
