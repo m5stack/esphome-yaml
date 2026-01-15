@@ -2,7 +2,7 @@ esphome:
   name: atoms3r-m12
   friendly_name: AtomS3R-M12
   on_boot:
-    priority: 1200
+    priority: 800
     then:
       - lambda: |-
           gpio_set_direction(GPIO_NUM_18, GPIO_MODE_OUTPUT);
