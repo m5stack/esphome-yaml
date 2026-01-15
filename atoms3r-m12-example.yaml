@@ -27,8 +27,8 @@ ota:
     password: "6aacaa1492f5e0eab0b7ce5af43087bc"
 
 wifi:
-  ssid: DeepSpace9
-  password: huxiaochuan
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
