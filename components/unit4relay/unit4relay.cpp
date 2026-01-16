@@ -1,4 +1,5 @@
 #include "unit4relay.h"
+#include "esphome/components/i2c/i2c.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
@@ -24,6 +25,7 @@ void Unit4Relay::setup() {
 }
 
 void Unit4Relay::dump_config() {
+    LOG_I2C_DEVICE(this);
 #ifdef USE_SWITCH
     ESP_LOGCONFIG(TAG, "Switch:");
     LOG_SWITCH("  ", "Relay 1", this->relay_1_switch_);
