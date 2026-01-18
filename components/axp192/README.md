@@ -51,8 +51,7 @@ spi:
   miso_pin: 38
 
 external_components:
-  - source: C:\Users\jims9\OneDrive\Documents\ESPComponents\esphome-yaml\components
-  # - source: github://jimwsmith/esphome-yaml/components
+  - source: github://jimwsmith/esphome-yaml/components
     components: [ axp192 ]
     refresh: 0s
 
