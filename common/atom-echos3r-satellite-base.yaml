@@ -1,5 +1,17 @@
 ---
 substitutions:
+  name: atom-echos3r-voice-assistant
+  friendly_name: M5Stack Atom EchoS3R Voice Assistant
+
+  # Audio files
+  wake_word_trigger_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+  error_cloud_expired_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+
+  # Micro wake word models
+  okay_nabu_model_file: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+  stop_model_file: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+
   # Phases of the Voice Assistant
   # The voice assistant is ready to be triggered by a wake word
   voice_assist_idle_phase_id: "1"
@@ -19,10 +31,12 @@ substitutions:
   voice_assist_timer_finished_phase_id: "20"
 
 esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
   project: 
     name: m5stack.echo-s3r-satellite
-    version: 2025.9.0
-  min_version: 2025.5.0
+    version: 2025.12.3
+  min_version: 2025.12.0
   on_boot:
     priority: 600
     then:
@@ -33,9 +47,8 @@ esphome:
           then:
             - lambda: id(init_in_progress) = false;
             
-
 esp32:
-  board: esp32s3box
+  variant: ESP32S3
   flash_size: 8MB
   cpu_frequency: 240MHz
   framework:
@@ -46,21 +59,22 @@ esp32:
         CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
         CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
 
-        # Moves instructions and read only data from flash into PSRAM on boot.
-        # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
-        # Considerably speeds up mWW at the cost of using more PSRAM.
-        CONFIG_SPIRAM_RODATA: "y"
-        CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
-
-        CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
-        CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
-
-        CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
-        CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
-
 psram:
   mode: octal
   speed: 80MHz
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  ap:
+
+captive_portal:
+
 
 logger:
   level: DEBUG
@@ -126,7 +140,6 @@ speaker:
     bits_per_sample: 16bit
     channel: left
     audio_dac: es8311_dac
-    buffer_duration: 100ms
 
 media_player:
   - platform: speaker
@@ -141,11 +154,11 @@ media_player:
       num_channels: 1  # Atom Echo S3R only has one output channel
     files:
       - id: wake_word_triggered_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+        file: ${wake_word_triggered_sound_file}
       - id: timer_finished_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+        file: ${timer_finished_sound_file}
       - id: error_cloud_expired
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+        file: ${error_cloud_expired_file}
     on_announcement:
       # Stop the wake word (mWW or VA) if the mic is capturing
       - if:
@@ -156,7 +169,9 @@ media_player:
             # Ensure VA stops before moving on
             - if:
                 condition:
-                  - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+                  - lambda: |-
+                      const char *option = id(wake_word_engine_location).current_option();
+                      return (option && std::string_view{option} == "In Home Assistant");
                 then:
                   - wait_until:
                       - not:
@@ -184,13 +199,13 @@ micro_wake_word:
   microphone: i2s_mic
   stop_after_detection: false
   models:
-    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+    - model: ${okay_nabu_model_file}
       id: okay_nabu
     - model: hey_jarvis
       id: hey_jarvis
     - model: hey_mycroft
       id: hey_mycroft
-    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+    - model: ${stop_model_file}
       id: stop
       internal: true
   vad:
@@ -199,8 +214,19 @@ micro_wake_word:
         id: play_sound
         priority: true
         sound_file: !lambda return id(wake_word_triggered_sound);
-    
-    - delay: 300ms
+
+    - wait_until:
+        condition:
+          - media_player.is_announcing:
+        timeout: 0.5s
+    # Announcement is finished and the I2S bus is free
+    - wait_until:
+        - and:
+            - not:
+                media_player.is_announcing:
+            - not:
+                speaker.is_playing:
+
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
 
@@ -234,7 +260,9 @@ voice_assistant:
     # Restart only mWW if enabled; streaming wake words automatically restart
     - if:
         condition:
-          - lambda: return id(wake_word_engine_location).state == "On device";
+          - lambda: |-
+              const char *option = id(wake_word_engine_location).current_option();
+              return (option && std::string_view{option} == "On device");
         then:
           - lambda: id(va).set_use_wake_word(false);
           - micro_wake_word.start:
@@ -295,7 +323,9 @@ script:
             and:
               - not:
                   - voice_assistant.is_running:
-              - lambda: return id(wake_word_engine_location).state == "On device";
+              - lambda: |-
+                  const char *option = id(wake_word_engine_location).current_option();
+                  return (option && std::string_view{option} == "On device");
           then:
             - lambda: id(va).set_use_wake_word(false);
             - micro_wake_word.start:
@@ -304,7 +334,9 @@ script:
             and:
               - not:
                   - voice_assistant.is_running:
-              - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+              - lambda: |-
+                  const char *option = id(wake_word_engine_location).current_option();
+                  return (option && std::string_view{option} == "In Home Assistant");
           then:
             - lambda: id(va).set_use_wake_word(true);
             - voice_assistant.start_continuous:
@@ -313,13 +345,17 @@ script:
     then:
       - if:
           condition:
-            lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+            lambda: |-
+              const char *option = id(wake_word_engine_location).current_option();
+              return (option && std::string_view{option} == "In Home Assistant");
           then:
             - lambda: id(va).set_use_wake_word(false);
             - voice_assistant.stop:
       - if:
           condition:
-            lambda: return id(wake_word_engine_location).state == "On device";
+            lambda: |-
+              const char *option = id(wake_word_engine_location).current_option();
+              return (option && std::string_view{option} == "On device");
           then:
             - micro_wake_word.stop:
   # Set the voice assistant phase to idle or muted, depending on if the software mute switch is activated
