@@ -225,7 +225,7 @@ media_player:
             - if:
                 condition:
                   - lambda: |-
-                      const char *option = id(wake_word_engine_location).current_option();
+                      const char *option = id(wake_word_engine_location).current_option().c_str();
                       return (option && std::string_view{option} == "In Home Assistant");
                 then:
                   - wait_until:
@@ -457,7 +457,7 @@ voice_assistant:
     - if:
         condition:
           - lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
+              const char *option = id(wake_word_engine_location).current_option().c_str();
               return (option && std::string_view{option} == "On device");
         then:
           - lambda: id(va).set_use_wake_word(false);
@@ -608,7 +608,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
+                  const char *option = id(wake_word_engine_location).current_option().c_str();
                   return (option && std::string_view{option} == "On device");
           then:
             - lambda: id(va).set_use_wake_word(false);
@@ -619,7 +619,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
+                  const char *option = id(wake_word_engine_location).current_option().c_str();
                   return (option && std::string_view{option} == "In Home Assistant");
           then:
             - lambda: id(va).set_use_wake_word(true);
@@ -630,7 +630,7 @@ script:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
+              const char *option = id(wake_word_engine_location).current_option().c_str();
               return (option && std::string_view{option} == "In Home Assistant");
           then:
             - lambda: id(va).set_use_wake_word(false);
@@ -638,7 +638,7 @@ script:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
+              const char *option = id(wake_word_engine_location).current_option().c_str();
               return (option && std::string_view{option} == "On device");
           then:
             - micro_wake_word.stop:
