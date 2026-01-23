@@ -231,7 +231,7 @@ media_player:
                   - wait_until:
                       - not:
                           voice_assistant.is_running:
-      # Since VA isn't running, this is user-intiated media playback. Draw the mute display
+      # Since VA isn't running, this is user-initiated media playback. Draw the mute display
       - if:
           condition:
             not:
@@ -240,7 +240,7 @@ media_player:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
             - script.execute: draw_display
     on_idle:
-      # Since VA isn't running, this is the end of user-intiated media playback. Restart the wake word.
+      # Since VA isn't running, this is the end of user-initiated media playback. Restart the wake word.
       - if:
           condition:
             not:
