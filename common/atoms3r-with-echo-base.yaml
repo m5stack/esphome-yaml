@@ -54,7 +54,7 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2025.11.3
+  min_version: 2025.12.0
   on_boot:
     priority: 600
     then:

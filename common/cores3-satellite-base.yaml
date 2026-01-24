@@ -2,13 +2,28 @@
 substitutions:
   name: cores3-va
   friendly_name: M5Stack CoreS3 Voice Assistant
+
+  # Casita images
   loading_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
   idle_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
   listening_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
   thinking_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
   replying_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
   error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
+  error_no_wifi_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-wifi.png
+  error_no_ha_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-ha.png
 
+  # Fonts
+  mdi_webfont_file: https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/fonts/materialdesignicons-webfont.ttf
+
+  # Audio files
+  wake_word_triggered_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+  error_cloud_expired_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+
+  # Micro wake word models
+  okay_nabu_model_file: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+  stop_model_file: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
 
   loading_illustration_background_color: '000000'
   idle_illustration_background_color: '000000'
@@ -44,7 +59,8 @@ esphome:
   friendly_name: ${friendly_name}
   project:
     name: m5stack.cores3-voice-assistant
-    version: 2025.9.0
+    version: 2025.12.5
+  min_version: 2025.12.0
   on_boot:
     - priority: 600
       then:
@@ -193,7 +209,6 @@ light:
     id: lcd_backlight
     name: "LCD Backlight"
     icon: "mdi:television"
-    entity_category: config
     output: lcd_backlight_output
     restore_mode: RESTORE_DEFAULT_ON
     default_transition_length: 250ms
@@ -283,9 +298,9 @@ media_player:
       num_channels: 1
     files:
       - id: wake_word_triggered_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+        file: ${wake_word_triggered_sound_file}
       - id: error_cloud_expired
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+        file: ${error_cloud_expired_file}
     on_announcement:
       # Stop the wake word (mWW or VA) if the mic is capturing
       - if:
@@ -296,12 +311,14 @@ media_player:
             # Ensure VA stops before moving on
             - if:
                 condition:
-                  - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+                  - lambda: |-
+                      const char *option = id(wake_word_engine_location).current_option();
+                      return (option && std::string_view{option} == "In Home Assistant");
                 then:
                   - wait_until:
                       - not:
                           voice_assistant.is_running:
-      # Since VA isn't running, this is user-intiated media playback. Draw the mute display
+      # Since VA isn't running, this is user-initiated media playback. Draw the mute display
       - if:
           condition:
             not:
@@ -309,9 +326,8 @@ media_player:
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
             - script.execute: draw_display
-            
     on_idle:
-      # Since VA isn't running, this is the end of user-intiated media playback. Restart the wake word.
+      # Since VA isn't running, this is the end of user-initiated media playback. Restart the wake word.
       - if:
           condition:
             not:
@@ -319,19 +335,20 @@ media_player:
           then:
             - script.execute: start_wake_word
             - script.execute: set_idle_or_mute_phase
+            - script.execute: draw_display
 
 micro_wake_word:
   id: mww
   microphone: i2s_mic
   stop_after_detection: false
   models:
-    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
+    - model: ${okay_nabu_model_file}
       id: okay_nabu
     - model: hey_jarvis
       id: hey_jarvis
     - model: hey_mycroft
       id: hey_mycroft
-    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+    - model: ${stop_model_file}
       id: stop
       internal: true
   vad:
@@ -340,6 +357,19 @@ micro_wake_word:
         id: play_sound
         priority: true
         sound_file: !lambda return id(wake_word_triggered_sound);
+
+    - wait_until:
+        condition:
+          - media_player.is_announcing:
+        timeout: 0.5s
+    # Announcement is finished and the I2S bus is free
+    - wait_until:
+        - and:
+            - not:
+                media_player.is_announcing:
+            - not:
+                speaker.is_playing:
+
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
 
@@ -468,11 +498,10 @@ switch:
     disabled_by_default: true
 
   - platform: template
-    name: Mute
+    name: Microphone Mute
     id: mute
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
-    entity_category: config
     on_turn_off:
         - microphone.unmute:
         - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
@@ -613,9 +642,7 @@ display:
       - id: muted_page
         lambda: |-
           it.fill(Color::BLACK);
-          it.printf(30, 195, id(font_response), Color::WHITE, "%s", "Software muted.");
-          it.printf(30, 225, id(font_response), Color::WHITE, "%s", "Unmute to continue with Voice Assistant.");
-
+          it.printf(96, 56, id(mdi_icon_128), Color::WHITE, "%s", "\U000F036D");
 
 touchscreen:
   - platform: ft63x6
@@ -699,7 +726,9 @@ script:
             and:
               - not:
                   - voice_assistant.is_running:
-              - lambda: return id(wake_word_engine_location).state == "On device";
+              - lambda: |-
+                  const char *option = id(wake_word_engine_location).current_option();
+                  return (option && std::string_view{option} == "On device");
           then:
             - lambda: id(va).set_use_wake_word(false);
             - micro_wake_word.start:
@@ -708,25 +737,31 @@ script:
             and:
               - not:
                   - voice_assistant.is_running:
-              - lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+              - lambda: |-
+                  const char *option = id(wake_word_engine_location).current_option();
+                  return (option && std::string_view{option} == "In Home Assistant");
           then:
             - lambda: id(va).set_use_wake_word(true);
-            - voice_assistant.start_continuous:  
-
+            - voice_assistant.start_continuous:
   # Stops either mWW or the streaming wake word, depending on the configured location
   - id: stop_wake_word
     then:
       - if:
           condition:
-            lambda: return id(wake_word_engine_location).state == "In Home Assistant";
+            lambda: |-
+              const char *option = id(wake_word_engine_location).current_option();
+              return (option && std::string_view{option} == "In Home Assistant");
           then:
             - lambda: id(va).set_use_wake_word(false);
             - voice_assistant.stop:
       - if:
           condition:
-            lambda: return id(wake_word_engine_location).state == "On device";
+            lambda: |-
+              const char *option = id(wake_word_engine_location).current_option();
+              return (option && std::string_view{option} == "On device");
           then:
             - micro_wake_word.stop:
+
   - id: set_idle_or_mute_phase
     then:
       - if:
@@ -787,12 +822,12 @@ image:
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-wifi.png
+  - file: ${error_no_wifi_illustration_file}
     id: error_no_wifi
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-ha.png
+  - file: ${error_no_ha_illustration_file}
     id: error_no_ha
     resize: 320x240
     type: RGB
@@ -816,6 +851,13 @@ font:
     size: 15
     glyphsets:
       - ${font_glyphsets}
+
+  - file: ${mdi_webfont_file}
+    id: mdi_icon_128
+    size: 128
+    bpp: 4
+    glyphs:
+      - "\U000F036D" # mdi:mic-mute
 
 
 text_sensor:

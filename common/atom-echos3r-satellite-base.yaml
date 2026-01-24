@@ -35,7 +35,7 @@ esphome:
   friendly_name: ${friendly_name}
   project: 
     name: m5stack.echo-s3r-satellite
-    version: 2025.12.3
+    version: 2025.12.5
   min_version: 2025.12.0
   on_boot:
     priority: 600
@@ -397,12 +397,11 @@ switch:
     disabled_by_default: true
     internal: true
   - platform: template
-    name: Mute
+    name: Microphone Mute
     id: mute
     icon: "mdi:microphone-off"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
-    entity_category: config
     on_turn_off:
       - microphone.unmute:
       - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
