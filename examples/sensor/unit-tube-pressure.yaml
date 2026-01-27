@@ -1,0 +1,43 @@
+esphome:
+  name: unit-tube-pressure
+  friendly_name: Unit Tube Pressure
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "8ratEFYK2ucP2NGR20RlHE02N41L3b92IX+/vqqvcUU="
+
+ota:
+  - platform: esphome
+    password: "fb969e9338634640cf1c48ec89f1c78f"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Tubepressure Fallback Hotspot"
+    password: "bKYWUw1jrJQV"
+
+captive_portal:
+    
+sensor:
+  - platform: template
+    name: "Pressure"
+    unit_of_measurement: "kPa"
+    accuracy_decimals: 2
+    update_interval: 100ms
+    lambda: |-
+      float K = 100.0;
+      float B = 110.0;
+      float voltage = id(adc_voltage).state;  
+      float P = voltage * K - B;
+      return P;

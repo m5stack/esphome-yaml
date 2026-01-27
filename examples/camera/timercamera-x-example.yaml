@@ -1,0 +1,124 @@
+esphome:
+  name: timercamera-x
+  friendly_name: M5Stack TimerCamera-X
+  on_boot: 
+    then:
+      # read the RTC time once when the system boots
+      bm8563.read_time:
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "BUEzgskL8daDJ5rLD90Chq2M43jC0haA/vVxcULQAls="
+
+ota:
+  - platform: esphome
+    password: "944c4bd534590fed3fba3aed66807f3c"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Timercamera-X Fallback Hotspot"
+    password: "MMqixsgBKG0K"
+
+captive_portal:
+
+psram:
+  mode: quad
+  speed: 80MHz
+
+
+i2c:
+  - id: bsp_i2c
+    sda: GPIO12
+    scl: GPIO14
+  - id: cam_i2c
+    sda: GPIO25
+    scl: GPIO23
+
+esp32_camera:
+  name: OV3660 Camera
+  external_clock:
+    pin: GPIO27
+    frequency: 20MHz
+  i2c_id: cam_i2c
+  data_pins: [GPIO32, GPIO35, GPIO34, GPIO5, GPIO39, GPIO18, GPIO36, GPIO19]
+  vsync_pin: GPIO22
+  href_pin: GPIO26
+  pixel_clock_pin: GPIO21
+  reset_pin: GPIO15
+  resolution: 640x480
+  jpeg_quality: 10
+
+output:
+  - platform: ledc
+    id: blue_led
+    pin: GPIO2
+
+switch:
+  - platform: gpio
+    id: bat_hold_pin
+    name: "Battery Hold Pin"
+    pin: GPIO33
+    restore_mode: RESTORE_DEFAULT_ON
+
+
+light:
+  - platform: monochromatic
+    output: blue_led
+    name: "Blue LED"
+    restore_mode: RESTORE_DEFAULT_ON
+
+time:
+  - platform: bm8563
+    i2c_id: bsp_i2c
+    # repeated synchronization is not necessary unless the external RTC
+    # is much more accurate than the internal clock
+    update_interval: never
+  - platform: homeassistant
+    # instead try to synchronize via network repeatedly ...
+    on_time_sync:
+      then:
+        # ... and update the RTC when the synchronization was successful
+        bm8563.write_time:
+
+
+# only valid:
+# battery hold pin is set, that means using the battery
+# no external USB power connected
+sensor:
+  - platform: adc
+    pin: GPIO38
+    attenuation: 12dB
+    name: "Battery Voltage"
+    id: battery_voltage
+    update_interval: 10s
+    filters:
+      - multiply: 1.51
+
+  - platform: template
+    id: battery_percent
+    name: "Battery Percentage"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: |-
+      float voltage = id(battery_voltage).state;
+      float min_voltage = 3.350f;
+      float max_voltage = 4.150f;
+    
+      if (voltage <= min_voltage) return 0.0;
+      if (voltage >= max_voltage) return 100.0;
+      
+      float percent = ((voltage - min_voltage) / (max_voltage - min_voltage)) * 100.0;
+      return percent;
