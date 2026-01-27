@@ -30,6 +30,16 @@ wifi:
 captive_portal:
     
 sensor:
+  - platform: adc
+    pin: GPIO1
+    id: adc_voltage
+    attenuation: 11db
+    update_interval: 100ms
+    unit_of_measurement: "V"
+    accuracy_decimals: 3
+    filters:
+      - multiply: 3.3
+
   - platform: template
     name: "Pressure"
     unit_of_measurement: "kPa"
@@ -38,6 +48,6 @@ sensor:
     lambda: |-
       float K = 100.0;
       float B = 110.0;
-      float voltage = id(adc_voltage).state;  
+      float voltage = id(adc_voltage).state;  // 单位 V
       float P = voltage * K - B;
       return P;
