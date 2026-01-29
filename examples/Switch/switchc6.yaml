@@ -1,0 +1,117 @@
+esphome:
+  name: switchc6
+  friendly_name: SwitchC6
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: VERBOSE
+
+
+api:
+  encryption:
+    key: "X7+AfftIYMa/cDqk1pZ9dug7cas7U3/tg5zghRQ1Gow="
+
+ota:
+  - platform: esphome
+    password: "1d25a8a9ad6d2069fd467f15c7795700"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Switch Fallback Hotspot"
+    password: "TVP1qcPH6I64"
+
+captive_portal:
+
+globals:
+  - id: current_cmd
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: response_received
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+espnow:
+  id: espnow1
+  auto_add_peer: true
+  peers:
+    - B4:3A:45:81:EC:70
+  on_receive:
+    - logger.log:
+        format: "Received from: %s = '%s'  RSSI: %d"
+        args:
+          - format_mac_address_pretty(info.src_addr).c_str()
+          - format_hex_pretty(data, size).c_str()
+          - info.rx_ctrl->rssi
+  on_broadcast:
+    - lambda: |-
+        std::string response((char*)data, size);
+        if(response.find("142B-2F9F-8704") != std::string::npos) {
+          ESP_LOGI("main", "Response received from device");
+          id(response_received) = true;
+        }
+    - logger.log:
+        format: "Broadcast from: %s = '%s'  RSSI: %d"
+        args:
+          - format_mac_address_pretty(info.src_addr).c_str()
+          - format_hex_pretty(data, size).c_str()
+          - info.rx_ctrl->rssi
+  on_unknown_peer:
+    - logger.log:
+        format: "Unknown peer: %s = '%s'  RSSI: %d"
+        args:
+          - format_mac_address_pretty(info.src_addr).c_str()
+          - format_hex_pretty(data, size).c_str()
+          - info.rx_ctrl->rssi
+
+
+script:
+  - id: send_switch_command
+    mode: restart
+    then:
+      - globals.set:
+          id: response_received
+          value: 'false'
+      - repeat:
+          count: 40
+          then:
+            - lambda: |-
+                if(id(response_received)) {
+                  ESP_LOGI("main", "Stopping - response confirmed");
+                  return;
+                }
+                
+                int channel = id(espnow1)->get_wifi_channel();
+                std::string cmd = id(current_cmd);
+                char data[40];
+                snprintf(data, sizeof(data), "B43A-4581-EC70=%s;ch=%d;", cmd.c_str(), channel);
+                std::vector<uint8_t> payload(data, data + strlen(data));
+                uint8_t addr[6] = {0xB4, 0x3A, 0x45, 0x81, 0xEC, 0x70};
+                id(espnow1)->send(addr, payload, [](esp_err_t status) {
+                  if(status == ESP_OK) {
+                    ESP_LOGV("main", "ESPNow sent");
+                  }
+                });
+            - delay: 100ms
+
+switch:
+  - platform: template
+    name: "SwitchC6"
+    optimistic: true
+    turn_on_action:
+      - globals.set:
+          id: current_cmd
+          value: '"1"'
+      - script.execute: send_switch_command
+    turn_off_action:
+      - globals.set:
+          id: current_cmd
+          value: '"0"'
+      - script.execute: send_switch_command
