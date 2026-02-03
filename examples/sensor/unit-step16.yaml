@@ -1,0 +1,122 @@
+esphome:
+  name: "unit-step16"
+  friendly_name: unit 16 Step
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+
+logger:
+
+
+api:
+  encryption:
+    key: "/p52UNP4294EtlpbBPrg1zol3a9P4YSzw1sluVIRkBY="
+
+ota:
+  - platform: esphome
+    password: "11a02f385a1f39ef18d424ef884c85a5"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  
+  ap:
+    ssid: "Unit-16-Step Fallback Hotspot"
+    password: "vnVdFdBdrZza"
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: unit_step16
+    refresh: 0s
+
+i2c:
+  - id: bsp_iic
+    scl: GPIO32
+    sda: GPIO26
+    scan: True
+    
+captive_portal:
+
+
+
+unit_step16:
+  id: my_step16
+  i2c_id: bsp_iic
+  address: 0x48
+
+
+
+sensor:
+  - platform: unit_step16
+    unit_step16_id: my_step16
+    name: "Encoder Value"
+    update_interval: 100ms
+    on_value:
+      then:
+        - logger.log:
+            format: "Encoder value changed to: %.0f"
+            args: [ 'x' ]
+
+
+
+output:
+  - platform: unit_step16
+    id: led_brightness_output
+    unit_step16_id: my_step16
+    channel: led_brightness
+
+  - platform: unit_step16
+    id: rgb_brightness_output
+    unit_step16_id: my_step16
+    channel: rgb_brightness
+  
+  - platform: unit_step16
+    id: rgb_red_output
+    unit_step16_id: my_step16
+    channel: rgb_red
+  
+  - platform: unit_step16
+    id: rgb_green_output
+    unit_step16_id: my_step16
+    channel: rgb_green
+  
+  - platform: unit_step16
+    id: rgb_blue_output
+    unit_step16_id: my_step16
+    channel: rgb_blue
+
+light:
+  - platform: rgb
+    id: step16_rgb_light
+    name: "Step16 RGB Light"
+    red: rgb_red_output
+    green: rgb_green_output
+    blue: rgb_blue_output
+    restore_mode: ALWAYS_ON  
+    default_transition_length: 0s  
+
+  - platform: monochromatic
+    id: step16_led_display
+    name: "Step16 LED Display"
+    output: led_brightness_output
+    restore_mode: ALWAYS_ON 
+    default_transition_length: 0s  
+
+
+number:
+  - platform: template
+    name: "RGB Brightness"
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    initial_value: 50
+    on_value:
+      then:
+        - output.set_level:
+            id: rgb_brightness_output
+            level: !lambda 'return x / 100.0;'
