@@ -48,5 +48,5 @@ switch:
     name: "SwitchC6 Device 1"
     espnow_id: espnow1
     mac_address: "XX:XX:XX:XX:XX:XX"
-    retry_count: 12
+    retry_count: 40
     retry_interval: 300
