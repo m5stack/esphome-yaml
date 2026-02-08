@@ -49,7 +49,7 @@ substitutions:
   voice_assist_muted_phase_id: "12"
 
 
-  # Add support for non-unicode characters by using better glyphset
+  # Add support for non-unicode characters by using better glyphs
   font_glyphsets: "GF_Latin_Core"
   # for Greek use "Noto Sans" for other languages use a compatible font family
   font_family: Figtree
@@ -59,8 +59,8 @@ esphome:
   friendly_name: ${friendly_name}
   project:
     name: m5stack.cores3-voice-assistant
-    version: 2025.12.5
-  min_version: 2025.12.0
+    version: 2026.1.2
+  min_version: 2026.1.2
   on_boot:
     - priority: 600
       then:
@@ -78,8 +78,9 @@ esphome:
 
 
 esp32:
-  board: esp32-s3-devkitc-1
+  variant: esp32s3
   flash_size: 16MB
+  cpu_frequency: 240MHz
   framework:
     type: esp-idf
     ## Note: Disable these configurations if you face the boot loop issue.
@@ -133,7 +134,7 @@ globals:
   - id: init_in_progress
     type: bool
     restore_value: no
-    initial_value: 'true'
+    initial_value: "true"
   - id: voice_assistant_phase
     type: int
     restore_value: no
@@ -143,11 +144,18 @@ i2s_audio:
   id: i2s_audio_bus
   i2s_lrclk_pin: GPIO33
   i2s_bclk_pin: GPIO34
-  i2s_mclk_pin: GPIO0
+  i2s_mclk_pin:
+    number: GPIO0
+    ignore_strapping_warning: true
 
 i2c:
-  sda: GPIO12
-  scl: GPIO11
+  - id: bsp_bus
+    sda: GPIO12
+    scl: GPIO11
+  - id: ext_bus
+    sda: GPIO2
+    scl: GPIO1
+    scan: true
 
 spi:
   - id: spi_bus
@@ -175,10 +183,12 @@ sensor:
     
 axp2101:
   id: axp2101_pmu
+  i2c_id: bsp_bus
 
 # IO Expander
 aw9523b:
   id: aw9523b_hub
+  i2c_id: bsp_bus
 
 output:
   - platform: axp2101
@@ -259,6 +269,7 @@ binary_sensor:
 audio_adc:
   - platform: es7210
     id: es7210_adc
+    i2c_id: bsp_bus
     bits_per_sample: 16bit
     sample_rate: 16000
     mic_gain: 36
@@ -266,6 +277,7 @@ audio_adc:
 audio_dac:
   - platform: aw88298
     id: aw88298_dac
+    i2c_id: bsp_bus
     sample_rate: 48000
 
 microphone:
@@ -312,8 +324,7 @@ media_player:
             - if:
                 condition:
                   - lambda: |-
-                      const char *option = id(wake_word_engine_location).current_option();
-                      return (option && std::string_view{option} == "In Home Assistant");
+                      return id(wake_word_engine_location).current_option() == "In Home Assistant";
                 then:
                   - wait_until:
                       - not:
@@ -487,7 +498,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     disabled_by_default: true
 
-
   - platform: gpio
     name: "CAM RST P1_0"
     pin:
@@ -496,6 +506,30 @@ switch:
     internal: true
     restore_mode: RESTORE_DEFAULT_ON
     disabled_by_default: true
+
+  - platform: gpio
+    name: "BUS_OUT_EN"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 1
+    # BUS_OUT_EN = 0
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "USB_OTG_EN"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 5
+    # USB_OTG_EN = 0
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "BOOST_EN"
+    pin:
+      aw9523b: aw9523b_hub
+      number: 15
+    # BOOST_EN
+    restore_mode: RESTORE_DEFAULT_ON
 
   - platform: template
     name: Microphone Mute
@@ -594,7 +628,9 @@ display:
     reset_pin:
       aw9523b: aw9523b_hub
       number: 9
-    cs_pin: GPIO3
+    cs_pin:
+      number: GPIO3
+      ignore_strapping_warning: true
     data_rate: 40MHz
     update_interval: never
     invert_colors: true
@@ -647,6 +683,7 @@ display:
 touchscreen:
   - platform: ft63x6
     id: touch
+    i2c_id: bsp_bus
     reset_pin:
       aw9523b: aw9523b_hub
       number: 0
@@ -727,8 +764,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
-                  return (option && std::string_view{option} == "On device");
+                  return id(wake_word_engine_location).current_option() == "On device";
           then:
             - lambda: id(va).set_use_wake_word(false);
             - micro_wake_word.start:
@@ -738,8 +774,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
-                  return (option && std::string_view{option} == "In Home Assistant");
+                  return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(true);
             - voice_assistant.start_continuous:
@@ -749,16 +784,14 @@ script:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "In Home Assistant");
+              return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(false);
             - voice_assistant.stop:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "On device");
+              return id(wake_word_engine_location).current_option() == "On device";
           then:
             - micro_wake_word.stop:
 
