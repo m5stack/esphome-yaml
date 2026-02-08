@@ -1,10 +1,10 @@
 esphome:
   name: tab5-ha-hmi
   friendly_name: M5Stack Tab5 Home Assistant HMI
-  min_version: 2025.9.3
+  min_version: 2025.12.0
 
 esp32:
-  board: esp32p4
+  variant: esp32p4
   flash_size: 16MB
   framework:
     type: esp-idf
@@ -16,11 +16,6 @@ packages:
       url: https://github.com/m5stack/esphome-yaml
       files: [ common/tab5-globals.yaml, common/tab5-lvgl.yaml, common/tab5-scripts.yaml]
       refresh: 1d
-
-external_components:
-  - source: github://pr#10511
-    components: [rx8130]
-    refresh: 1h
 
 esp32_hosted:
   variant: esp32c6
