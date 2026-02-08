@@ -1,0 +1,36 @@
+esphome:
+  name: atom-echo-s3r-voice-assistant
+  friendly_name: Atom EchoS3R Voice Assistant
+
+esp32:
+  variant: esp32s3
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "ds9p1uSdUB0SUIz4J+osnWoIRwE6SLldaH9c4TX109I="  # example key, you are supposed to generate a new one
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Atom-EchoS3R-Voice-Assistant"
+    password: ""
+
+captive_portal:
+
+
+packages:
+  - !include ../../common/atom-echos3r-satellite-base.yaml
+    

@@ -1,0 +1,352 @@
+esphome:
+  name: powerhub
+  friendly_name: M5Stack PowerHub
+  min_version: 2025.5.0
+  on_boot:
+    then:
+      # read the RTC time once when the system boots
+      powerhub.read_time:
+
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "powerhub"
+    password: ""
+
+api:
+  encryption:
+    key: "STm5aLUIckeHqTZotQPVzgiA4Vz8ju6ZZXux+z+3TVQ=" # example key, you are supposed to generate a new one
+
+ota:
+  - platform: esphome
+    # Replace the key by your OTA key
+    password: "86211424946831287ed4bef6aa32a41b" # example passwd, you are supposed to generate a new one
+
+i2c:
+  sda: GPIO45
+  scl: GPIO48
+
+
+uart:
+  - id: rs485_bus
+    tx_pin: GPIO8
+    rx_pin: GPIO17
+    baud_rate: 115200
+  - id: can_bus
+    tx_pin: GPIO39
+    rx_pin: GPIO40
+    baud_rate: 115200
+
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: powerhub
+    refresh: 0s
+
+powerhub:
+
+
+time:
+  - platform: powerhub
+    # repeated synchronization is not necessary unless the external RTC
+    # is much more accurate than the internal clock
+    update_interval: never
+  
+  - platform: homeassistant
+    # instead try to synchronize via network repeatedly ...
+    on_time_sync:
+      then:
+        # ... and update the RTC when the synchronization was successful
+        powerhub.write_time:
+
+binary_sensor:
+  - platform: gpio
+    name: "USER Button"
+    id: usr_sw2_binary_sensor
+    pin:
+      number: GPIO11
+      inverted: true
+  - platform: powerhub
+    button: 
+      name: "Top PMU Button"
+
+text_sensor:
+  - platform: powerhub
+    charge_status:
+      name: "Battery Charge Status"
+      id: bat_charge_status_text_sensor
+      on_value:
+        - lambda: |-
+            static std::string last_state = "";
+            if (last_state == x) return; 
+            last_state = x;
+
+            auto call = id(led_bat_charge).turn_on();
+            call.set_brightness(0.9);
+            call.set_color_mode(ColorMode::RGB);
+
+            if (x == "Charging") {
+              // Pulse green
+              call.set_rgb(0, 1.0, 0);
+              call.set_effect("Slow Pulse");
+            } else if (x == "Discharging") {
+              // Solid green
+              call.set_rgb(0, 1.0, 0);
+              call.set_effect("None");
+            } else {
+              // Solid white
+              call.set_rgb(1.0, 1.0, 1.0);
+              call.set_effect("None");
+            }
+            call.perform();
+    vin_status:
+      name: "External Input Power Status"
+      id: ext_vin_status_text_sensor
+    firmware_ver:
+      name: "Internal Firmware Version"
+      id: int_firm_ver_text_sensor
+    bootloader_ver:
+      name: "Bootloader Version"
+      id: boot_ver_text_sensor
+  
+  - platform: version
+    name: "ESPHome Version"
+
+sensor:
+  - platform: powerhub
+    battery_voltage:
+      name: "Battery Voltage"
+      id: bat_volt_sensor
+    battery_current:
+      name: "Battery Current"
+      id: bat_curr_sensor
+    battery_level:
+      name: "Battery Percentage"
+      id: bat_level_sensor
+      on_value:
+        - lambda: |-
+            auto call_1 = id(led_pwr_l).turn_on();
+            auto call_2 = id(led_pwr_r).turn_on();
+            auto call_off_1 = id(led_pwr_l).turn_off();
+            auto call_off_2 = id(led_pwr_r).turn_off();
+            call_1.set_transition_length(1000);
+            call_2.set_transition_length(1000);
+            call_off_1.set_transition_length(1000);
+            call_off_2.set_transition_length(1000);
+            call_1.set_color_mode(ColorMode::RGB);
+            call_2.set_color_mode(ColorMode::RGB);
+            // if read battery level is unknown
+            // set the LED color to white
+            if ( std::isnan(x) ) {
+              call_1.set_rgb(1.0, 1.0, 1.0);
+              call_2.set_rgb(1.0, 1.0, 1.0);
+              call_1.set_brightness(1.0);
+              call_2.set_brightness(1.0);
+              call_1.perform();
+              call_2.perform();
+              return;
+            }
+
+            if ( x > 80.0f && x <= 100.0f ) {
+                call_1.set_rgb(0, 1.0, 0);
+                call_2.set_rgb(0, 1.0, 0);
+                call_1.set_brightness(1.0);
+                call_2.set_brightness(1.0);
+                call_1.perform();
+                call_2.perform();
+            } else if ( x > 50.0f && x <= 80.0f ) {
+                call_1.set_rgb(0, 1.0, 0);
+                call_2.set_rgb(0, 1.0, 0);
+                call_1.set_brightness(1.0);
+                call_2.set_brightness(0.8);
+                call_1.perform();
+                call_2.perform();
+            } else if ( x > 20.0f && x <= 50.0f ) {
+                call_1.set_rgb(1.0, 0.95, 0.19); // left only one LED on with YELLOW color suggest low power
+                call_1.set_brightness(1.0);
+                call_1.perform();
+                call_off_2.perform();
+            } else if ( x > 5.0f && x <= 20.0f ){
+                call_1.set_rgb(1.0, 0.43, 0.32); // left only one LED on with RED color suggest extremely low power
+                call_1.set_brightness(0.8);
+                call_1.perform();
+                call_off_2.perform();
+            } else {
+                call_1.set_rgb(1.0, 0.43, 0.32);
+                call_1.set_brightness(0.8); // almost empty
+                call_1.perform();
+                call_off_2.perform();
+            }
+
+    grove_red_voltage:
+      name: "Port.A Voltage"
+      id: grove_red_volt_sensor
+    grove_red_current:
+      name: "Port.A Current"
+      id: grove_red_curr_sensor
+    grove_blue_voltage:
+      name: "Port.C Voltage"
+      id: grove_blue_volt_sensor
+    grove_blue_current:
+      name: "Port.C Current"
+      id: grove_blue_curr_sensor
+    can_voltage:
+      name: "CAN Voltage"
+      id: can_volt_sensor
+    can_current:
+      name: "CAN Current"
+      id: can_curr_sensor
+    rs485_voltage:
+      name: "RS485 Voltage"
+      id: rs485_volt_sensor
+    rs485_current:
+      name: "RS485 Current"
+      id: rs485_curr_sensor
+    usb_voltage:
+      name: "USB Voltage"
+      id: usb_volt_sensor
+    usb_current:
+      name: "USB Current"
+      id: usb_curr_sensor
+
+
+switch:
+  - platform: powerhub
+    led_pwr:
+      name: "LED Power"
+      id: led_pwr_switch
+      restore_mode: RESTORE_DEFAULT_ON
+    usb_pwr:
+      name: "USB Power"
+      id: usb_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_usb_a
+            brightness: 90%
+            # Color maybe
+            # red: 100%
+            # green: 100%
+            # blue: 100%
+        - light.turn_on:
+            id: led_usb_c
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_usb_a
+        - light.turn_off:
+            id: led_usb_c
+
+    grove_red_pwr:
+      name: "Port.A Power"
+      id: grove_red_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_grove_red
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_grove_red
+
+    grove_blue_pwr:
+      name: "Port.C Power"
+      id: grove_blue_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_grove_blue
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_grove_blue
+    rs485_can_pwr:
+      name: "RS485&CAN Power"
+      id: rs485_can_pwr_switch
+      on_turn_on:
+        - light.turn_on:
+            id: led_rs485_can
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_rs485_can
+    charge_pwr:
+      name: "Charge Power"
+      id: charge_pwr_switch
+      restore_mode: RESTORE_DEFAULT_ON
+      on_turn_on:
+        - light.turn_on:
+            id: led_bat_charge
+            brightness: 90%
+      on_turn_off:
+        - light.turn_off:
+            id: led_bat_charge
+    rs485_can_direction:
+      name: "RS485&CAN Power Output"
+      id: rs485_can_direction_switch
+    vameter_pwr:
+      name: "VAMeter Power"
+      id: vameter_pwr_switch
+      restore_mode: RESTORE_DEFAULT_ON
+
+
+
+select:
+  - platform: powerhub
+    usb_mode:
+      name: "USB Mode"
+      id: usb_mode_select
+
+number:
+  - platform: powerhub
+    rs485_can_output_voltage:
+      name: "RS485&CAN Output Voltage"
+      mode: "box"
+    rs485_can_current_limit:
+      name: "RS485&CAN Output Current Limit"
+      mode: "box"
+
+light:
+  - platform: powerhub
+    usb_c_rgb:
+      id: led_usb_c
+      name: "USB C Light"
+    usb_a_rgb:
+      id: led_usb_a
+      name: "USB A Light"
+    grove_blue_rgb:
+      id: led_grove_blue
+      name: "Port.C Light"
+    grove_red_rgb:
+      id: led_grove_red
+      name: "Port.A Light"
+    rs485_can_rgb:
+      id: led_rs485_can
+      name: "RS485&CAN Light"
+    bat_charge_rgb:
+      id: led_bat_charge
+      name: "Battery Charge Light"
+      effects:
+        - pulse:
+            name: "Slow Pulse"
+            transition_length: 500ms
+            update_interval: 2s
+    pwr_l_rgb:
+      id: led_pwr_l
+      name: "Power L Light"
+    pwr_r_rgb:
+      id: led_pwr_r
+      name: "Power R Light"

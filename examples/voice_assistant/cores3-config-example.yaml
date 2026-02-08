@@ -1,0 +1,35 @@
+esphome:
+  name: cores3-voice-assistant
+  friendly_name: M5Stack CoreS3 Voice Assistant
+
+esp32:
+  variant: esp32s3
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "BUEzgskL8daDJ5rLD90Chq2M43jC0haA/vVxcULQAls="  # example key, you are supposed to generate a new one
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "CoreS3-Voice-Assistant"
+    password: ""
+
+captive_portal:
+
+packages:
+  - !include ../../common/cores3-satellite-base.yaml
+    

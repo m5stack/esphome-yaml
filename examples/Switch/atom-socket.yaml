@@ -1,0 +1,63 @@
+esphome:
+  name: atom-socket
+  friendly_name: M5Stack Atom Socket
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "c9+hAXu4wOL2jczsnhePdUkMzKtMznmiwHEiVTF6yII=" # example key, you are supposed to generate a new one
+
+ota:
+  - platform: esphome
+    password: "617e76c27db9d7fe1935dc6e7cae10ed" # example passwd, you are supposed to generate a new one
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Atom-Socket Fallback Hotspot"
+    password: "Q0a7y5p3O1LS"
+
+captive_portal:
+  
+uart:
+  rx_pin: GPIO22
+  baud_rate: 4800
+  parity: EVEN
+
+switch:
+  - platform: gpio
+    name: "Atom Sokcet"
+    pin:
+      number: GPIO23
+      inverted: False
+    restore_mode: ALWAYS_ON
+
+sensor:
+  - platform: hlw8032
+    voltage:
+      name: HLW8032 Voltage
+      id: hlw8032_voltage
+    current:
+      name: HLW8032 Current
+      id: hlw8032_current
+    power:
+      name: HLW8032 Power
+      id: hlw8032_power
+    apparent_power:
+      name: HLW8032 Apparent Power
+      id: hlw8032_apparent_power
+    power_factor:
+      name: HLW8032 Power Factor
+      id: hlw8032_power_factor
+
