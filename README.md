@@ -4,7 +4,7 @@
 
 <div align="center" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;">
   <img src="https://img.shields.io/badge/home%20assistant-%2341BDF5.svg?style=for-the-badge&logo=home-assistant&logoColor=white">
-  <img src="https://img.shields.io/badge/ESPHome-000000.svg?style=for-the-badge&logo=ESPHome&logoColor=white">
+  <img src="https://img.shields.io/badge/ESPHome-2026.1.2-000000?style=for-the-badge&logo=esphome&logoColor=white">
   <img src="https://img.shields.io/badge/espressif-E7352C.svg?style=for-the-badge&logo=espressif&logoColor=white">
   <img src="https://img.shields.io/badge/PlatformIO-F5822A.svg?style=for-the-badge&logo=PlatformIO&logoColor=white">
 </div>
@@ -28,6 +28,8 @@ As of now the below devices/functionalities are supported:
 - [Tab5 Home Assistant HMI](https://docs.m5stack.com/en/homeassistant/kit/tab5_ha_hmi)
 
 [More](https://docs.m5stack.com/en/homeassistant/overview)
+
+Some example configurations can be found under `examples` folder, you can clone the repo and use `esphome` locally if you want.
 
 ## ❤️ Feature Request & Contributing
 
