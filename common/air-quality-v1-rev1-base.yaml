@@ -11,7 +11,7 @@ esphome:
       bm8563.read_time:
 
 esp32:
-  board: m5stack-stamps3
+  variant: esp32s3
   framework:
     type: esp-idf
 
