@@ -1,6 +1,10 @@
-Example yaml file
+> [!NOTE] Component Note
+> This feature is based on a community contribution and has been merged to move development forward.
+> Full validation within the official M5Stack ESPHome integration is still in progress, and additional testing across hardware variants is planned.
 
-```
+The below example was for [M5Stack Core2](https://docs.m5stack.com/en/core/core2) (SKU: K010, original version)
+
+```yaml
 substitutions:
   friendly_name: "AXP192_test" #Core2
   esphome_name: "axp192test"
@@ -8,7 +12,7 @@ substitutions:
 
 esphome:
   name: ${esphome_name}
-  build_path: C:/EsphomeTemp/${esphome_name}
+  build_path: <Your Path>
 
 esp32:
   board: m5stack-core2
@@ -51,7 +55,7 @@ spi:
   miso_pin: 38
 
 external_components:
-  - source: github://jimwsmith/esphome-yaml/components
+  - source: github://m5stack/esphome-yaml/components
     components: [ axp192 ]
     refresh: 0s
 
