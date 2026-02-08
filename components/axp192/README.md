@@ -1,4 +1,4 @@
-> [!NOTE] Component Note
+> [!NOTE]
 > This feature is based on a community contribution and has been merged to move development forward.
 > Full validation within the official M5Stack ESPHome integration is still in progress, and additional testing across hardware variants is planned.
 
