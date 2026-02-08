@@ -1,9 +1,9 @@
 esphome:
   name: "unit-step16"
-  friendly_name: unit 16 Step
+  friendly_name: M5Stack Unit 16 Step
 
 esp32:
-  board: esp32dev
+  variant: esp32
   framework:
     type: esp-idf
 
@@ -13,11 +13,11 @@ logger:
 
 api:
   encryption:
-    key: "/p52UNP4294EtlpbBPrg1zol3a9P4YSzw1sluVIRkBY="
+    key: "/p52UNP4294EtlpbBPrg1zol3a9P4YSzw1sluVIRkBY=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    password: "11a02f385a1f39ef18d424ef884c85a5"
+    password: "11a02f385a1f39ef18d424ef884c85a5" # example passwd, you are supposed to generate a new one
 
 wifi:
   ssid: !secret wifi_ssid

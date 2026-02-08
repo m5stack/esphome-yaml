@@ -60,7 +60,7 @@ esphome:
   project:
     name: m5stack.cores3-voice-assistant
     version: 2026.1.2
-  min_version: 2026.1.2
+  min_version: 2026.1.0
   on_boot:
     - priority: 600
       then:

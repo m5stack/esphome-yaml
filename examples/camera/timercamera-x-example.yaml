@@ -7,7 +7,7 @@ esphome:
       bm8563.read_time:
 
 esp32:
-  board: esp32dev
+  variant: esp32
   framework:
     type: esp-idf
 
@@ -17,11 +17,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "BUEzgskL8daDJ5rLD90Chq2M43jC0haA/vVxcULQAls="
+    key: "BUEzgskL8daDJ5rLD90Chq2M43jC0haA/vVxcULQAls=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    password: "944c4bd534590fed3fba3aed66807f3c"
+    password: "944c4bd534590fed3fba3aed66807f3c" # example passwd, you are supposed to generate a new one
 
 wifi:
   ssid: !secret wifi_ssid

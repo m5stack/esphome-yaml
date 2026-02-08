@@ -1,6 +1,6 @@
 esphome:
   name: atoms3r-m12
-  friendly_name: AtomS3R-M12
+  friendly_name: M5Stack AtomS3R M12
   on_boot:
     priority: 800
     then:
@@ -9,7 +9,7 @@ esphome:
           gpio_set_level(GPIO_NUM_18, 0);  
           vTaskDelay(pdMS_TO_TICKS(1500)); 
 esp32:
-  board: esp32-s3-devkitc-1
+  variant: esp32s3
   framework:
     type: esp-idf
 
@@ -20,11 +20,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "mLTyVD5L13T7hvkdRr9ardNbXYYWmBOo6l7kjg5OSdI="
+    key: "mLTyVD5L13T7hvkdRr9ardNbXYYWmBOo6l7kjg5OSdI=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    password: "6aacaa1492f5e0eab0b7ce5af43087bc"
+    password: "6aacaa1492f5e0eab0b7ce5af43087bc" # example passwd, you are supposed to generate a new one
 
 wifi:
   ssid: !secret wifi_ssid

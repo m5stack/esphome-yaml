@@ -1,9 +1,9 @@
 esphome:
   name: switchc6
-  friendly_name: SwitchC6
+  friendly_name: M5Stack SwitchC6
 
 esp32:
-  board: esp32dev
+  variant: esp32
   framework:
     type: esp-idf
 
@@ -12,11 +12,11 @@ logger:
 
 api:
   encryption:
-    key: "X7+AfftIYMa/cDqk1pZ9dug7cas7U3/tg5zghRQ1Gow="
+    key: "X7+AfftIYMa/cDqk1pZ9dug7cas7U3/tg5zghRQ1Gow=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    password: "1d25a8a9ad6d2069fd467f15c7795700"
+    password: "1d25a8a9ad6d2069fd467f15c7795700" # example passwd, you are supposed to generate a new one
 
 external_components:
   - source: github://m5stack/esphome-yaml/components

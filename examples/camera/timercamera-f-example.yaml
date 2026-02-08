@@ -3,7 +3,7 @@ esphome:
   friendly_name: M5Stack TimerCamera-F
 
 esp32:
-  board: esp32dev
+  variant: esp32
   framework:
     type: esp-idf
 
@@ -13,11 +13,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "RyCv6a2fj69bP+gBTnBvLXZHdMoCqdXYMzVjnOBemsY="
+    key: "RyCv6a2fj69bP+gBTnBvLXZHdMoCqdXYMzVjnOBemsY=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    password: "e56f53d257507a81e08d2a47ae778fb2"
+    password: "e56f53d257507a81e08d2a47ae778fb2" # example passwd, you are supposed to generate a new one
 
 wifi:
   ssid: !secret wifi_ssid

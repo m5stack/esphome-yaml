@@ -1,9 +1,9 @@
 esphome:
   name: unit-tube-pressure
-  friendly_name: Unit Tube Pressure
+  friendly_name: M5Stack Unit Tube Pressure
 
 esp32:
-  board: esp32-s3-devkitc-1
+  variant: esp32s3
   framework:
     type: esp-idf
 
@@ -13,11 +13,11 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "8ratEFYK2ucP2NGR20RlHE02N41L3b92IX+/vqqvcUU="
+    key: "8ratEFYK2ucP2NGR20RlHE02N41L3b92IX+/vqqvcUU=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    password: "fb969e9338634640cf1c48ec89f1c78f"
+    password: "fb969e9338634640cf1c48ec89f1c78f" # example passwd, you are supposed to generate a new one
 
 wifi:
   ssid: !secret wifi_ssid
