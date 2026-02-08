@@ -35,8 +35,8 @@ esphome:
   friendly_name: ${friendly_name}
   project: 
     name: m5stack.echo-s3r-satellite
-    version: 2025.12.5
-  min_version: 2025.12.0
+    version: 2026.1.2
+  min_version: 2026.1.0
   on_boot:
     priority: 600
     then:
@@ -48,7 +48,7 @@ esphome:
             - lambda: id(init_in_progress) = false;
             
 esp32:
-  variant: ESP32S3
+  variant: esp32s3
   flash_size: 8MB
   cpu_frequency: 240MHz
   framework:
@@ -105,15 +105,21 @@ binary_sensor:
 
 # I2C Bus Configuration
 i2c:
-  sda: GPIO45
-  scl: GPIO0
+  sda:
+    number: GPIO45
+    ignore_strapping_warning: true
+  scl:
+    number: GPIO0
+    ignore_strapping_warning: true
   scan: false
   id: i2c0
 
 # I2S Bus Configuration
 i2s_audio:
   - id: i2s_audio_bus
-    i2s_lrclk_pin: GPIO3
+    i2s_lrclk_pin:
+      number: GPIO3
+      ignore_strapping_warning: true
     i2s_bclk_pin: GPIO17
     i2s_mclk_pin: GPIO11
 
@@ -170,8 +176,7 @@ media_player:
             - if:
                 condition:
                   - lambda: |-
-                      const char *option = id(wake_word_engine_location).current_option();
-                      return (option && std::string_view{option} == "In Home Assistant");
+                      return id(wake_word_engine_location).current_option() == "In Home Assistant";
                 then:
                   - wait_until:
                       - not:
@@ -261,8 +266,7 @@ voice_assistant:
     - if:
         condition:
           - lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "On device");
+              return id(wake_word_engine_location).current_option() == "On device";
         then:
           - lambda: id(va).set_use_wake_word(false);
           - micro_wake_word.start:
@@ -313,7 +317,6 @@ voice_assistant:
         media_player.is_announcing:
     - lambda: id(voice_assistant_phase) = ${voice_assist_timer_finished_phase_id};
     
-
 script:
   # Starts either mWW or the streaming wake word, depending on the configured location
   - id: start_wake_word
@@ -324,8 +327,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
-                  return (option && std::string_view{option} == "On device");
+                  return id(wake_word_engine_location).current_option() == "On device";
           then:
             - lambda: id(va).set_use_wake_word(false);
             - micro_wake_word.start:
@@ -335,8 +337,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
-                  return (option && std::string_view{option} == "In Home Assistant");
+                  return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(true);
             - voice_assistant.start_continuous:
@@ -346,16 +347,14 @@ script:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "In Home Assistant");
+              return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(false);
             - voice_assistant.stop:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "On device");
+              return id(wake_word_engine_location).current_option() == "On device";
           then:
             - micro_wake_word.stop:
   # Set the voice assistant phase to idle or muted, depending on if the software mute switch is activated
@@ -521,10 +520,10 @@ select:
 globals:
   - id: init_in_progress
     type: bool
-    restore_value: false
+    restore_value: no
     initial_value: "true"
   - id: voice_assistant_phase
     type: int
-    restore_value: false
+    restore_value: no
     initial_value: ${voice_assist_not_ready_phase_id}
  
