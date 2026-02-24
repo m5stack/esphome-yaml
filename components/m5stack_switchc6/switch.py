@@ -3,7 +3,7 @@ import esphome.config_validation as cv
 from esphome.components import switch, espnow
 from esphome.const import CONF_ID
 from . import (
-    espnow_switch_ns,
+    m5stack_switchc6_ns,
     CONF_ESPNOW_ID,
     CONF_MAC_ADDRESS,
     CONF_RESPONSE_TOKEN,
@@ -14,7 +14,7 @@ from . import (
 DEPENDENCIES = ["espnow"]
 CODEOWNERS = ["@jason"]
 
-ESPNowSwitch = espnow_switch_ns.class_("ESPNowSwitch", switch.Switch, cg.Component)
+ESPNowSwitch = m5stack_switchc6_ns.class_("ESPNowSwitch", switch.Switch, cg.Component)
 
 
 CONFIG_SCHEMA = (

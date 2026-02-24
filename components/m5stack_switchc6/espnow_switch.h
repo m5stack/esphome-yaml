@@ -6,7 +6,7 @@
 #include <string>
 
 namespace esphome {
-namespace espnow_switch {
+namespace m5stack_switchc6 {
 
 class ESPNowSwitch : public switch_::Switch, public Component {
  public:
@@ -59,5 +59,5 @@ class ESPNowSwitch : public switch_::Switch, public Component {
   bool send_in_flight_{false};
 };
 
-}  // namespace espnow_switch
+}  // namespace m5stack_switchc6
 }  // namespace esphome

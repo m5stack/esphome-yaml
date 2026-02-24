@@ -4,9 +4,9 @@
 #include "esphome/core/application.h"
 
 namespace esphome {
-namespace espnow_switch {
+namespace m5stack_switchc6 {
 
-static const char *const TAG = "espnow_switch";
+static const char *const TAG = "m5stack_switchc6";
 
 void ESPNowSwitch::setup() {
   ESP_LOGCONFIG(TAG, "Setting up ESPNow Switch...");
@@ -118,5 +118,5 @@ void ESPNowSwitch::loop() {
   }
 }
 
-}  // namespace espnow_switch
+}  // namespace m5stack_switchc6
 }  // namespace esphome
