@@ -20,7 +20,7 @@ ota:
 
 external_components:
   - source: github://m5stack/esphome-yaml/components
-    components: espnow_switch
+    components: m5stack_switchc6
     refresh: 0s
 
 wifi:
@@ -43,7 +43,7 @@ espnow:
         id(sw1).handle_broadcast(data, size);
 
 switch:
-  - platform: espnow_switch
+  - platform: m5stack_switchc6
     id: sw1
     name: "SwitchC6 Device 1"
     espnow_id: espnow1

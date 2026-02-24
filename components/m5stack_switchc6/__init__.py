@@ -4,7 +4,7 @@ from esphome.components import espnow
 DEPENDENCIES = ["espnow"]
 CODEOWNERS = ["@jason"]
 
-espnow_switch_ns = cg.esphome_ns.namespace("espnow_switch")
+m5stack_switchc6_ns = cg.esphome_ns.namespace("m5stack_switchc6")
 
 # 常量定义
 CONF_ESPNOW_ID = "espnow_id"
