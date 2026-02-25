@@ -107,6 +107,8 @@ wifi:
 # Enable logging
 logger:
   level: DEBUG
+  logs:
+    sensor: WARN
   
 captive_portal:
 
@@ -136,7 +138,7 @@ binary_sensor:
 
 
 external_components:
-  - source: github://m5stack/esphome-yaml/components
+  - source: github://Jasionf/echo-pyramid-components@main
     components: [aw87559,si5351,lp5562,pyramidrgb,pyramidtouch]
     refresh: 0s
 
@@ -151,11 +153,16 @@ i2c:
     scl: GPIO39
 
 
+# Ehco Base GPIO Expander
+pi4ioe5v6408:
+  - id: pi4ioe5v6408_hub
+    i2c_id: ext_bus
+    address: 0x43
+    
 aw87559:
   id: audio_amp
   i2c_id: ext_bus
   address: 0x5B
-
 
 si5351:
   id: clock_gen
@@ -246,8 +253,7 @@ media_player:
             - if:
                 condition:
                   - lambda: |-
-                      const char *option = id(wake_word_engine_location).current_option();
-                      return (option && std::string_view{option} == "In Home Assistant");
+                      return id(wake_word_engine_location).current_option() == "In Home Assistant";
                 then:
                   - wait_until:
                       - not:
@@ -480,8 +486,7 @@ voice_assistant:
     - if:
         condition:
           - lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "On device");
+              return id(wake_word_engine_location).current_option() == "On device";
         then:
           - lambda: id(va).set_use_wake_word(false);
           - micro_wake_word.start:
@@ -572,27 +577,45 @@ sensor:
         then:
           - lambda: |-
               // Swipe codes:
-              // 1 = Left Up
-              // 2 = Left Down
-              // 3 = Right Up
-              // 4 = Right Down
-              const float step = 0.05f;  // 5% per gesture
-              float v = id(current_volume);
+              // 1 = Left Up   (volume up)
+              // 2 = Left Down (volume down)
+              // 3 = Right Up  (brightness up)
+              // 4 = Right Down (brightness down)
+              const float volume_step = 0.05f;   // 5% volume per gesture
+              const float brightness_step = 5.0f; // 5% brightness per gesture
+
               const int ev = (int) x;
 
-              if (ev == 1 || ev == 3) {
-                v = std::min(1.0f, v + step);
-              } else if (ev == 2 || ev == 4) {
-                v = std::max(0.0f, v - step);
+              if (ev == 1 || ev == 2) {
+                // Left side: control volume (0.0 - 1.0)
+                float v = id(current_volume);
+                if (ev == 1) {
+                  v = std::min(1.0f, v + volume_step);
+                } else {
+                  v = std::max(0.0f, v - volume_step);
+                }
+
+                auto call = id(echo_pyramid_player).make_call();
+                call.set_volume(v);
+                call.perform();
+
+                id(current_volume) = v;
+              } else if (ev == 3 || ev == 4) {
+                // Right side: control RGB brightness (0 - 100)
+                float b = id(rgb_master_brightness).state;
+                if (ev == 3) {
+                  b = std::min(100.0f, b + brightness_step);
+                } else {
+                  b = std::max(0.0f, b - brightness_step);
+                }
+
+                uint8_t b8 = (uint8_t) b;
+                id(pyramid_rgb1).set_strip_brightness(1, b8);
+                id(pyramid_rgb2).set_strip_brightness(2, b8);
+                id(rgb_master_brightness).publish_state(b);
               } else {
                 return;
               }
-
-              auto call = id(echo_pyramid_player).make_call();
-              call.set_volume(v);
-              call.perform();
-
-              id(current_volume) = v;
 
 
 lp5562:
@@ -607,10 +630,14 @@ lp5562:
 pyramidrgb:
   - id: pyramid_rgb1
     i2c_id: ext_bus
+    address: 0x1A
     strip: 1
+    brightness: 80  
   - id: pyramid_rgb2
     i2c_id: ext_bus
+    address: 0x1A
     strip: 2
+    brightness: 80  
 
 number:
   # Master media player volume (0.0–1.0)
@@ -733,24 +760,28 @@ light:
     red: rgb1_ch0_red
     green: rgb1_ch0_green
     blue: rgb1_ch0_blue
+    restore_mode: RESTORE_DEFAULT_ON
 
   - platform: rgb
     name: "Strip1 Group2"
     red: rgb1_ch1_red
     green: rgb1_ch1_green
     blue: rgb1_ch1_blue
+    restore_mode: RESTORE_DEFAULT_ON
 
   - platform: rgb
     name: "Strip2 Group1"
     red: rgb2_ch2_red
     green: rgb2_ch2_green
     blue: rgb2_ch2_blue
+    restore_mode: RESTORE_DEFAULT_ON
 
   - platform: rgb
     name: "Strip2 Group2"
     red: rgb2_ch3_red
     green: rgb2_ch3_green
     blue: rgb2_ch3_blue
+    restore_mode: RESTORE_DEFAULT_ON
 
 
 
@@ -816,8 +847,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
-                  return (option && std::string_view{option} == "On device");
+                  return id(wake_word_engine_location).current_option() == "On device";
           then:
             - lambda: id(va).set_use_wake_word(false);
             - micro_wake_word.start:
@@ -827,8 +857,7 @@ script:
               - not:
                   - voice_assistant.is_running:
               - lambda: |-
-                  const char *option = id(wake_word_engine_location).current_option();
-                  return (option && std::string_view{option} == "In Home Assistant");
+                  return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(true);
             - voice_assistant.start_continuous:
@@ -838,16 +867,14 @@ script:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "In Home Assistant");
+              return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(false);
             - voice_assistant.stop:
       - if:
           condition:
             lambda: |-
-              const char *option = id(wake_word_engine_location).current_option();
-              return (option && std::string_view{option} == "On device");
+              return id(wake_word_engine_location).current_option() == "On device";
           then:
             - micro_wake_word.stop:
   # Set the voice assistant phase to idle or muted, depending on if the software mute switch is activated
