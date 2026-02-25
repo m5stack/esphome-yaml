@@ -92,8 +92,8 @@ ota:
     password: "6cf9a68db5bb8db6e92a32723ef524cf"
 
 wifi:
-  ssid: DeepSpace9
-  password: huxiaochuan
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
   
   ap:
     ssid: "Echo-Pyramid Fallback Hotspot"
@@ -161,13 +161,6 @@ si5351:
   id: clock_gen
   i2c_id: ext_bus
   address: 0x60
-
-
-# Ehco Base GPIO Expander
-pi4ioe5v6408:
-  - id: pi4ioe5v6408_hub
-    i2c_id: ext_bus
-    address: 0x43
       
 # I2S Bus Configuration
 i2s_audio:
