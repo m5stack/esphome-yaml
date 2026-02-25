@@ -10,7 +10,6 @@
 namespace esphome {
 namespace aw87559 {
 
-// 寄存器地址定义
 static const uint8_t AW87559_REG_CHIPID = 0x00;
 static const uint8_t AW87559_REG_SYSCTRL = 0x01;
 static const uint8_t AW87559_REG_BATSAFE = 0x02;

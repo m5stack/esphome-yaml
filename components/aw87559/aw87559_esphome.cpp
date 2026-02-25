@@ -35,10 +35,10 @@ void AW87559Component::setup() {
 void AW87559Component::dump_config() {
   ESP_LOGCONFIG(TAG, "AW87559 Audio Amplifier:");
   
-  // 打印 I2C 地址信息
+ 
   LOG_I2C_DEVICE(this);
 
-  // 打印初始化状态
+
   ESP_LOGCONFIG(TAG, "  Setup Status: %s", this->setup_complete_ ? "OK" : "FAILED");
 }
 

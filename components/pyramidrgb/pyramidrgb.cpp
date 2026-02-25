@@ -53,16 +53,16 @@ bool PyramidRGBComponent::set_strip_brightness(uint8_t strip, uint8_t brightness
 
 uint8_t PyramidRGBComponent::channel_base_addr_(uint8_t channel) const {
   switch (channel) {
-    case 0: return RGB_CH1_I1_COLOR_REG_ADDR; // Channel 0 -> 灯带1组1
-    case 1: return RGB_CH2_I1_COLOR_REG_ADDR; // Channel 1 -> 灯带1组2
-    case 2: return RGB_CH4_I1_COLOR_REG_ADDR; // 设备映射：channel 2 -> CH4
-    case 3: return RGB_CH3_I1_COLOR_REG_ADDR; // 设备映射：channel 3 -> CH3
+    case 0: return RGB_CH1_I1_COLOR_REG_ADDR;
+    case 1: return RGB_CH2_I1_COLOR_REG_ADDR; 
+    case 2: return RGB_CH4_I1_COLOR_REG_ADDR; 
+    case 3: return RGB_CH3_I1_COLOR_REG_ADDR; 
     default: return RGB_CH1_I1_COLOR_REG_ADDR;
   }
 }
 
 bool PyramidRGBComponent::write_color_block_(uint8_t base_reg_addr, const uint8_t *color_bytes, size_t len) {
-  // 组装寄存器+数据的写入缓冲区
+
   const size_t total = len + 1;
   uint8_t *buf = (uint8_t *) malloc(total);
   if (buf == nullptr) return false;
@@ -79,12 +79,11 @@ bool PyramidRGBComponent::set_channel_color(uint8_t channel, uint8_t r, uint8_t 
   channel_colors_[channel][1] = g;
   channel_colors_[channel][2] = b;
 
-  // 每个 LED 4 字节：B, G, R, reserved（按硬件定义）
-  // 逐 LED 写入，避免设备不支持连续自增写导致失败
+
   uint8_t base = channel_base_addr_(channel);
   bool all_ok = true;
   for (uint8_t i = 0; i < NUM_LEDS_PER_GROUP; i++) {
-    // 通道 0 和 1 的 LED 顺序需要反转（索引 0..6 -> 6..0）
+
     uint8_t hardware_index = i;
     if (channel == 0 || channel == 1) {
       hardware_index = NUM_LEDS_PER_GROUP - 1 - i;
