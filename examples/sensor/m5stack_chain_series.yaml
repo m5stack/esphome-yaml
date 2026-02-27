@@ -1,0 +1,183 @@
+esphome:
+  name: chain-dualkey
+  friendly_name: Chain DualKey
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+logger:
+  level: VERBOSE
+  logs:
+    sensor: WARN
+
+api:
+  encryption:
+    key: "BKmXH7eRu9bQiSQr52c9Z0lIO+zSjeCy1vIYM/KklhE="
+
+ota:
+  - platform: esphome
+    password: "f6ba84c83fe30b62bcbfc46368d4a78b"
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Chain-Dualkey Fallback Hotspot"
+    password: "uC7W4EhRoAZc"
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [m5stack_chain_angle,m5stack_chain_encoder,m5stack_chain_tof,m5stack_chain_joystick,m5stack_chain_key]
+    refresh: 0s
+
+captive_portal:
+
+uart:
+  - id: chain_uart_right
+    tx_pin: GPIO6
+    rx_pin: GPIO5
+    baud_rate: 115200
+
+  - id: chain_uart_left
+    tx_pin: GPIO48
+    rx_pin: GPIO47
+    baud_rate: 115200
+
+sensor:
+  - platform: m5stack_chain_encoder
+    name: "Chain Encoder"
+    uart_id: chain_uart_right   
+    chain_id: 1                
+    update_interval: 100ms
+
+  - platform: m5stack_chain_tof
+    name: "Chain Tof"
+    uart_id: chain_uart_right   
+    chain_id: 3                
+    update_interval: 100ms
+
+  - platform: m5stack_chain_angle
+    name: "Chain Angle Left"
+    uart_id: chain_uart_right
+    chain_id: 2
+    update_interval: 100ms
+    
+  - platform: m5stack_chain_joystick
+    name: "Chain Joystick Left X"
+    uart_id: chain_uart_left
+    chain_id: 1
+    axis: x
+    update_interval: 100ms
+
+  - platform: m5stack_chain_joystick
+    name: "Chain Joystick Left Y"
+    uart_id: chain_uart_left
+    chain_id: 1
+    axis: y
+    update_interval: 100ms
+
+  - platform: adc
+    pin: GPIO10
+    name: "ADC_BAT"
+    update_interval: 1s
+
+  - platform: adc
+    pin: GPIO2
+    name: "ADC_VBUS"
+    update_interval: 1s
+
+  - platform: adc
+    pin: GPIO9
+    name: "ADC_CHARGE"
+    update_interval: 1s
+
+output:
+  - platform: gpio
+    id: pwr_en
+    pin: GPIO40
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: key_light_raw
+    internal: true
+    pin: GPIO21
+    num_leds: 2
+    chipset: ws2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_OFF
+
+  - platform: partition
+    name: "Key Light 1"
+    id: key_light_1
+    segments:
+      - id: key_light_raw
+        from: 0
+        to: 0
+
+  - platform: partition
+    name: "Key Light 2"
+    id: key_light_2
+    segments:
+      - id: key_light_raw
+        from: 1
+        to: 1
+
+binary_sensor:
+
+  - platform: gpio
+    name: "KEY 2"
+    pin:
+      number: GPIO17
+      inverted: true
+      mode: INPUT_PULLUP
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+    on_press:
+      - light.turn_on:
+          id: key_light_2
+          transition_length: 0ms
+
+    on_release:
+      - light.turn_off: key_light_2
+
+  - platform: gpio
+    name: "KEY 1"
+    pin:
+      number: GPIO0
+      inverted: true
+      mode: INPUT_PULLUP
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+
+    on_press:
+      - light.turn_on:
+          id: key_light_1
+          transition_length: 0ms
+
+    on_release:
+      - light.turn_off: key_light_1
+
+  - platform: m5stack_chain_key
+    name: "Chain Key Right 1"
+    uart_id: chain_uart_left
+    chain_id: 2        
+    update_interval: 50ms
+
+  - platform: gpio
+    name: "SWITCH 1"
+    pin:
+      number: GPIO7
+      mode: INPUT
+
+  - platform: gpio
+    name: "SWITCH 2"
+    pin:
+      number: GPIO8
+      mode: INPUT
