@@ -138,7 +138,7 @@ binary_sensor:
 
 
 external_components:
-  - source: github://Jasionf/echo-pyramid-components@main
+  - source: github://m5stack/esphome-yaml/components
     components: [aw87559,si5351,lp5562,pyramidrgb,pyramidtouch]
     refresh: 0s
 
