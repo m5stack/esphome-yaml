@@ -20,6 +20,17 @@ void ChainEncoderSensor::update() {
   } else {
     ESP_LOGW(TAG, "Failed to read encoder value (status=0x%02X)", static_cast<uint8_t>(status));
   }
+
+  if (this->button_sensor_ != nullptr) {
+    uint8_t button_status = 0;
+    ChainStatus bstatus = this->get_button_status_(this->device_id_, &button_status, 100);
+    if (bstatus == CHAIN_OK) {
+      bool pressed = (button_status != 0);
+      this->button_sensor_->publish_state(pressed);
+    } else {
+      ESP_LOGW(TAG, "Failed to read encoder button status (status=0x%02X)", static_cast<uint8_t>(bstatus));
+    }
+  }
 }
 
 ChainStatus ChainEncoderSensor::get_encoder_value_(uint8_t id, int16_t *value, uint32_t timeout_ms) {
@@ -37,6 +48,140 @@ ChainStatus ChainEncoderSensor::get_encoder_value_(uint8_t id, int16_t *value, u
     if (this->wait_for_data_(id, CHAIN_ENCODER_GET_VALUE, timeout_ms)) {
       if (this->check_packet_(this->return_packet_, this->return_packet_size_)) {
         *value = static_cast<int16_t>((this->return_packet_[7] << 8) | this->return_packet_[6]);
+      } else {
+        status = CHAIN_RETURN_PACKET_ERROR;
+      }
+    } else {
+      status = CHAIN_TIMEOUT;
+    }
+
+    this->release_mutex_();
+  } else {
+    status = CHAIN_BUSY;
+  }
+
+  return status;
+}
+
+ChainStatus ChainEncoderSensor::get_button_status_(uint8_t id, uint8_t *status, uint32_t timeout_ms) {
+  if (status == nullptr) {
+    return CHAIN_PARAMETER_ERROR;
+  }
+
+  ChainStatus res = CHAIN_OK;
+
+  if (this->acquire_mutex_()) {
+    this->cmd_buffer_size_ = 0;
+
+    this->send_packet_(id, CHAIN_BUTTON_GET_STATUS, this->cmd_buffer_, this->cmd_buffer_size_);
+
+    if (this->wait_for_data_(id, CHAIN_BUTTON_GET_STATUS, timeout_ms)) {
+      if (this->check_packet_(this->return_packet_, this->return_packet_size_)) {
+        *status = this->return_packet_[6];
+      } else {
+        res = CHAIN_RETURN_PACKET_ERROR;
+      }
+    } else {
+      res = CHAIN_TIMEOUT;
+    }
+
+    this->release_mutex_();
+  } else {
+    res = CHAIN_BUSY;
+  }
+
+  return res;
+}
+
+ChainStatus ChainEncoderSensor::set_led_brightness(uint8_t brightness, uint8_t *operation_status) {
+  if (brightness > 100) {
+    return CHAIN_PARAMETER_ERROR;
+  }
+
+  ChainStatus status = CHAIN_OK;
+
+  if (this->acquire_mutex_()) {
+    this->cmd_buffer_size_ = 0;
+    this->cmd_buffer_[this->cmd_buffer_size_++] = brightness;
+    this->cmd_buffer_[this->cmd_buffer_size_++] = 0x00;  // do not save to flash
+
+    this->send_packet_(this->device_id_, CHAIN_SET_RGB_LIGHT, this->cmd_buffer_, this->cmd_buffer_size_);
+
+    if (this->wait_for_data_(this->device_id_, CHAIN_SET_RGB_LIGHT, 100)) {
+      if (this->check_packet_(this->return_packet_, this->return_packet_size_)) {
+        if (operation_status != nullptr) {
+          *operation_status = this->return_packet_[6];
+        }
+      } else {
+        status = CHAIN_RETURN_PACKET_ERROR;
+      }
+    } else {
+      status = CHAIN_TIMEOUT;
+    }
+
+    this->release_mutex_();
+  } else {
+    status = CHAIN_BUSY;
+  }
+
+  return status;
+}
+
+ChainStatus ChainEncoderSensor::set_rgb_color(uint8_t r, uint8_t g, uint8_t b, uint8_t *operation_status) {
+  ChainStatus status = CHAIN_OK;
+
+  if (this->acquire_mutex_()) {
+    this->cmd_buffer_size_ = 0;
+    this->cmd_buffer_[this->cmd_buffer_size_++] = 0;  // index
+    this->cmd_buffer_[this->cmd_buffer_size_++] = 1;  // num LEDs
+    this->cmd_buffer_[this->cmd_buffer_size_++] = r;
+    this->cmd_buffer_[this->cmd_buffer_size_++] = g;
+    this->cmd_buffer_[this->cmd_buffer_size_++] = b;
+
+    this->send_packet_(this->device_id_, CHAIN_SET_RGB_VALUE, this->cmd_buffer_, this->cmd_buffer_size_);
+
+    if (this->wait_for_data_(this->device_id_, CHAIN_SET_RGB_VALUE, 100)) {
+      if (this->check_packet_(this->return_packet_, this->return_packet_size_)) {
+        if (operation_status != nullptr) {
+          *operation_status = this->return_packet_[6];
+        }
+      } else {
+        status = CHAIN_RETURN_PACKET_ERROR;
+      }
+    } else {
+      status = CHAIN_TIMEOUT;
+    }
+
+    this->release_mutex_();
+  } else {
+    status = CHAIN_BUSY;
+  }
+
+  return status;
+}
+
+ChainStatus ChainEncoderSensor::get_rgb_color(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *operation_status) {
+  if (r == nullptr || g == nullptr || b == nullptr) {
+    return CHAIN_PARAMETER_ERROR;
+  }
+
+  ChainStatus status = CHAIN_OK;
+
+  if (this->acquire_mutex_()) {
+    this->cmd_buffer_size_ = 0;
+    this->cmd_buffer_[this->cmd_buffer_size_++] = 0;  // index
+    this->cmd_buffer_[this->cmd_buffer_size_++] = 1;  // num LEDs
+
+    this->send_packet_(this->device_id_, CHAIN_GET_RGB_VALUE, this->cmd_buffer_, this->cmd_buffer_size_);
+
+    if (this->wait_for_data_(this->device_id_, CHAIN_GET_RGB_VALUE, 100)) {
+      if (this->check_packet_(this->return_packet_, this->return_packet_size_)) {
+        if (operation_status != nullptr) {
+          *operation_status = this->return_packet_[6];
+        }
+        *r = this->return_packet_[7];
+        *g = this->return_packet_[8];
+        *b = this->return_packet_[9];
       } else {
         status = CHAIN_RETURN_PACKET_ERROR;
       }

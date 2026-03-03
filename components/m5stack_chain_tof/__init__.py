@@ -10,3 +10,5 @@ ChainToFSensor = m5stack_chain_tof_ns.class_(
     cg.PollingComponent,
     uart.UARTDevice,
 )
+
+CONF_M5STACK_CHAIN_TOF_ID = "m5stack_chain_tof_id"
