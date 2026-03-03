@@ -7,6 +7,7 @@ esp32:
   framework:
     type: esp-idf
 
+
 logger:
   level: VERBOSE
   logs:
@@ -14,12 +15,11 @@ logger:
 
 api:
   encryption:
-    key: "BKmXH7eRu9bQiSQr52c9Z0lIO+zSjeCy1vIYM/KklhE="
+    key: ""
 
 ota:
   - platform: esphome
-    password: "f6ba84c83fe30b62bcbfc46368d4a78b"
-
+    password: ""
 
 wifi:
   ssid: !secret wifi_ssid
@@ -35,7 +35,6 @@ external_components:
     refresh: 0s
 
 captive_portal:
-
 uart:
   - id: chain_uart_right
     tx_pin: GPIO6
@@ -49,32 +48,36 @@ uart:
 
 sensor:
   - platform: m5stack_chain_encoder
-    name: "Chain Encoder"
+    id: chain_encoder_1
+    name: "Encoder"
     uart_id: chain_uart_right   
     chain_id: 1                
     update_interval: 100ms
 
   - platform: m5stack_chain_tof
-    name: "Chain Tof"
+    id: chain_tof_1
+    name: "ToF Distance"
     uart_id: chain_uart_right   
     chain_id: 3                
     update_interval: 100ms
 
   - platform: m5stack_chain_angle
-    name: "Chain Angle Left"
+    id: chain_angle_1
+    name: "Angle"
     uart_id: chain_uart_right
     chain_id: 2
     update_interval: 100ms
     
   - platform: m5stack_chain_joystick
-    name: "Chain Joystick Left X"
+    id: chain_joystick_x
+    name: "Joystick X"
     uart_id: chain_uart_left
     chain_id: 1
     axis: x
     update_interval: 100ms
 
   - platform: m5stack_chain_joystick
-    name: "Chain Joystick Left Y"
+    name: "Joystick Y"
     uart_id: chain_uart_left
     chain_id: 1
     axis: y
@@ -99,6 +102,78 @@ output:
   - platform: gpio
     id: pwr_en
     pin: GPIO40
+  - platform: m5stack_chain_encoder
+    id: chain_encoder_rgb_r
+    chain_encoder_id: chain_encoder_1
+    channel: rgb_red
+
+  - platform: m5stack_chain_encoder
+    id: chain_encoder_rgb_g
+    chain_encoder_id: chain_encoder_1
+    channel: rgb_green
+
+  - platform: m5stack_chain_encoder
+    id: chain_encoder_rgb_b
+    chain_encoder_id: chain_encoder_1
+    channel: rgb_blue
+
+  - platform: m5stack_chain_key
+    id: chain_key_rgb_r
+    chain_key_id: chain_key_1
+    channel: rgb_red
+
+  - platform: m5stack_chain_key
+    id: chain_key_rgb_g
+    chain_key_id: chain_key_1
+    channel: rgb_green
+
+  - platform: m5stack_chain_key
+    id: chain_key_rgb_b
+    chain_key_id: chain_key_1
+    channel: rgb_blue
+
+  - platform: m5stack_chain_joystick
+    id: chain_joystick_rgb_r
+    chain_joystick_id: chain_joystick_x
+    channel: rgb_red
+
+  - platform: m5stack_chain_joystick
+    id: chain_joystick_rgb_g
+    chain_joystick_id: chain_joystick_x
+    channel: rgb_green
+
+  - platform: m5stack_chain_joystick
+    id: chain_joystick_rgb_b
+    chain_joystick_id: chain_joystick_x
+    channel: rgb_blue
+  - platform: m5stack_chain_angle
+    id: chain_angle_rgb_r
+    chain_angle_id: chain_angle_1
+    channel: rgb_red
+
+  - platform: m5stack_chain_angle
+    id: chain_angle_rgb_g
+    chain_angle_id: chain_angle_1
+    channel: rgb_green
+
+  - platform: m5stack_chain_angle
+    id: chain_angle_rgb_b
+    chain_angle_id: chain_angle_1
+    channel: rgb_blue
+  - platform: m5stack_chain_tof
+    id: chain_tof_rgb_r
+    m5stack_chain_tof_id: chain_tof_1
+    channel: rgb_red
+
+  - platform: m5stack_chain_tof
+    id: chain_tof_rgb_g
+    m5stack_chain_tof_id: chain_tof_1
+    channel: rgb_green
+
+  - platform: m5stack_chain_tof
+    id: chain_tof_rgb_b
+    m5stack_chain_tof_id: chain_tof_1
+    channel: rgb_blue
 
 light:
   - platform: esp32_rmt_led_strip
@@ -111,20 +186,50 @@ light:
     restore_mode: ALWAYS_OFF
 
   - platform: partition
-    name: "Key Light 1"
+    name: "Key1 LED"
     id: key_light_1
+    segments:
+      - id: key_light_raw
+        from: 1
+        to: 1
+
+  - platform: partition
+    name: "Key2 LED"
+    id: key_light_2
     segments:
       - id: key_light_raw
         from: 0
         to: 0
 
-  - platform: partition
-    name: "Key Light 2"
-    id: key_light_2
-    segments:
-      - id: key_light_raw
-        from: 1
-        to: 1
+  - platform: rgb
+    name: "Encoder RGB"
+    red: chain_encoder_rgb_r
+    green: chain_encoder_rgb_g
+    blue: chain_encoder_rgb_b
+
+  - platform: rgb
+    name: "Key RGB"
+    red: chain_key_rgb_r
+    green: chain_key_rgb_g
+    blue: chain_key_rgb_b
+
+  - platform: rgb
+    name: "Joystick RGB"
+    red: chain_joystick_rgb_r
+    green: chain_joystick_rgb_g
+    blue: chain_joystick_rgb_b
+
+  - platform: rgb
+    name: "Angle RGB"
+    red: chain_angle_rgb_r
+    green: chain_angle_rgb_g
+    blue: chain_angle_rgb_b
+
+  - platform: rgb
+    name: "ToF RGB"
+    red: chain_tof_rgb_r
+    green: chain_tof_rgb_g
+    blue: chain_tof_rgb_b
 
 binary_sensor:
 
@@ -165,10 +270,19 @@ binary_sensor:
       - light.turn_off: key_light_1
 
   - platform: m5stack_chain_key
-    name: "Chain Key Right 1"
+    id: chain_key_1
+    name: "Key Module Button"
     uart_id: chain_uart_left
     chain_id: 2        
     update_interval: 50ms
+
+  - platform: m5stack_chain_encoder
+    name: "Encoder Button"
+    chain_encoder_id: chain_encoder_1
+
+  - platform: m5stack_chain_joystick
+    name: "Joystick Button"
+    chain_joystick_id: chain_joystick_x
 
   - platform: gpio
     name: "SWITCH 1"

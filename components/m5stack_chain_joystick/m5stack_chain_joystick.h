@@ -3,6 +3,7 @@
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 
 namespace esphome {
 namespace m5stack_chain_joystick {
@@ -18,6 +19,14 @@ enum ChainStatus : uint8_t {
 enum JoystickCommand : uint8_t {
   CHAIN_JOYSTICK_GET_ADC_XY_MAPPED_INT16_VALUE = 0x34,
 };
+
+// Button command (shared with other Chain button devices)
+static const uint8_t CHAIN_BUTTON_GET_STATUS = 0xE1;
+
+// Common RGB LED commands (shared by all Chain devices)
+static const uint8_t CHAIN_SET_RGB_VALUE = 0x20;
+static const uint8_t CHAIN_GET_RGB_VALUE = 0x21;
+static const uint8_t CHAIN_SET_RGB_LIGHT = 0x22;
 
 static const uint8_t PACK_HEAD_HIGH = 0xAA;
 static const uint8_t PACK_HEAD_LOW = 0x55;
@@ -39,11 +48,22 @@ class ChainJoystickSensor : public sensor::Sensor,
   void set_device_id(uint8_t id) { this->device_id_ = id; }
   void set_axis(uint8_t axis) { this->axis_ = axis; }
 
+  void set_button_sensor(binary_sensor::BinarySensor *button) { this->button_sensor_ = button; }
+
+  // Set onboard LED brightness (0-100)
+  ChainStatus set_led_brightness(uint8_t brightness, uint8_t *operation_status = nullptr);
+
+  // Set onboard RGB color
+  ChainStatus set_rgb_color(uint8_t r, uint8_t g, uint8_t b, uint8_t *operation_status = nullptr);
+  // Get onboard RGB color
+  ChainStatus get_rgb_color(uint8_t *r, uint8_t *g, uint8_t *b, uint8_t *operation_status = nullptr);
+
   void setup() override;
   void update() override;
 
  protected:
   ChainStatus get_mapped_int16_value_(uint8_t id, int16_t *x_value, int16_t *y_value, uint32_t timeout_ms = 100);
+  ChainStatus get_button_status_(uint8_t id, uint8_t *status, uint32_t timeout_ms = 100);
 
   bool acquire_mutex_();
   void release_mutex_();
@@ -59,6 +79,8 @@ class ChainJoystickSensor : public sensor::Sensor,
 
   uint8_t device_id_{1};
   uint8_t axis_{0};
+
+  binary_sensor::BinarySensor *button_sensor_{nullptr};
 
   bool mutex_locked_{false};
 
