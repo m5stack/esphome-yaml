@@ -41,6 +41,10 @@ void Module4Relay::set_all_relay(bool en) {
 
 void Module4Relay::set_relay_by_index(uint8_t index, bool en) {
   // Index is 0-3, mapping to relay channels 1-4.
+  if (index > 3) {
+    ESP_LOGE(TAG, "Relay index %u out of range (valid: 0-3)", index);
+    return;
+  }
   uint8_t val = this->read_all_relay();
   if (en) {
     val |= (1 << index);
