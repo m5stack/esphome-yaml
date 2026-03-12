@@ -1,0 +1,337 @@
+esphome:
+  name: station-bat
+  friendly_name: station-bat
+  on_boot:
+    - priority: 600
+      then:
+        - bm8563.read_time:
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: ""
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Station-Bat Fallback Hotspot"
+    password: "JahANnrx22J3"
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [m5station_axp192]
+    refresh: 0s
+
+i2c:
+  - id: i2c_bus
+    sda: GPIO21
+    scl: GPIO22
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+
+captive_portal:
+
+sensor:
+  - platform: mpu6886
+    i2c_id: i2c_bus
+    accel_x:
+      name: "MPU6886 Accel X"
+      id: imu_ax
+    accel_y:
+      name: "MPU6886 Accel Y"
+      id: imu_ay
+    accel_z:
+      name: "MPU6886 Accel z"
+      id: imu_az
+    gyro_x:
+      name: "MPU6886 Gyro X"
+    gyro_y:
+      name: "MPU6886 Gyro Y"
+    gyro_z:
+      name: "MPU6886 Gyro z"
+    temperature:
+      name: "MPU6886 Temperature"
+      id: imu_temp
+    update_interval: 5s
+
+  - platform: m5station_axp192
+    id: pmu
+    i2c_id: i2c_bus
+    battery_level:
+      name: "M5Station Battery Level"
+      id: bat_level
+    update_interval: 60s
+    brightness: 0.8
+
+  - platform: ina3221
+    id: ina1
+    i2c_id: i2c_bus
+    address: 0x40
+    update_interval: 1s
+    channel_1:
+      shunt_resistance: 0.01
+      bus_voltage:
+        name: "P.A1 Bus Voltage"
+        id: v_a1
+      current:
+        name: "P.A1 Current"
+        id: i_a1
+    channel_2:
+      shunt_resistance: 0.01
+      bus_voltage:
+        name: "P.A2 Bus Voltage"
+        id: v_a2
+      current:
+        name: "P.A2 Current"
+        id: i_a2
+    channel_3:
+      shunt_resistance: 0.01
+      bus_voltage:
+        name: "P.B1 Bus Voltage"
+        id: v_b1
+      current:
+        name: "P.B1 Current"
+        id: i_b1
+
+  - platform: ina3221
+    id: ina2
+    i2c_id: i2c_bus
+    address: 0x41
+    update_interval: 1s
+    channel_1:
+      shunt_resistance: 0.01
+      bus_voltage:
+        name: "P.B2 Bus Voltage"
+        id: v_b2
+      current:
+        name: "P.B2 Current"
+        id: i_b2
+    channel_2:
+      shunt_resistance: 0.01
+      bus_voltage:
+        name: "P.C1 Bus Voltage"
+        id: v_c1
+      current:
+        name: "P.C1 Current"
+        id: i_c1
+    channel_3:
+      shunt_resistance: 0.01
+      bus_voltage:
+        name: "P.C2 Bus Voltage"
+        id: v_c2
+      current:
+        name: "P.C2 Current"
+        id: i_c2
+
+binary_sensor:
+  - platform: gpio
+    name: "Button1"
+    pin:
+      number: GPIO37
+      inverted: true
+  - platform: gpio
+    name: "Button2"
+    pin:
+      number: GPIO38
+      inverted: true
+  - platform: gpio
+    name: "Button3"
+    pin:
+      number: GPIO39
+      inverted: true
+
+switch:
+  - platform: template
+    name: "LCD Backlight"
+    id: lcd_backlight
+    lambda: |-
+      return true;
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      - lambda: |-
+          id(pmu).set_backlight(true);
+    turn_off_action:
+      - lambda: |-
+          id(pmu).set_backlight(false);
+
+  - platform: gpio
+    name: "USB Power"
+    id: usb_power
+    pin: GPIO12
+
+font:
+  - file: "gfonts://Share Tech Mono"
+    id: font_num
+    size: 16
+
+  - file: "gfonts://Share Tech Mono"
+    id: font_lbl
+    size: 13
+
+  - file: "gfonts://Share Tech Mono"
+    id: font_hdr
+    size: 11
+
+  - file: "gfonts://Share Tech Mono"
+    id: font_med
+    size: 14
+
+display:
+  - platform: st7789v
+    model: CUSTOM
+    width: 135
+    height: 240
+    offset_height: 52
+    offset_width: 40
+    cs_pin: GPIO5
+    dc_pin: GPIO19
+    reset_pin: GPIO15
+    rotation: 90
+    update_interval: 1s
+    lambda: |-
+      auto BLACK  = Color(0,   0,   0);
+      auto GREEN  = Color(0,   255, 110);
+      auto G_DIM  = Color(0,   150, 65);
+      auto G_DARK = Color(0,   45,  20);
+      auto CYAN   = Color(60,  220, 255);
+      auto AMBER  = Color(255, 190, 0);
+
+      it.fill(BLACK);
+
+      it.filled_rectangle(0, 0, 240, 18, G_DARK);
+      it.print(3, 3, id(font_hdr), G_DIM, "PWR");
+
+      auto t = id(bm8563_time).now();
+      if (t.is_valid()) {
+        char time_buf[8];
+        snprintf(time_buf, sizeof(time_buf), "%02d:%02d", t.hour, t.minute);
+        it.print(48, 2, id(font_med), GREEN, time_buf);
+      } else {
+        it.print(48, 3, id(font_hdr), G_DARK, "--:--");
+      }
+
+      char bat_buf[10];
+      if (!isnan(id(bat_level).state))
+        snprintf(bat_buf, sizeof(bat_buf), "%3.0f%%", id(bat_level).state);
+      else
+        snprintf(bat_buf, sizeof(bat_buf), "--%");
+      it.print(185, 3, id(font_hdr), G_DIM, "BAT");
+      it.print(207, 1, id(font_med), GREEN, bat_buf);
+
+      it.horizontal_line(0, 18, 240, G_DARK);
+      it.vertical_line(120, 18, 88, G_DARK);
+
+      it.print(  2, 19, id(font_hdr), G_DIM, "CH");
+      it.print( 34, 19, id(font_hdr), G_DIM, "mA");
+      it.print( 78, 19, id(font_hdr), G_DIM, "V");
+      it.print(122, 19, id(font_hdr), G_DIM, "CH");
+      it.print(152, 19, id(font_hdr), G_DIM, "mA");
+      it.print(198, 19, id(font_hdr), G_DIM, "V");
+
+      it.horizontal_line(0, 30, 240, G_DARK);
+
+      const char* ch1[3] = {"A1", "B1", "C1"};
+      const char* ch2[3] = {"A2", "B2", "C2"};
+
+      float cur1[3] = { id(i_a1).state, id(i_b1).state, id(i_c1).state };
+      float vol1[3] = { id(v_a1).state, id(v_b1).state, id(v_c1).state };
+      float cur2[3] = { id(i_a2).state, id(i_b2).state, id(i_c2).state };
+      float vol2[3] = { id(v_a2).state, id(v_b2).state, id(v_c2).state };
+
+      for (int r = 0; r < 3; r++) {
+        int ry  = 31 + r * 24;
+        int ty  = ry + 3;
+        int chy = ty + 2;
+
+        if (r % 2 == 0) {
+          it.filled_rectangle(  1, ry, 118, 23, Color(0, 22, 10));
+          it.filled_rectangle(121, ry, 118, 23, Color(0, 22, 10));
+        }
+
+        it.print(2, chy, id(font_lbl), G_DIM, ch1[r]);
+
+        char ib[10];
+        if (!isnan(cur1[r])) {
+          float ma = cur1[r] * 1000.0f;
+          if (fabsf(ma) >= 100.0f)      snprintf(ib, sizeof(ib), "%.0f", ma);
+          else if (fabsf(ma) >= 10.0f)  snprintf(ib, sizeof(ib), "%.1f", ma);
+          else                           snprintf(ib, sizeof(ib), "%.2f", ma);
+        } else { snprintf(ib, sizeof(ib), "--"); }
+        it.print(34, ty, id(font_num), GREEN, ib);
+
+        char vb[10];
+        if (!isnan(vol1[r])) snprintf(vb, sizeof(vb), "%.2f", vol1[r]);
+        else                  snprintf(vb, sizeof(vb), "--");
+        it.print(78, ty, id(font_num), CYAN, vb);
+
+        it.print(122, chy, id(font_lbl), G_DIM, ch2[r]);
+
+        char ib2[10];
+        if (!isnan(cur2[r])) {
+          float ma = cur2[r] * 1000.0f;
+          if (fabsf(ma) >= 100.0f)      snprintf(ib2, sizeof(ib2), "%.0f", ma);
+          else if (fabsf(ma) >= 10.0f)  snprintf(ib2, sizeof(ib2), "%.1f", ma);
+          else                           snprintf(ib2, sizeof(ib2), "%.2f", ma);
+        } else { snprintf(ib2, sizeof(ib2), "--"); }
+        it.print(154, ty, id(font_num), GREEN, ib2);
+
+        char vb2[10];
+        if (!isnan(vol2[r])) snprintf(vb2, sizeof(vb2), "%.2f", vol2[r]);
+        else                  snprintf(vb2, sizeof(vb2), "--");
+        it.print(198, ty, id(font_num), CYAN, vb2);
+      }
+
+      it.horizontal_line(0, 103, 240, G_DARK);
+      it.filled_rectangle(0, 104, 240, 31, G_DARK);
+
+      bool usb_on = id(usb_power).state;
+      it.filled_circle(7, 113, 5, usb_on ? GREEN : Color(50, 50, 50));
+      it.print(15, 107, id(font_lbl), usb_on ? GREEN : G_DIM,
+               usb_on ? "USB ON" : "USB OFF");
+
+      if (!isnan(id(imu_temp).state)) {
+        char tb[10];
+        snprintf(tb, sizeof(tb), "%.1fC", id(imu_temp).state);
+        it.print(178, 105, id(font_num), AMBER, tb);
+      }
+
+      if (!isnan(id(imu_ax).state)) {
+        char imu[40];
+        snprintf(imu, sizeof(imu), "X%+.1f Y%+.1f Z%+.1f",
+                 id(imu_ax).state, id(imu_ay).state, id(imu_az).state);
+        it.print(4, 121, id(font_hdr), G_DIM, imu);
+      } else {
+        it.print(4, 121, id(font_hdr), G_DARK, "IMU: no data");
+      }
+
+time:
+  - platform: bm8563
+    id: bm8563_time
+    update_interval: never
+
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      then:
+        - bm8563.write_time:
+
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO4
+    num_leds: 7
+    chipset: ws2812
+    name: "My Light"
