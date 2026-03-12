@@ -160,6 +160,7 @@ output:
     id: chain_angle_rgb_b
     chain_angle_id: chain_angle_1
     channel: rgb_blue
+
   - platform: m5stack_chain_tof
     id: chain_tof_rgb_r
     m5stack_chain_tof_id: chain_tof_1
