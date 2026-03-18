@@ -1,0 +1,60 @@
+esphome:
+  name: acmeasure
+  friendly_name: acmeasure
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: ""
+
+ota:
+  - platform: esphome
+    password: "0446f0d2a9dd6a5c7a2fcea983dfaf39"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Acmeasure Fallback Hotspot"
+    password: "nKhv9b4ENLWJ"
+
+external_components:
+  - source: github://Jasionf/echo-pyramid-components@main
+    components: [unit_acmeasure]
+    refresh: 0s
+
+captive_portal:
+    
+
+i2c:
+  sda: GPIO2
+  scl: GPIO1
+  scan: true
+
+sensor:
+  - platform: unit_acmeasure
+    id: acmeasure1
+    address: 0x42
+    update_interval: 2s
+    voltage:
+      name: AC Voltage
+    current:
+      name: AC Current
+    power:
+      name: Active Power
+    apparent_power:
+      name: Apparent Power
+    power_factor:
+      name: Power Factor
+    energy:
+      name: Energy
