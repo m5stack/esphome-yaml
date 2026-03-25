@@ -1,0 +1,50 @@
+esphome:
+  name: unit-fader
+  friendly_name: Unit Fader
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "8JyzxRcuHp1rkpulplMm8ZVSJo3+llKH4XRshq2H17Y="
+
+ota:
+  - platform: esphome
+    password: "b5afc47430b57e9732b1dfdec96545e5"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Unit-Fader Fallback Hotspot"
+    password: "WjWzPmAhE0mC"
+
+captive_portal:
+    
+sensor:
+  - platform: adc
+    pin: GPIO1
+    name: "Fader ADC"
+    id: fader_adc
+    update_interval: 100ms
+    attenuation: 12db
+    filters:
+      - exponential_moving_average:
+          alpha: 0.2
+
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO2
+    num_leds: 14
+    name: "Fader LED Strip"
+    id: led_strip
+    chipset: ws2812
