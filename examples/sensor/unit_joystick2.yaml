@@ -1,0 +1,66 @@
+esphome:
+  name: unit-joystick2
+  friendly_name: Unit Joystick2
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: ""
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Unit-Joystick2 Fallback Hotspot"
+    password: "12345678"
+
+captive_portal:
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [i2c_joystick_2]
+    refresh: 0s
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+  i2c_id: i2c_bus
+
+i2c_joystick_2:
+  - id: joystick2
+    i2c_id: i2c_bus
+
+sensor:
+  - platform: i2c_joystick_2
+    id: joystick2_x
+    i2c_joystick_2_id: joystick2
+    name: "Joystick2 X"
+    axis: x
+    mode: offset_12bit
+    update_interval: 100ms
+
+  - platform: i2c_joystick_2
+    i2c_joystick_2_id: joystick2
+    id: joystick2_y
+    name: "Joystick2 Y"
+    axis: y
+    mode: offset_12bit
+    update_interval: 100ms
+
+binary_sensor:
+  - platform: i2c_joystick_2
+    name: "Joystick2 Button"
+    id: joystick2_button
+    i2c_joystick_2_id: joystick2
