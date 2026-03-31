@@ -16,7 +16,7 @@ from .. import (
 DEPENDENCIES = ["m5ioe1"]
 
 
-M5IOE1Sensor = m5ioe1_ns.class_("M5IOE1Sensor", cg.PollingComponent)
+M5IOE1Sensor = m5ioe1_ns.class_("M5IOE1Sensor", sensor.Sensor, cg.PollingComponent)
 
 CONFIG_SCHEMA = (
     cv.Schema(

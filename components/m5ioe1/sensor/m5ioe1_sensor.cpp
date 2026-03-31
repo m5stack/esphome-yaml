@@ -7,11 +7,10 @@ namespace m5ioe1 {
 
 static const char *TAG = "m5ioe1.adc_sensor";
 
-#if ESP_LOG_LEVEL >= ESP_LOG_LEVEL_DEBUG
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
 
 PROGMEM_STRING_TABLE(ADCChannelStrings,
   "ADC_NONE",
-  "ADC_1",
   "ADC_1",
   "ADC_2",
   "ADC_3",

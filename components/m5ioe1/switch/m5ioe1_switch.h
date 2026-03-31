@@ -18,10 +18,10 @@ public:
 
   void dump_config() override {
     ESP_LOGCONFIG(TAG, "M5IOE1 Switch: "
-                       "  Pin: IO%d",
+                       "  Pin: IO%d"
                        "  Pulse number: %d",
                       this->pin_, this->pulse_num_);
-    LOG_SWITCH("", "AW8737A Switch", this);
+    LOG_SWITCH("  ", "AW8737A Switch", this);
   }
 
   void set_pin(uint8_t pin) { this->pin_ = pin; }

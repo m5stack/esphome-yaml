@@ -50,10 +50,10 @@ PWM_CHANNEL = {
 M5IOE1ADCChannel = m5ioe1_ns.enum("M5IOE1ADCChannel")
 
 ADC_CHANNEL = {
-    "ADC_NONE": M5IOE1ADCChannel.ADC_NONE,
-    "ADC_0" : M5IOE1ADCChannel.ADC_0,
     "ADC_1" : M5IOE1ADCChannel.ADC_1,
     "ADC_2" : M5IOE1ADCChannel.ADC_2,
+    "ADC_2" : M5IOE1ADCChannel.ADC_3,
+    "ADC_2" : M5IOE1ADCChannel.ADC_4,
 }
 
 BASE_SCHEMA = cv.Schema(

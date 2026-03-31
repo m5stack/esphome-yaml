@@ -44,7 +44,7 @@ void M5IOE1FloatOutput::write_state(float state) {
 
 void M5IOE1FloatOutput::dump_config() {
   ESP_LOGCONFIG(TAG, "M5IOE1 Float Output:\n"
-                     "  PWM Channel: %s\n", 
+                     "  PWM Channel: %s\n"
                      "  PWM Polarity: %s",
                      LOG_STR_ARG(pwm_channel_to_string(this->channel_)),
                      LOG_STR_ARG(pwm_polarity_to_string(this->polar_)));

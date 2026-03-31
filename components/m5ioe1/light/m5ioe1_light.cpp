@@ -29,7 +29,7 @@ void M5IOE1AddressableLight::setup() {
     this->mark_failed();
   }
 
-  memset(this->buf_, 0x00, this->num_leds_);
+  memset(this->effect_data_, 0x00, this->num_leds_);
 
   // Enable LED, refresh RAM datazone
   this->parent_->setup_neopixel(this->num_leds_);

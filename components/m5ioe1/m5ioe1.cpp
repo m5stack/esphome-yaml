@@ -105,8 +105,7 @@ void M5IOE1Component::setup() {
   M5IOE1_ERR_FAILED(this->write_bytes(REG_PWM_FREQ_L, 
                                     reinterpret_cast<uint8_t *>(&this->pwm_freq_), 2));
 
-  ESP_LOGD(TAG, "Chip UID (2 bytes): %s, Firmware version: %s\n", 
-                "M5IOE1 Setup finished",
+  ESP_LOGD(TAG, "M5IOE1 Setup finished. Chip UID (2 bytes): %s, Firmware version: %s",
                 uid_str, ver_str);
 }
 
@@ -277,7 +276,7 @@ void M5IOE1Component::config_pwm_channel_(M5IOE1PWMChannel channel,
 {
   // PWM register
   uint8_t reg = REG_PWM1_DUTY_L + (static_cast<uint8_t>(channel) * 2);
-  uint8_t data[2];
+  uint8_t data[2] = {0, 0};
   
   // set polarity
   if ( polar == M5IOE1PWMPolarity::ACTIVE_LOW ) {
@@ -307,7 +306,7 @@ void M5IOE1Component::write_pwm_duty_(M5IOE1PWMChannel channel, float duty) {
     duty = 1.0f;
 
   // calculate the uint16_t duty from given float range
-  uint16_t value = static_cast<uint16_t>(value * 4095.0f + 0.5f) & 0x0FFF;
+  uint16_t value = static_cast<uint16_t>(duty * 4095.0f + 0.5f) & 0x0FFF;
 
   if ( !this->write_bytes(reg, reinterpret_cast<uint8_t *>(&value), 2) ) {
     this->status_set_warning(LOG_STR("Failed to set PWM duty register."));
@@ -339,7 +338,7 @@ float M5IOE1Component::read_adc_(M5IOE1ADCChannel channel) {
     return NAN;
   } else {
     // H [11:8], L[7:0]
-    uint16_t val = (result[1] & 0x0F) | result[0];
+    uint16_t val = ((result[1] & 0x0F) << 8) | result[0];
     return static_cast<float>(val);
   }
 
@@ -370,7 +369,7 @@ float M5IOE1Component::read_temperature_() {
   // write back control value
   if ( !this->write_byte(REG_TEMP_CTRL, data) ) {
     this->status_set_warning(LOG_STR("Failed to write temperature config register."));
-    return false;
+    return NAN;
   }
 
   // wait for sampling
@@ -506,7 +505,7 @@ void M5IOE1Component::enable_aw8737a_pluse_(bool enabled) {
   if ( enabled ) {
     data |= (1 << 7); // commence pulse generation immediately
   } else {
-    data &= (1 <<7); // do not trigger refresh, wait for the next trigger
+    data &= ~(1 << 7); // do not trigger refresh, wait for the next trigger
   }
 
   // write back
