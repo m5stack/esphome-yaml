@@ -8,6 +8,8 @@ from .. import si12t_ns, BASE_SCHEMA, CONF_SI12T
 
 DEPENDENCIES = ["si12t"]
 
+ICON_GESTURE_TAP_BUTTON = "mdi:gesture-tap-button"
+
 SI12TTextSensor = si12t_ns.class_("SI12TTextSensor", text_sensor.TextSensor, cg.PollingComponent)
 
 SI12TChannel = si12t_ns.enum("SI12TChannel")
@@ -43,7 +45,11 @@ SENS_LEVEL = {
 CONF_EXTEND_THRESHOLD = "extend_threshold"
 
 CONFIG_SCHEMA = cv.Schema(
-    text_sensor.text_sensor_schema(SI12TTextSensor).extend(
+    text_sensor.text_sensor_schema(
+        SI12TTextSensor,
+        icon=ICON_GESTURE_TAP_BUTTON,
+    )
+    .extend(
         {
             cv.Required(CONF_CHANNEL): cv.enum(
                 CHANNEL, upper=True, space="_"
