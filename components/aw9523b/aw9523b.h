@@ -19,8 +19,8 @@ enum AW9523BP0DriveMode : uint8_t {
 enum AW9523BLEDMaxCurrent : uint8_t {
   CURRENT_MAX = 0x00,
   CURRENT_3QUARTERS = 0x01,
-  CURRENT_HALF = 0x10,
-  CURRENT_1QUARTER = 0x11
+  CURRENT_HALF = 0x02,
+  CURRENT_1QUARTER = 0x03
 };
 
 class AW9523BComponent : public Component,
@@ -67,7 +67,7 @@ protected:
   /// The mask to write as pullup state - 1 means pullup, 0 means pulldown
   uint16_t pull_up_down_mask_{0};
   /// Interrupt mask - 0: enable interrupt, 1: disable interrupt
-  uint8_t interrupt_mask_{0};
+  uint16_t interrupt_mask_{0};
   /// LED mode register - 1: GPIO mode, 0: LED mode
   uint16_t led_mode_mask_{0};
   /// P0 output drive mode - 0: open-drain, 1: push-pull

@@ -140,11 +140,11 @@ void AW9523BComponent::loop() { this->reset_pin_cache_();}
 
 void AW9523BComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "AW9523B: \n"
-                     "  P0 drive mode: %s\n", 
+                     "  P0 drive mode: %s\n"
                      "  LED Max Current: %s",
                      LOG_STR_ARG(p0_drive_mode_to_string(this->p0_drive_mode_)),
                      LOG_STR_ARG(led_max_current_to_string(this->led_max_current_)));
-  LOG_I2C_DEVICE(this)
+  LOG_I2C_DEVICE(this);
   if (this->is_failed()) {
     ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
   }
@@ -214,6 +214,7 @@ bool AW9523BComponent::read_gpio_interrupts_() {
 
   if ( !this->read_bytes(AW9523B_INT_P0, data, 2) ) {
     this->status_set_warning(LOG_STR("Failed to read gpio interrupts"));
+    return false;
   }
 
   this->status_clear_warning();
@@ -274,6 +275,7 @@ void AW9523BComponent::digital_write_hw(uint8_t pin, bool value) {
 
   if ( !this->write_bytes(AW9523B_OUTPUT_P0, reinterpret_cast<uint8_t *>(&new_mask), 2) ) {
     this->status_set_warning(LOG_STR("Failed to set pin for output"));
+    return;
   }
 
   this->output_mask_ = new_mask;
@@ -284,8 +286,6 @@ void AW9523BComponent::digital_write_hw(uint8_t pin, bool value) {
   ESP_LOGV(TAG, "Wrote GPIO output: 0b" BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN,
            BYTE_TO_BINARY(this->output_mask_ >> 8), BYTE_TO_BINARY(this->output_mask_ & 0x00FF));
 #endif
-
-  this->status_clear_warning();
 }
 
 
@@ -295,7 +295,7 @@ bool AW9523BComponent::setup_led_mode(uint8_t pin) {
     return false;
   }
 
-  this->led_mode_mask_ |= (1 << pin);
+  this->led_mode_mask_ &= ~(1 << pin);
 
   if ( !this->write_bytes(AW9523B_LED_MODE_P0, reinterpret_cast<uint8_t *>(&led_mode_mask_), 2) ) {
     this->status_set_warning(LOG_STR("Failed to write LED mode"));

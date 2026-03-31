@@ -12,9 +12,9 @@ void AW9523BFloatOutput::setup() {
 }
 
 void AW9523BFloatOutput::dump_config() {
-  ESP_LOGCONFIG(TAG, "AW9523B Float Output:\n";
-                     "  Pin: %d", 
-                    this->pin_);
+  ESP_LOGCONFIG(TAG, "AW9523B Float Output:\n"
+                         "  Pin: %d",
+                         this->pin_);
   LOG_FLOAT_OUTPUT(this);
 }
 
