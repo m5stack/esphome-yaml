@@ -95,6 +95,18 @@ output:
   - `ACTIVE_LOW`: PWM signal is active low
 - All other options from [Float Output](https://esphome.io/components/output#float-output).
 
+PWM physical pin layout:
+
+| PWM   | Pin Name | Pin Number |
+|:------|:---------|-----------:|
+| PWM_1 | IO9      |          8 |
+| PWM_2 | IO8      |          7 |
+| PWM_3 | IO11     |         10 |
+| PWM_4 | IO10     |          9 |
+
+> [!NOTE]  
+> GPIO functionality is disabled when pins are configured as PWM outputs.
+
 ## Light
 
 The M5IOE1 supports addressable RGB LEDs (NeoPixel) with up to 32 LEDs. The internal driver uses RGB565 format. Connect the addressable light to `Pin 14` 
@@ -140,13 +152,25 @@ sensor:
 - **id** (*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID to use for this sensor component.
 - **m5ioe1_id** (*Optional*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the M5IOE1 component. If you have only one M5IOE1 component, this can be omitted.
 - **channel** (*Required*, enum): The ADC channel to read. Must be one of:
-  - `ADC_NONE`: No ADC channel (placeholder)
   - `ADC_1`: ADC channel 1
   - `ADC_2`: ADC channel 2
   - `ADC_3`: ADC channel 3
   - `ADC_4`: ADC channel 4
 - **update_interval** (*Optional*, [Time](https://esphome.io/guides/configuration-types#config-time)): The interval to check the sensor. Defaults to `60s`.
 - All other options from [Sensor](https://esphome.io/components/sensor#config-sensor).
+
+ADC physical pin layout:
+
+| ADC   | Pin Name | Pin Number |
+|:------|:---------|-----------:|
+| ADC_1 | IO2      |          1 |
+| ADC_2 | IO4      |          3 |
+| ADC_3 | IO5      |          4 |
+| ADC_4 | IO7      |          6 |
+
+> [!NOTE]  
+> GPIO functionality is disabled when pins are configured as ADC inputs.
+
 
 ## Switch
 
@@ -157,17 +181,20 @@ switch:
   - platform: m5ioe1
     id: aw8737a_control
     m5ioe1_id: m5ioe1_hub
-    pin: 0
+    pin: 0  # IO1
     pulse_num: 2
     name: "AW8737A Amplifier"
 ```
+
+> ![NOTE]
+> GPIO functionality is disabled when selected pins are configured as AW8737A output.
 
 ### Configuration variables
 
 - **id** (*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID to use for this switch component.
 - **m5ioe1_id** (*Optional*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the M5IOE1 component. If you have only one M5IOE1 component, this can be omitted.
-- **pin** (*Required*, int): The GPIO pin connected to the AW8737A. Range: 0 to 13 (corresponding to IO1-IO14).
-- **pulse_num** (*Required*, int): Number of pulses to generate. Range: 0 to 3.
+- **pin** (*Required*, int): The GPIO pin connected to the AW8737A. Range: `0` to `13` (corresponding to IO1 - IO14).
+- **pulse_num** (*Required*, int): Number of pulses to generate. Range: `0` to `3`.
 - All other options from [Switch](https://esphome.io/components/switch#config-switch).
 
 ## Full Configuration Example
