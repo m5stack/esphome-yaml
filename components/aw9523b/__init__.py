@@ -31,9 +31,20 @@ CONF_AW9523B_ID = "aw9523b_id"
 CONF_P0_DRIVE_MODE = "p0_drive_mode"
 CONF_LED_MAX_CURRENT = "led_max_current"
 
+AW9523BP0DriveMode = aw9523b_ns.enum("AW9523BP0DriveMode")
+
 P0_DRIVE_MODES = {
-    "open_drain": 0,
-    "push_pull": 1,
+    "OPEN_DRAIN": AW9523BP0DriveMode.OPEN_DRAIN,
+    "PUSH_PULL": AW9523BP0DriveMode.PUSH_PULL
+}
+
+AW9523BLEDMaxCurrent = aw9523b_ns.enum("AW9523BLEDMaxCurrent")
+
+LED_MAX_CURRENTS = {
+    "37mA": AW9523BLEDMaxCurrent.CURRENT_MAX,
+    "27.75mA": AW9523BLEDMaxCurrent.CURRENT_3QUARTERS,
+    "18.5mA": AW9523BLEDMaxCurrent.CURRENT_HALF,
+    "9.25mA": AW9523BLEDMaxCurrent.CURRENT_1QUARTER
 }
 
 BASE_SCHEMA = cv.Schema(
@@ -42,20 +53,14 @@ BASE_SCHEMA = cv.Schema(
     }
 )
 
-LED_MAX_CURRENTS = {
-    "37mA": 0,
-    "27.75mA": 1,
-    "18.5mA": 2,
-    "9.25mA": 3,
-}
-
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.Required(CONF_ID): cv.declare_id(AW9523BComponent),
             cv.Optional(CONF_RESET, default=True): cv.boolean,
-            cv.Optional(CONF_P0_DRIVE_MODE, default="open_drain"): cv.enum(P0_DRIVE_MODES, lower=True),
-            cv.Optional(CONF_LED_MAX_CURRENT, default="37mA"): cv.enum(LED_MAX_CURRENTS, lower=True)
+            cv.Optional(CONF_P0_DRIVE_MODE, default="OPEN_DRAIN"): cv.enum(
+                P0_DRIVE_MODES, upper=True, space="_"),
+            cv.Optional(CONF_LED_MAX_CURRENT, default="37mA"): cv.enum(LED_MAX_CURRENTS)
         }
     )
     .extend(cv.COMPONENT_SCHEMA)

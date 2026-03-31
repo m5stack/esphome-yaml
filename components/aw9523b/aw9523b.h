@@ -10,6 +10,19 @@
 
 namespace esphome {
 namespace aw9523b {
+
+enum AW9523BP0DriveMode : uint8_t {
+  OPEN_DRAIN = 0x00,
+  PUSH_PULL  = 0x01
+};
+
+enum AW9523BLEDMaxCurrent : uint8_t {
+  CURRENT_MAX = 0x00,
+  CURRENT_3QUARTERS = 0x01,
+  CURRENT_HALF = 0x10,
+  CURRENT_1QUARTER = 0x11
+};
+
 class AW9523BComponent : public Component,
                               public i2c::I2CDevice,
                               public gpio_expander::CachedGpioExpander<uint8_t, 16> {
@@ -22,16 +35,15 @@ public:
   void pin_mode(uint8_t pin, gpio::Flags flags);
   
   float get_setup_priority() const override { return setup_priority::IO; }
-  float get_loop_priority() const override { return 9.0f; }
 
   /// Indicate if the component should reset the state during setup
   void set_reset(bool reset) { this->reset_ = reset; }
 
   /// Set P0 output mode: 1 for push-pull, 0 for open-drain
-  void set_p0_drive_mode(uint8_t mode) { this->p0_drive_mode_ = mode; }
+  void set_p0_drive_mode(AW9523BP0DriveMode mode) { this->p0_drive_mode_ = mode; }
 
   /// Set global max current for LED
-  void set_led_max_current(uint8_t current) { this->led_max_current_ = current; }
+  void set_led_max_current(AW9523BLEDMaxCurrent current) { this->led_max_current_ = current; }
 
   /// Setup LED mode by pin number, called by 'output'
   bool setup_led_mode(uint8_t pin);
@@ -59,7 +71,7 @@ protected:
   /// LED mode register - 1: GPIO mode, 0: LED mode
   uint16_t led_mode_mask_{0};
   /// P0 output drive mode - 0: open-drain, 1: push-pull
-  uint8_t p0_drive_mode_{0};
+  AW9523BP0DriveMode p0_drive_mode_{OPEN_DRAIN};
   /// Chip reset flag
   bool reset_{true};
   /// Global Imax for LED control, typical Imax is 37 mA 
@@ -68,7 +80,7 @@ protected:
   /// 1              | Imax * 0.75    | [0 ~ Imax * 0.75]
   /// 2              | Imax * 0.5     | [0 ~ Imax * 0.5]
   /// 3              | Imax * 0.25    | [0 ~ Imax * 0.25]
-  uint8_t led_max_current_{0};
+  AW9523BLEDMaxCurrent led_max_current_{CURRENT_MAX};
 
   bool read_gpio_modes_();
   bool write_gpio_modes_();

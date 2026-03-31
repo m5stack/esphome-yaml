@@ -2,7 +2,7 @@
 #include "esphome/core/gpio.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
-#include <cstdint>
+#include "esphome/core/progmem.h"
 
 namespace esphome {
 namespace aw9523b {
@@ -58,9 +58,21 @@ static const uint8_t AW9523B_DIM_REGS[16] = {
 
 static const uint8_t AW9523B_SW_RST = 0x7F;           // software reset
 
-
 static const char *TAG = "aw9523b";
 
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+PROGMEM_STRING_TABLE(P0DriveModeStrings, "OPEN_DRAIN", "PUSH_PULL");
+
+static const LogString *p0_drive_mode_to_string(AW9523BP0DriveMode mode) {
+  return  P0DriveModeStrings::get_log_str(mode, 0);
+}
+
+PROGMEM_STRING_TABLE(LEDMaxCurrentStrings, "37mA", "27.75mA", "18.5mA", "9.25mA");
+
+static const LogString *led_max_current_to_string(AW9523BLEDMaxCurrent current) {
+  return LEDMaxCurrentStrings::get_log_str(current, 0);
+}
+#endif
 
 #define AW9523B_ERROR_FAILED(err) \
   if (!(err)) { \
@@ -95,14 +107,14 @@ void AW9523BComponent::setup()
     AW9523B_ERROR_FAILED(this->read_byte(AW9523B_CTL, &ctl_data));
 
     // configure pad 0 open-drain or push-pull mode
-    if ( this->p0_drive_mode_ == 0x01 ) {
+    if ( this->p0_drive_mode_ == AW9523BP0DriveMode::PUSH_PULL ) {
         ctl_data |= (1 << 4);   //  push-pull
     } else {
         ctl_data &= ~(1 << 4);  //  open-drain
     }
 
     // set led max current
-    ctl_data |= this->led_max_current_;
+    ctl_data |= static_cast<uint8_t>(this->led_max_current_);
 
     // write global control register
     AW9523B_ERROR_FAILED(this->write_byte(AW9523B_CTL, ctl_data));
@@ -128,8 +140,10 @@ void AW9523BComponent::loop() { this->reset_pin_cache_();}
 
 void AW9523BComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "AW9523B: \n"
-                     "  P0 drive mode: %s", 
-                     this->p0_drive_mode_  == 0 ? "Open Drain" : "Push Pull");
+                     "  P0 drive mode: %s\n", 
+                     "  LED Max Current: %s",
+                     LOG_STR_ARG(p0_drive_mode_to_string(this->p0_drive_mode_)),
+                     LOG_STR_ARG(led_max_current_to_string(this->led_max_current_)));
   LOG_I2C_DEVICE(this)
   if (this->is_failed()) {
     ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
@@ -267,8 +281,8 @@ void AW9523BComponent::digital_write_hw(uint8_t pin, bool value) {
   this->status_clear_warning();
 
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_VERBOSE
-  ESP_LOGV(TAG, "Wrote GPIO output: 0b" BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN,
-           BYTE_TO_BINARY(this->output_mask_ & 0xFF), BYTE_TO_BINARY(this->output_mask_ >> 8));
+  ESP_LOGV(TAG, "Wrote GPIO output: 0b" BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN,
+           BYTE_TO_BINARY(this->output_mask_ >> 8), BYTE_TO_BINARY(this->output_mask_ & 0x00FF));
 #endif
 
   this->status_clear_warning();
