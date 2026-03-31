@@ -2,8 +2,6 @@
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
-#include <cassert>
-#include <cstdint>
 
 
 namespace esphome {
@@ -58,6 +56,8 @@ static const uint8_t CHANNEL_OUTPUT_REGS[12] = {
         }                        \
     } while(0)
 
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+
 PROGMEM_STRING_TABLE(SI12TFTTStrings,
   "FTT_5S",
   "FTT_10S",
@@ -98,6 +98,7 @@ static const LogString *res_time_to_string(SI12TResponseTime time) {
   return SI12TResponseTimeStrings::get_log_str(static_cast<uint8_t>(time), SI12TResponseTimeStrings::LAST_INDEX);
 }
 
+#endif
 
 void SI12TComponent::setup() {
     ESP_LOGD(TAG, "Setting up SI12T touch sensor");

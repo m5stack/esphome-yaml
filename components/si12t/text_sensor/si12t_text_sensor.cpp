@@ -1,12 +1,11 @@
 #include "si12t_text_sensor.h"
 #include "esphome/core/progmem.h"
-#include "../si12t.h"
-
 
 namespace esphome {
 namespace si12t {
 
 static const char *TAG = "si12t.text_sensor";
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
 
 // string lookup table
 PROGMEM_STRING_TABLE(SI12TChannelStrings,
@@ -56,6 +55,8 @@ static const LogString *output_level_to_string(uint8_t level) {
   return SI12TOutputStrings::get_log_str(level, 0);
 }
 
+#endif
+
 void SI12TTextSensor::setup() {
   this->parent_->setup_channel(this->channel_);
   this->parent_->write_channel_sensitivity(this->channel_, this->sens_level_, this->extend_threshold_);
@@ -70,7 +71,7 @@ void SI12TTextSensor::dump_config() {
   LOG_TEXT_SENSOR("", "SI12T Text Sensor", this);
   ESP_LOGCONFIG(TAG, "  Channel: %s\n"
              "  Sensitivity: %s\n"
-             "  Extend Threshold: %s\n",
+             "  Extend Threshold: %s",
              LOG_STR_ARG(channel_to_string(this->channel_)),
              LOG_STR_ARG(sensitivity_to_string(this->sens_level_)),
              TRUEFALSE(this->extend_threshold_));
