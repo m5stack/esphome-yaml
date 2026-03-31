@@ -250,12 +250,12 @@ void SI12TComponent::setup_channel(SI12TChannel channel) {
         return;
     }
 
-    if ( !this->write_bytes(REG_CH_ON_1, ref_data, 2) ){
+    if ( !this->write_bytes(REG_CH_ON_1, ch_en_data, 2) ){
         this->status_set_warning(LOG_STR("Failed to write channel sensitivity control register."));
         return;
     }
 
-    if ( !this->write_bytes(REG_CAL_ON_1, ref_data, 2) ){
+    if ( !this->write_bytes(REG_CAL_ON_1, ch_calib_data, 2) ){
         this->status_set_warning(LOG_STR("Failed to write calibrate control register"));
         return;
     }

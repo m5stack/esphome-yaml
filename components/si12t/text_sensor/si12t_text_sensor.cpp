@@ -48,7 +48,7 @@ static const LogString *channel_to_string(SI12TChannel channel) {
 }
 
 static const LogString *sensitivity_to_string(SI12TSensitivityLevel sens_level) {
-  return SI12TSensitivityStrings::get_log_str(static_cast<uint8_t>(sens_level), SI12TChannelStrings::LAST_INDEX);
+  return SI12TSensitivityStrings::get_log_str(static_cast<uint8_t>(sens_level), SI12TSensitivityStrings::LAST_INDEX);
 }
 
 static const LogString *output_level_to_string(uint8_t level) {
