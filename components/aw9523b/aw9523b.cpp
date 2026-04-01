@@ -114,7 +114,8 @@ void AW9523BComponent::setup()
     }
 
     // set led max current
-    ctl_data |= static_cast<uint8_t>(this->led_max_current_);
+    ctl_data &= ~0x03;
+    ctl_data |= static_cast<uint8_t>(this->led_max_current_) & 0x03;
 
     // write global control register
     AW9523B_ERROR_FAILED(this->write_byte(AW9523B_CTL, ctl_data));
@@ -132,6 +133,11 @@ void AW9523BComponent::setup()
     }
 
     // read led modes
+    if ( !this->read_led_modes_() ) {
+      this->mark_failed();
+      return;
+    }
+
     ESP_LOGI(TAG, "AW9523B setup complete.");
 }
 
