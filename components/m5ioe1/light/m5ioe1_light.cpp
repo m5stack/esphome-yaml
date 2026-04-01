@@ -27,6 +27,7 @@ void M5IOE1AddressableLight::setup() {
   if (this->effect_data_ == nullptr) {
     ESP_LOGE(TAG, "Failed to allocate effect data.");
     this->mark_failed();
+    return;
   }
 
   memset(this->effect_data_, 0x00, this->num_leds_);

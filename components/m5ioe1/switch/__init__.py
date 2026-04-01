@@ -13,14 +13,14 @@ from .. import m5ioe1_ns, BASE_SCHEMA, CONF_M5IOE1_ID
 
 DEPENDENCIES = ["m5ioe1"]
 
-CONF_AW9737A = "aw9737a"
+CONF_AW8737A = "aw8737a"
 
 CONF_PULSE_NUM = "pulse_num"
 
-AW9737ASwitch = m5ioe1_ns.class_("AW9737ASwitch", cg.Component, switch.Switch)
+AW8737ASwitch = m5ioe1_ns.class_("AW8737ASwitch", cg.Component, switch.Switch)
 
 CONFIG_SCHEMA = switch.switch_schema(
-    AW9737ASwitch,
+    AW8737ASwitch,
     device_class=DEVICE_CLASS_SWITCH,
     icon=ICON_PULSE,
     default_restore_mode="RESTORE_DEFAULT_OFF"

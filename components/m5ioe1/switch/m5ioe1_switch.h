@@ -8,7 +8,7 @@ namespace m5ioe1 {
 
 static const char *TAG = "m5ioe1.switch";
 
-class AW9737ASwitch : public switch_::Switch,
+class AW8737Switch : public switch_::Switch,
                       public Component,
                       public Parented<M5IOE1Component>
 {
