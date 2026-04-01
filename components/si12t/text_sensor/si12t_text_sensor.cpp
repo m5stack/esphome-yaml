@@ -57,6 +57,13 @@ static const LogString *output_level_to_string(uint8_t level) {
 
 #endif
 
+static const char *const OUTPUT_LEVEL_STRINGS[] = {
+  "No touch",
+  "Low",
+  "Medium",
+  "High",
+};
+
 void SI12TTextSensor::setup() {
   this->parent_->setup_channel(this->channel_);
   this->parent_->write_channel_sensitivity(this->channel_, this->sens_level_, this->extend_threshold_);
@@ -64,7 +71,14 @@ void SI12TTextSensor::setup() {
 
 void SI12TTextSensor::update() {
   uint8_t result = this->parent_->read_channel_output(this->channel_);
-  this->publish_state(LOG_STR_ARG(output_level_to_string(result)));
+  if (result == this->last_output_) {
+    return;
+  }
+  this->last_output_ = result;
+  const char *str = (result < sizeof(OUTPUT_LEVEL_STRINGS) / sizeof(OUTPUT_LEVEL_STRINGS[0]))
+                        ? OUTPUT_LEVEL_STRINGS[result]
+                        : "UNKNOWN";
+  this->publish_state(str);
 }
 
 void SI12TTextSensor::dump_config() {

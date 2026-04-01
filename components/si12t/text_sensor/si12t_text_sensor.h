@@ -22,6 +22,7 @@ protected:
   SI12TChannel channel_;
   SI12TSensitivityLevel sens_level_;
   bool extend_threshold_;
+  uint8_t last_output_{UINT8_MAX};
 };
 
 
