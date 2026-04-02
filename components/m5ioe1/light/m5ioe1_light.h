@@ -15,6 +15,7 @@ class M5IOE1AddressableLight : public light::AddressableLight,
     void setup() override;
     void write_state(light::LightState *state) override;
 
+    float get_setup_priority() const override { return setup_priority::HARDWARE; }
     void set_num_led(int32_t num) { this->num_leds_ = num; }
 
     int32_t size() const override { return this->num_leds_; }
