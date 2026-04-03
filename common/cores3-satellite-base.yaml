@@ -57,16 +57,17 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  project:
-    name: m5stack.cores3-voice-assistant
-    version: 2026.1.2
   min_version: 2026.1.0
+  name_add_mac_suffix: true
   on_boot:
     - priority: 600
       then:
         - light.turn_on:
             id: lcd_backlight
             brightness: 80%
+    - priority: 100
+      then:
+        - delay: 200ms
         - script.execute: draw_display
         - delay: 30s
         - if:
@@ -189,6 +190,7 @@ axp2101:
 aw9523b:
   id: aw9523b_hub
   i2c_id: bsp_bus
+  p0_drive_mode: PUSH_PULL
 
 output:
   - platform: axp2101
@@ -229,7 +231,7 @@ binary_sensor:
   - platform: gpio
     name: "ES_INT P0_3"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 3
     on_press:
       then:
@@ -239,7 +241,7 @@ binary_sensor:
   - platform: gpio
     name: "TF_SW P0_4"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 4 
     on_press:
       then:
@@ -249,7 +251,7 @@ binary_sensor:
   - platform: gpio
     name: "TOUCH_INT P1_2"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 10
     on_press:
       then:
@@ -259,7 +261,7 @@ binary_sensor:
   - platform: gpio
     name: "AW_INT P1_3"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 11
     on_press:
       then:
@@ -432,7 +434,7 @@ voice_assistant:
     # Restart only mWW if enabled; streaming wake words automatically restart
     - if:
         condition:
-          - lambda: return id(wake_word_engine_location).state == "On device";
+          - lambda: return id(wake_word_engine_location).current_option() == "On device";
         then:
           - lambda: id(va).set_use_wake_word(false);
           - micro_wake_word.start:
@@ -492,7 +494,7 @@ switch:
   - platform: gpio
     name: "AW RST P0_2"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 2
     internal: true
     restore_mode: RESTORE_DEFAULT_ON
@@ -501,7 +503,7 @@ switch:
   - platform: gpio
     name: "CAM RST P1_0"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 8
     internal: true
     restore_mode: RESTORE_DEFAULT_ON
@@ -510,7 +512,7 @@ switch:
   - platform: gpio
     name: "BUS_OUT_EN"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 1
     # BUS_OUT_EN = 0
     restore_mode: RESTORE_DEFAULT_OFF
@@ -518,7 +520,7 @@ switch:
   - platform: gpio
     name: "USB_OTG_EN"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 5
     # USB_OTG_EN = 0
     restore_mode: RESTORE_DEFAULT_OFF
@@ -526,7 +528,7 @@ switch:
   - platform: gpio
     name: "BOOST_EN"
     pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 15
     # BOOST_EN
     restore_mode: RESTORE_DEFAULT_ON
@@ -626,7 +628,7 @@ display:
     model: M5CORE
     dc_pin: GPIO35
     reset_pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 9
     cs_pin:
       number: GPIO3
@@ -685,7 +687,7 @@ touchscreen:
     id: touch
     i2c_id: bsp_bus
     reset_pin:
-      aw9523b: aw9523b_hub
+      aw9523b_id: aw9523b_hub
       number: 0
     calibration:
       x_min: 0
