@@ -1,0 +1,30 @@
+packages:
+  # This is an inline package to prefix the on_client_connected with the wait_until action
+  # It must appear before the actual package so it becomes the original config and the
+  # on_client_connected list from the package config is appends onto this one.
+  va_connected_wait_for_ble:
+    voice_assistant:
+      on_client_connected:
+        - wait_until:
+            not: ble.enabled
+  m5stack-atom-echos3r: !include ../../common/atom-echos3r-satellite-base.yaml
+
+esphome:
+  project:
+    name: m5stack.atom-echos3r-voice-assistant
+    version: 2026.3.0
+
+dashboard_import:
+  package_import_url: github://m5stack/esphome-yaml/common/atom-echos3r-satellite-base.yaml@main
+
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none

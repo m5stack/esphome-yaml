@@ -1,0 +1,22 @@
+packages:
+  m5stack-airq-pm25-sht30: !include ../../common/pm2_5-air-quality-kit-base.yaml
+
+esphome:
+  project:
+    name: m5stack.air-quality-pm25-sht30
+    version: 2026.3.0
+
+dashboard_import:
+  package_import_url: github://m5stack/esphome-yaml/common/pm2_5-air-quality-kit-base.yaml@main
+
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
