@@ -54,12 +54,9 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  project: 
-    name: m5stack.echo-s3r-satellite
-    version: 2026.1.2
   min_version: 2026.1.0
   on_boot:
-    priority: 600
+    priority: 200
     then:
       - script.execute: draw_display
       - delay: 30s
