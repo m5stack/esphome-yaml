@@ -52,7 +52,7 @@ scs9009:
   id: scs9009_bus
   uart_id: uart_bus
 
-scs9009_servo:
+ftservo:
   - id: my_servo
     scs9009_id: scs9009_bus
     address: 1
