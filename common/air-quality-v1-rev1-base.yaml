@@ -1,9 +1,23 @@
+---
+substitutions:
+  # Material Icons
+  mdi_thermometer:    "\U000F050F"
+  mdi_water_percent:  "\U000F058E"
+  mdi_CO2:            "\U000F07E4"
+  mdi_weather_hazy:   "\U000F0F30"
+  mdi_water_outline:  "\U000F0E0A"
+  mdi_chemical_weapon: "\U000F013B"
+  mdi_radiator:       "\U000F0438"
+  mdi_wifi:           "\U000F05A9"
+  mdi_wifi_off:       "\U000F05AA"
+  mdi_api:            "\U000F109B"
+  mdi_api_off:        "\U000F1257"
+  mdi_bullhorn:       "\U000F00E6"
+  mdi_battery:        "\U000F0079"
+
 esphome:
   name: air-quality-v1-rev1
   friendly_name: Air Quality V1.1 Kit
-  project: 
-    name: m5stack.air-quality-v1-rev1-kit
-    version: 2025.10.3
   min_version: 2025.5.0
   on_boot:
     then:
@@ -12,6 +26,7 @@ esphome:
 
 esp32:
   variant: esp32s3
+  flash_size: 8MB
   framework:
     type: esp-idf
 
@@ -50,6 +65,7 @@ output:
   - platform: gpio
     pin:
       number: GPIO46
+      ignore_strapping_warning: true
       inverted: true
     id: hold
   
@@ -67,6 +83,7 @@ binary_sensor:
   - platform: gpio
     pin:
       number: GPIO0
+      ignore_strapping_warning: true
       inverted: true
     name: "USER_A"
     on_press:
@@ -195,27 +212,29 @@ font:
     id: extra_icon
     size: 24
     bpp: 4
-    glyphs: [
-      "\U000F050F", # mdi:thermometer
-      "\U000F058E", # mdi:water-percent
-      "\U000F07E4", # mdi:CO2
-      "\U000F0F30", # mdi:weather-hazy
-      "\U000F0E0A", # mdi:water-outline
-      "\U000F013B", # mdi:chemical-weapon
-      "\U000F0438", # mdi:radiator
-      "\U000F05A9", # mdi:wifi
-      "\U000F05AA", # mdi:wifi-off
-      "\U000F109B", # mdi:api
-      "\U000F1257", # mdi:api-off
-      "\U000F00E6", # mdi:bullhorn
-      "\U000F0079", # mdi:battery
-    ]
+    glyphs:
+      - ${mdi_thermometer}
+      - ${mdi_water_percent}
+      - ${mdi_CO2}
+      - ${mdi_weather_hazy}
+      - ${mdi_water_outline}
+      - ${mdi_chemical_weapon}
+      - ${mdi_radiator}
+      - ${mdi_wifi}
+      - ${mdi_wifi_off}
+      - ${mdi_api}
+      - ${mdi_api_off}
+      - ${mdi_bullhorn}
+      - ${mdi_battery}
+
 
 display:
   - platform: waveshare_epaper
     id: epaper_disp
     cs_pin: GPIO4
-    dc_pin: GPIO3
+    dc_pin:
+      number: GPIO3
+      ignore_strapping_warning: true
     busy_pin: GPIO1
     reset_pin: GPIO2
     data_rate: 40000000
@@ -227,26 +246,26 @@ display:
         lambda: |-
           it.strftime(5, 5, id(montserrat_md), "%H:%M", id(rtc_time).now());
           it.strftime(10, 68, id(montserrat), "%Y-%m-%d %a", id(rtc_time).now());
-          it.print(5, 100, id(extra_icon), "\U000F050F");
+          it.print(5, 100, id(extra_icon), "${mdi_thermometer}");
           // Average temperature/humidity calculated from two temperature/humidity sensors
           auto temp = (id(sen55_temp).state + id(scd40_temp).state) / 2;
           auto humi = (id(sen55_humi).state + id(scd40_humi).state) / 2;
           it.printf(30, 100, id(montserrat), "%.1f °C", temp);
-          it.print(105, 100, id(extra_icon), "\U000F0E0A");
+          it.print(105, 100, id(extra_icon), "${mdi_water_outline}");
           it.printf(135, 100, id(montserrat), "%.1f% %", humi);
-          it.print(5, 128, id(extra_icon), "\U000F07E4");
+          it.print(5, 128, id(extra_icon), "${mdi_CO2}");
           it.printf(35, 128, id(montserrat), "%.0f ppm", id(scd40_co2).state);
-          it.print(5, 158, id(extra_icon), "\U000F0F30");
+          it.print(5, 158, id(extra_icon), "${mdi_weather_hazy}");
           it.printf(35, 158, id(montserrat_special), "%.1f µg/m³", id(sen55_pm_2_0).state);
       - id: detail_page
         lambda: |-
           // This page display the single sensor readings
           it.print(5, 5, id(montserrat), "SDC40");
-          it.print(5, 25, id(extra_icon), "\U000F050F");
+          it.print(5, 25, id(extra_icon), "${mdi_thermometer}");
           it.printf(35, 25, id(montserrat), "%.1f °C", id(scd40_temp).state);
-          it.print(95, 25, id(extra_icon), "\U000F0E0A");
+          it.print(95, 25, id(extra_icon), "${mdi_water_outline}");
           it.printf(125, 25, id(montserrat), "%.1f% %", id(scd40_humi).state);
-          it.print(5, 50, id(extra_icon), "\U000F07E4");
+          it.print(5, 50, id(extra_icon), "${mdi_CO2}");
           it.printf(35, 50, id(montserrat), "%.0f ppm", id(scd40_co2).state);
           it.print(5, 70, id(montserrat), "SEN55");
           it.printf(5, 95, id(open_sans_special_sm), "Temp: %.1f °C  Humi: %.1f%%", id(sen55_temp).state, id(sen55_humi).state);
@@ -258,11 +277,12 @@ display:
       - id: about_page
         lambda: |-
           it.print(10, 10, id(montserrat), "Air Quality V1.1");
-          it.printf(10, 35, id(extra_icon), "%s", id(airq_wifi).is_connected() ? "\U000F05A9" : "\U000F05AA");
-          it.printf(40, 35, id(montserrat), "%s", id(airq_wifi).is_connected() ? id(airq_wifi).wifi_ssid().c_str() : "Not Connected");
-          it.printf(10, 65, id(extra_icon), "%s", id(airq_api).is_connected() ? "\U000F109B" : "\U000F109B");
+          it.printf(10, 35, id(extra_icon), "%s", id(airq_wifi).is_connected() ? "${mdi_wifi}" : "${mdi_wifi_off}");
+          char ssid_buf[33];
+          const char *ssid_str = id(airq_wifi).is_connected() ? id(airq_wifi).wifi_ssid_to(ssid_buf) : "Not Connected";
+          it.printf(10, 65, id(extra_icon), "%s", id(airq_api).is_connected() ? "${mdi_api}" : "${mdi_api_off}");
           it.printf(40, 65, id(montserrat), "%s", id(airq_api).is_connected() ? "Connected" : "Not connected");
-          it.print(10, 95, id(extra_icon), "\U000F00E6");
+          it.print(10, 95, id(extra_icon), "${mdi_bullhorn}");
           it.printf(40, 95, id(montserrat), "%s", id(beep_switch).state ? "ON" : "OFF");
-          it.print(8, 128, id(extra_icon), "\U000F0079");
+          it.print(8, 128, id(extra_icon), "${mdi_battery}");
           it.printf(40, 128, id(montserrat), "%.2f V", id(battery).state);
