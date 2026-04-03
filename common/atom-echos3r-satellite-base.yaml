@@ -1,6 +1,6 @@
 ---
 substitutions:
-  name: atom-echos3r-voice-assistant
+  name: atom-echos3r
   friendly_name: M5Stack Atom EchoS3R Voice Assistant
 
   # Audio files
@@ -33,9 +33,7 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  project: 
-    name: m5stack.echo-s3r-satellite
-    version: 2026.1.2
+  name_add_mac_suffix: true
   min_version: 2026.1.0
   on_boot:
     priority: 600
