@@ -113,6 +113,23 @@ number:
 
 > **Note**: Either `position` or `angle` must be specified, but not both. The `speed` and `time` parameters are optional and control how movements are executed.
 
+Alternative: use angle control instead of position
+
+```yaml
+number:
+  - platform: ftservo
+    ftservo_id: my_servo
+    angle:
+      name: "Servo Angle"
+      min_value: -90
+      max_value: 90
+      step: 10
+      use_raw_angle: false
+      angle_offset: 90.0
+```
+
+Internally the angle data were converted to position, the default raw angle for a servo is `[0, 360]`, corresponding to `[0, 1024]` in steps. When you are not using the raw angle, remind that you should normalize your angle with corresponding offset, the converted new range is `[ min_value + angle_offset, max_value + angle_offset ]`
+
 ## Sensor
 
 The `sensor` sub-component polls servo telemetry at a configurable interval. Each telemetry field is an independent optional sub-sensor.
@@ -167,35 +184,9 @@ switch:
     ftservo_id: my_servo
     name: "Servo Torque"
 ```
-position:
-      name: "Servo Position"
-      min_value: 0
-      max_value: 1024
-      step: 20
-    speed:
-      name: "Movement Speed"
-      min_value: 100
-      max_value: 1500
-      step: 100
-    time:
-      name: "Movement Time"
-      min_value: 0
-      max_value: 5000
-      step: 200
 
-# Alternative: use angle control instead of position
-# number:
-#   - platform: ftservo
-#     ftservo_id: my_servo
-#     angle:
-#       name: "Servo Angle"
-#       min_value: -90
-#       max_value: 90
-#       step: 10
-#       use_raw_angle: false
-#       angle_offset: 90.0
-#     speed:
-#       name: "Movement Speed"id** (*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the `FTServo` component.
+- **ftservo_id**(*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the FTServo component.
+
 - All other options from [Switch](https://esphome.io/components/switch#config-switch).
 
 ## Full Configuration Example
