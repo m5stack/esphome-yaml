@@ -1,4 +1,5 @@
 #include "ftservo.h"
+#include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
 #include <functional>
 
@@ -32,6 +33,32 @@ void FTServo::add_error_callback(std::function<void(const LogString *)> &&error_
   this->error_callbacks_.add(std::move(error_callback));
 }
 
+
+void FTServo::move_angle(int angle) {
+  // a degree is around 2.844 steps
+  float unit = 2.844f;
+  int current_pos;
+  // read current position
+  bool ret = this->read_sensor_value(ServoSensorField::POSITION, current_pos);
+
+  if ( !ret ) {
+    ESP_LOGW(TAG, "Failed to read current position");
+    return;
+  }
+  // set the target position
+  float target_pos = (float)angle * unit;
+
+  // read speed and time
+  int speed = this->get_servo_speed();
+  int time  = this->get_servo_time();
+
+  this->move(target_pos, time, speed);
+
+  // add proper delay
+  delay(abs(target_pos - current_pos) * 1000 / speed + 100);
+
+  this->write_torque_enable(false); // release the torque once the movement is finished
+}
 
 }
 }

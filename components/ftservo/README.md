@@ -61,25 +61,57 @@ on_...:
 
 ## Number
 
-The `number` sub-component provides a UI-controllable number entity for direct position control. Writing a value commands the servo to move and releases torque after the estimated travel time.
+The `number` sub-component provides UI-controllable number entities for servo control. It supports multiple control modes: position (raw steps), angle (degrees), speed, and time parameters.
 
 ```yaml
 number:
   - platform: ftservo
     ftservo_id: my_servo
-    name: "Servo Position"
-    min_value: 0
-    max_value: 1024
-    step: 20
+    position:
+      name: "Servo Position"
+      min_value: 0
+      max_value: 1024
+      step: 20
+    speed:
+      name: "Servo Speed"
+      min_value: 100
+      max_value: 1500
+      step: 100
+    time:
+      name: "Movement Time"
+      min_value: 0
+      max_value: 5000
+      step: 200
 ```
 
 ### Configuration variables
 
 - **ftservo_id** (*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the `FTServo` component.
-- **min_value** (*Optional*, float): Minimum allowable position in steps. Defaults to `0`.
-- **max_value** (*Optional*, float): Maximum allowable position in steps. Defaults to `1024`.
-- **step** (*Optional*, float): Step size for the number entity. Defaults to `20`.
+- **position** (*Optional*, exclusive with `angle`): Position control in raw steps. When changed, the servo moves to the target position and releases torque after completion.
+  - **min_value** (*Optional*, float): Minimum position. Defaults to `0`.
+  - **max_value** (*Optional*, float): Maximum position. Defaults to `1024`.
+  - **step** (*Optional*, float): Step size. Defaults to `20`.
+  - Unit: `steps`
+- **angle** (*Optional*, exclusive with `position`): Angle control in degrees. When changed, the servo moves to the target angle and releases torque after completion.
+  - **min_value** (*Optional*, float): Minimum angle. Defaults to `0`.
+  - **max_value** (*Optional*, float): Maximum angle. Defaults to `360`.
+  - **step** (*Optional*, float): Step size. Defaults to `10`.
+  - **use_raw_angle** (*Optional*, boolean): If `true`, uses the angle value directly. If `false`, applies `angle_offset`. Defaults to `true`.
+  - **angle_offset** (*Required when `use_raw_angle` is `false`*, float): Offset to add to the angle value before sending to servo.
+  - Unit: `°`
+- **speed** (*Optional*): Movement speed control. This value is used by position/angle movements.
+  - **min_value** (*Optional*, float): Minimum speed. Must be greater than `0`. Defaults to `0`.
+  - **max_value** (*Optional*, float): Maximum speed. Defaults to `1500`.
+  - **step** (*Optional*, float): Step size. Defaults to `500`.
+  - Unit: `steps/s`
+- **time** (*Optional*): Movement time control. When set to non-zero, the servo reaches the target within the specified duration regardless of speed.
+  - **min_value** (*Optional*, float): Minimum time. Defaults to `0`.
+  - **max_value** (*Optional*, float): Maximum time. Defaults to `5000`.
+  - **step** (*Optional*, float): Step size. Defaults to `200`.
+  - Unit: `ms`
 - All other options from [Number](https://esphome.io/components/number#config-number).
+
+> **Note**: Either `position` or `angle` must be specified, but not both. The `speed` and `time` parameters are optional and control how movements are executed.
 
 ## Sensor
 
@@ -135,10 +167,35 @@ switch:
     ftservo_id: my_servo
     name: "Servo Torque"
 ```
+position:
+      name: "Servo Position"
+      min_value: 0
+      max_value: 1024
+      step: 20
+    speed:
+      name: "Movement Speed"
+      min_value: 100
+      max_value: 1500
+      step: 100
+    time:
+      name: "Movement Time"
+      min_value: 0
+      max_value: 5000
+      step: 200
 
-### Configuration variables
-
-- **ftservo_id** (*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the `FTServo` component.
+# Alternative: use angle control instead of position
+# number:
+#   - platform: ftservo
+#     ftservo_id: my_servo
+#     angle:
+#       name: "Servo Angle"
+#       min_value: -90
+#       max_value: 90
+#       step: 10
+#       use_raw_angle: false
+#       angle_offset: 90.0
+#     speed:
+#       name: "Movement Speed"id** (*Required*, [ID](https://esphome.io/guides/configuration-types#id)): The ID of the `FTServo` component.
 - All other options from [Switch](https://esphome.io/components/switch#config-switch).
 
 ## Full Configuration Example

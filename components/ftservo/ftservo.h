@@ -5,6 +5,8 @@
 #include <functional>
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+#include "esphome/components/number/number.h"
+#include "esphome/core/defines.h"
 
 namespace esphome {
 namespace ftservo {
@@ -36,6 +38,13 @@ enum class ServoSensorField : uint8_t {
 };
 
 class FTServo {
+
+#ifdef USE_NUMBER
+SUB_NUMBER(position)
+SUB_NUMBER(angle)
+SUB_NUMBER(speed)
+SUB_NUMBER(time)
+#endif
  
  public:
   virtual void move(int position, uint16_t time = 0, uint16_t speed = 500) = 0;
@@ -45,6 +54,20 @@ class FTServo {
   virtual bool read_torque_enable() = 0;
 
   virtual void write_torque_enable(bool enable) = 0;
+
+  
+  int get_servo_position() const { return this->c_position_; }
+  int get_servo_angle() const { return this->c_angle_; }
+  int get_servo_speed() const { return this->c_speed_; }
+  int get_servo_time() const { return this->c_time_; }
+
+  void set_servo_position(int pos) { this->c_position_ = pos; }
+  void set_servo_angle(int angle) { this->c_angle_ = angle; }
+  void set_servo_speed(int speed) { this->c_speed_ = speed; }
+  void set_servo_time(int time) { this->c_time_ = time; }
+
+  void move_angle(int angle);  // this is called by Angle Number
+
   
   bool is_moving() const { return this->state_ == State::MOVING; }
   bool is_idle() const { return this->state_ == State::IDLE; }
@@ -57,6 +80,13 @@ class FTServo {
 
   CallbackManager<void()> move_callbacks_ {};
   CallbackManager<void(const LogString *)> error_callbacks_ {};
+
+  // servo control parameters
+  int c_position_;
+  int c_angle_;
+  int c_speed_{500};
+  int c_time_{0};
+
 };
 
 }
