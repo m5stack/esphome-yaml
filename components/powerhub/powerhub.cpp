@@ -208,10 +208,16 @@ void PowerHub::setup() {
      * If the user's output voltage is high, 
      * the output current register will be limited to a lower value.
     */
-    uint8_t rs485_can_config[5] = { 0x0B, 0xB8, 0x00, 0x00, 0x00 };
+    // 3000 mV = 0x0BB8: LSB=0xB8, MSB=0x0B (little-endian)
+    uint8_t rs485_can_config[5] = { 0xB8, 0x0B, 0x00, 0x00, 0x00 };
     RETURN_IF_ERROR(this->write_register(Register::REG_VOLT_LSB, 
                                          rs485_can_config, 
                                          sizeof(rs485_can_config)));
+    // Update internal state variables to match the configured values
+    this->rs485_can_voltage_mv_ = 3000;  // Default 3.0V
+    this->rs485_can_current_limit_ = 13;  // Default 13mA
+    this->rs485_can_power_output_ctrl_ = false;
+    this->rs485_can_power_direction_ = false;
 #ifdef USE_NUMBER
     // this->rs485_can_output_voltage_number_->publish_state(3000.0f);
     // this->rs485_can_current_limit_number_->publish_state(13.0f);
@@ -266,17 +272,6 @@ void PowerHub::update() {
 #ifdef USE_SENSOR
    this->update_vameter_sensor();
 #endif
-
-#ifdef USE_TEXT_SENSOR
-    if (this->firmware_ver_text_sensor_) {
-        this->firmware_ver_text_sensor_->publish_state(std::to_string(this->get_firmware_ver()));
-    }
-
-    if(this->bootloader_ver_text_sensor_) {
-        this->bootloader_ver_text_sensor_->publish_state(std::to_string(this->get_bootloader_ver()));
-    }
-#endif
-
 }
 
 
@@ -300,23 +295,10 @@ void PowerHub::dump_config() {
 
 #ifdef USE_TEXT_SENSOR
     ESP_LOGCONFIG(TAG, "Text Sensor:");
-    LOG_TEXT_SENSOR("  ", "Bootloader", this->bootloader_ver_text_sensor_);
     LOG_TEXT_SENSOR("  ", "Charge Status", this->charge_status_text_sensor_);
-    LOG_TEXT_SENSOR("  ", "Firmware", this->firmware_ver_text_sensor_);
     LOG_TEXT_SENSOR("  ", "External Input Power", this->vin_status_text_sensor_);
 #endif
 
-#ifdef USE_SWITCH
-    ESP_LOGCONFIG(TAG, "Switch:");
-    LOG_SWITCH("  ", "LED Power", this->led_pwr_switch_);
-    LOG_SWITCH("  ", "USB Power", this->usb_pwr_switch_);
-    LOG_SWITCH("  ", "Port.A Power (Grove Red)", this->grove_red_pwr_switch_);
-    LOG_SWITCH("  ", "Port.C Power (Grove Blue)", this->grove_blue_pwr_switch_);
-    LOG_SWITCH("  ", "RS485 & CAN Power", this->rs485_can_pwr_switch_);
-    LOG_SWITCH("  ", "RS485 & CAN Power Direction", this->rs485_can_direction_switch_);
-    LOG_SWITCH("  ", "V/A Meter Power", this->vameter_pwr_switch_);
-    LOG_SWITCH("  ", "Charge Power", this->charge_pwr_switch_);
-#endif
 
 #ifdef USE_SELECT
     ESP_LOGCONFIG(TAG, "Select:");
@@ -434,7 +416,7 @@ void PowerHub::set_rs485_can_pwr_direction(bool direction) {
 // 0x00 disable output
 void PowerHub::set_rs485_can_pwr_output(bool output) {
     uint8_t val = output ? 0x01 : 0x00;
-    WARN_IF(this->write_register(Register::REG_PWR_DIR, &val, 1));
+    WARN_IF(this->write_register(Register::REG_PWR_OUTPUT_CTRL, &val, 1));
     this->rs485_can_power_output_ctrl_ = output;
 }
 
@@ -515,6 +497,7 @@ void PowerHub::read_power_channel() {
         this->rs485_.voltage = power.rs485_volt;
         this->rs485_.current = power.rs485_curr;
     }
+    this->power_ = power;
 }
 
 void PowerHub::update_vameter_sensor() {
@@ -617,13 +600,21 @@ uint8_t PowerHub::read_vin_status() {
 void PowerHub::update_charge_vin_sensor() {
 #ifdef USE_TEXT_SENSOR
     if (this->charge_status_text_sensor_) {
-        std::string status = charge_status_to_string(this->read_charge_status());
-        this->charge_status_text_sensor_->publish_state(status);
+        uint8_t charge_status = this->read_charge_status();
+        // Only publish if the value has changed
+        if (charge_status != this->last_charge_status_) {
+            this->charge_status_text_sensor_->publish_state(charge_status_to_string(charge_status));
+            this->last_charge_status_ = charge_status;
+        }
     }
 
     if (this->vin_status_text_sensor_) {
-        std::string status = vin_status_to_string(this->read_vin_status());
-        this->vin_status_text_sensor_->publish_state(status);
+        uint8_t vin_status = this->read_vin_status();
+        // Only publish if the value has changed
+        if (vin_status != this->last_vin_status_) {
+            this->vin_status_text_sensor_->publish_state(vin_status_to_string(vin_status));
+            this->last_vin_status_ = vin_status;
+        }
     }
 #endif 
 }
@@ -719,7 +710,6 @@ void PowerHub::set_brightness_pwr_r(uint8_t b) {
 }
 
 
-
 // Consider adding invert options in YAML
 // 0: press
 // 1: no press
@@ -797,5 +787,5 @@ void PowerHub::sys_download_mode() {
 
 
 
-}    
+} // namespace powerhub
 } // namespace esphome

@@ -1,11 +1,14 @@
 esphome:
   name: powerhub
   friendly_name: M5Stack PowerHub
-  min_version: 2025.5.0
+  name_add_mac_suffix: true
   on_boot:
     then:
       # read the RTC time once when the system boots
       powerhub.read_time:
+  project:
+    name: m5stack.powerhub
+    version: 2026.3.0
 
 esp32:
   variant: esp32s3
@@ -20,28 +23,31 @@ psram:
 logger:
   level: DEBUG
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+improv_serial:
 
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
+esp32_improv:
+  authorizer: none
+
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
   ap:
-    ssid: "powerhub"
-    password: ""
+
+captive_portal:
 
 api:
-  encryption:
-    key: "STm5aLUIckeHqTZotQPVzgiA4Vz8ju6ZZXux+z+3TVQ=" # example key, you are supposed to generate a new one
 
 ota:
   - platform: esphome
-    # Replace the key by your OTA key
-    password: "86211424946831287ed4bef6aa32a41b" # example passwd, you are supposed to generate a new one
 
 i2c:
-  sda: GPIO45
+  sda:
+    number: GPIO45
+    ignore_strapping_warning: true
   scl: GPIO48
-
 
 uart:
   - id: rs485_bus
@@ -55,7 +61,7 @@ uart:
 
 
 external_components:
-  - source: github://m5stack/esphome-yaml/components
+  - source: github://m5stack/esphome-yaml/components@main
     components: powerhub
     refresh: 0s
 
@@ -118,27 +124,25 @@ text_sensor:
     vin_status:
       name: "External Input Power Status"
       id: ext_vin_status_text_sensor
-    firmware_ver:
-      name: "Internal Firmware Version"
-      id: int_firm_ver_text_sensor
-    bootloader_ver:
-      name: "Bootloader Version"
-      id: boot_ver_text_sensor
-  
-  - platform: version
-    name: "ESPHome Version"
+
 
 sensor:
   - platform: powerhub
     battery_voltage:
       name: "Battery Voltage"
       id: bat_volt_sensor
+      filters:
+        - delta: 50  # Only publish if voltage changes by 50mV
     battery_current:
       name: "Battery Current"
       id: bat_curr_sensor
+      filters:
+        - delta: 20  # Only publish if current changes by 20mA
     battery_level:
       name: "Battery Percentage"
       id: bat_level_sensor
+      filters:
+        - delta: 1  # Only publish if battery level changes by 1%
       on_value:
         - lambda: |-
             auto call_1 = id(led_pwr_l).turn_on();
@@ -197,111 +201,137 @@ sensor:
     grove_red_voltage:
       name: "Port.A Voltage"
       id: grove_red_volt_sensor
+      filters:
+        - delta: 50  # Only publish if voltage changes by 50mV
     grove_red_current:
       name: "Port.A Current"
       id: grove_red_curr_sensor
+      filters:
+        - delta: 20  # Only publish if current changes by 20mA
     grove_blue_voltage:
       name: "Port.C Voltage"
       id: grove_blue_volt_sensor
+      filters:
+        - delta: 50  # Only publish if voltage changes by 50mV
     grove_blue_current:
       name: "Port.C Current"
       id: grove_blue_curr_sensor
+      filters:
+        - delta: 20  # Only publish if current changes by 20mA
     can_voltage:
       name: "CAN Voltage"
       id: can_volt_sensor
+      filters:
+        - delta: 50  # Only publish if voltage changes by 50mV
     can_current:
       name: "CAN Current"
       id: can_curr_sensor
+      filters:
+        - delta: 20  # Only publish if current changes by 20mA
     rs485_voltage:
       name: "RS485 Voltage"
       id: rs485_volt_sensor
+      filters:
+        - delta: 50  # Only publish if voltage changes by 50mV
     rs485_current:
       name: "RS485 Current"
       id: rs485_curr_sensor
+      filters:
+        - delta: 20  # Only publish if current changes by 20mA
     usb_voltage:
       name: "USB Voltage"
       id: usb_volt_sensor
+      filters:
+        - delta: 50  # Only publish if voltage changes by 50mV
     usb_current:
       name: "USB Current"
       id: usb_curr_sensor
+      filters:
+        - delta: 20  # Only publish if current changes by 20mA
 
 
 switch:
   - platform: powerhub
-    led_pwr:
-      name: "LED Power"
-      id: led_pwr_switch
-      restore_mode: RESTORE_DEFAULT_ON
-    usb_pwr:
-      name: "USB Power"
-      id: usb_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_usb_a
-            brightness: 90%
-            # Color maybe
-            # red: 100%
-            # green: 100%
-            # blue: 100%
-        - light.turn_on:
-            id: led_usb_c
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_usb_a
-        - light.turn_off:
-            id: led_usb_c
+    channel: LED
+    name: "LED Power"
+    id: led_pwr_switch
+    restore_mode: RESTORE_DEFAULT_ON
 
-    grove_red_pwr:
-      name: "Port.A Power"
-      id: grove_red_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_grove_red
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_grove_red
+  - platform: powerhub
+    channel: USB
+    name: "USB Power"
+    id: usb_pwr_switch
+    on_turn_on:
+      - light.turn_on:
+          id: led_usb_a
+          brightness: 90%
+      - light.turn_on:
+          id: led_usb_c
+          brightness: 90%
+    on_turn_off:
+      - light.turn_off:
+          id: led_usb_a
+      - light.turn_off:
+          id: led_usb_c
 
-    grove_blue_pwr:
-      name: "Port.C Power"
-      id: grove_blue_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_grove_blue
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_grove_blue
-    rs485_can_pwr:
-      name: "RS485&CAN Power"
-      id: rs485_can_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_rs485_can
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_rs485_can
-    charge_pwr:
-      name: "Charge Power"
-      id: charge_pwr_switch
-      restore_mode: RESTORE_DEFAULT_ON
-      on_turn_on:
-        - light.turn_on:
-            id: led_bat_charge
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_bat_charge
-    rs485_can_direction:
-      name: "RS485&CAN Power Output"
-      id: rs485_can_direction_switch
-    vameter_pwr:
-      name: "VAMeter Power"
-      id: vameter_pwr_switch
-      restore_mode: RESTORE_DEFAULT_ON
+  - platform: powerhub
+    channel: GROVE_RED
+    name: "Port.A Power"
+    id: grove_red_pwr_switch
+    on_turn_on:
+      - light.turn_on:
+          id: led_grove_red
+          brightness: 90%
+    on_turn_off:
+      - light.turn_off:
+          id: led_grove_red
 
+  - platform: powerhub
+    channel: GROVE_BLUE
+    name: "Port.C Power"
+    id: grove_blue_pwr_switch
+    on_turn_on:
+      - light.turn_on:
+          id: led_grove_blue
+          brightness: 90%
+    on_turn_off:
+      - light.turn_off:
+          id: led_grove_blue
+
+  - platform: powerhub
+    channel: RS485_CAN
+    name: "RS485&CAN Power"
+    id: rs485_can_pwr_switch
+    on_turn_on:
+      - light.turn_on:
+          id: led_rs485_can
+          brightness: 90%
+    on_turn_off:
+      - light.turn_off:
+          id: led_rs485_can
+
+  - platform: powerhub
+    channel: CHARGE
+    name: "Charge Power"
+    id: charge_pwr_switch
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - light.turn_on:
+          id: led_bat_charge
+          brightness: 90%
+    on_turn_off:
+      - light.turn_off:
+          id: led_bat_charge
+
+  - platform: powerhub
+    channel: VAMETER
+    name: "VAMeter Power"
+    id: vameter_pwr_switch
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: powerhub
+    name: "RS485 CAN Direction"
+    id: rs485_can_dir
 
 
 select:
@@ -321,32 +351,46 @@ number:
 
 light:
   - platform: powerhub
-    usb_c_rgb:
-      id: led_usb_c
-      name: "USB C Light"
-    usb_a_rgb:
-      id: led_usb_a
-      name: "USB A Light"
-    grove_blue_rgb:
-      id: led_grove_blue
-      name: "Port.C Light"
-    grove_red_rgb:
-      id: led_grove_red
-      name: "Port.A Light"
-    rs485_can_rgb:
-      id: led_rs485_can
-      name: "RS485&CAN Light"
-    bat_charge_rgb:
-      id: led_bat_charge
-      name: "Battery Charge Light"
-      effects:
-        - pulse:
-            name: "Slow Pulse"
-            transition_length: 500ms
-            update_interval: 2s
-    pwr_l_rgb:
-      id: led_pwr_l
-      name: "Power L Light"
-    pwr_r_rgb:
-      id: led_pwr_r
-      name: "Power R Light"
+    channel: USB_A
+    name: "USB A Light"
+    id: led_usb_a
+
+  - platform: powerhub
+    channel: USB_C
+    name: "USB C Light"
+    id: led_usb_c
+
+  - platform: powerhub
+    channel: GROVE_BLUE
+    name: "Port.C Light"
+    id: led_grove_blue
+
+  - platform: powerhub
+    channel: GROVE_RED
+    name: "Port.A Light"
+    id: led_grove_red
+
+  - platform: powerhub
+    channel: RS485_CAN
+    name: "RS485&CAN Light"
+    id: led_rs485_can
+
+  - platform: powerhub
+    channel: CHARGE
+    name: "Battery Charge Light"
+    id: led_bat_charge
+    effects:
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 500ms
+          update_interval: 2s
+
+  - platform: powerhub
+    channel: POWER_LEFT
+    name: "Power L Light"
+    id: led_pwr_l
+
+  - platform: powerhub
+    channel: POWER_RIGHT
+    name: "Power R Light"
+    id: led_pwr_r

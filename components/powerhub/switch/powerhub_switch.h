@@ -2,170 +2,46 @@
 
 #include "esphome/components/switch/switch.h"
 #include "../powerhub.h"
+
+
+
 namespace esphome {
 namespace powerhub {
 
-class LEDSwitch : public switch_::Switch,
-                  public Component,
-                  public Parented<PowerHub>
-{
-
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-    void write_state(bool state) override {
-        this->parent_->set_led_pwr_en(state);
-        this->publish_state(state);
-    }
-
+enum class PowerChannel {
+  POWER_LED,
+  POWER_USB,
+  POWER_GROVE_RED,
+  POWER_GROVE_BLUE,
+  POWER_RS485_CAN,
+  POWER_VAMETER,
+  POWER_CHARGE,
 };
 
-class USBSwitch : public switch_::Switch,
-                  public Component,
-                  public Parented<PowerHub>
-{
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
 
-    void write_state(bool state) override {
-        this->parent_->set_usb_pwr_en(state);
-        this->publish_state(state);
-    }
+class PowerSwitch : public switch_::Switch,
+                    public Component,
+                    public Parented<PowerHub>
+{
+ public:
+  void set_channel(PowerChannel channel) { this->channel_ = channel; }
+  void setup() override;
+  void dump_config() override;
+ protected:
+  void write_state(bool state) override;
+  PowerChannel channel_;
 };
 
-class GroveRedSwitch : public switch_::Switch,
-                       public Component,
-                       public Parented<PowerHub>
+
+class RS485CANDirSwitch : public switch_::Switch,
+                          public Component,
+                          public Parented<PowerHub>
 {
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-
-    void write_state(bool state) override {
-        this->parent_->set_grove_red_pwr_en(state);
-        this->publish_state(state);
-    }
-};
-
-class GroveBlueSwitch : public switch_::Switch,
-                        public Component,
-                        public Parented<PowerHub>
-{
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-
-    void write_state(bool state) override {
-        this->parent_->set_grove_blue_pwr_en(state);
-        this->publish_state(state);
-    }
-};
-
-class RS485CANSwitch : public switch_::Switch,
-                       public Component,
-                       public Parented<PowerHub>
-{
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-
-    void write_state(bool state) override {
-        this->parent_->set_rs485_can_pwr_en(state);
-        this->publish_state(state);
-    }
-};
-
-class VAMeterSwitch : public switch_::Switch,
-                      public Component,
-                      public Parented<PowerHub>
-{
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-
-    void write_state(bool state) override {
-        this->parent_->set_vameter_pwr_en(state);
-        this->publish_state(state);
-    }
-};
-
-class ChargeSwitch : public switch_::Switch,
-                     public Component,
-                     public Parented<PowerHub>
-{
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-
-    void write_state(bool state) override {
-        this->parent_->set_charge_pwr_en(state);
-        this->publish_state(state);
-    }
-
-};
-
-class DirectionSwitch : public switch_::Switch,
-                        public Component,
-                        public Parented<PowerHub>
-{
-public:
-    void setup() override {
-        bool initial_state = this->get_initial_state_with_restore_mode().value_or(false);
-        if (initial_state) {
-            this->turn_on();
-        } else {
-            this->turn_off();
-        }
-    }
-
-    void write_state(bool state) override {
-        this->parent_->set_rs485_can_pwr_output(state);
-        this->parent_->set_rs485_can_pwr_direction(state);
-        this->publish_state(state);
-    }
+ public:
+  void setup() override;
+  void dump_config() override;
+ protected:
+  void write_state(bool state) override;
 };
 
 } // namespace powerhub

@@ -8,70 +8,30 @@
 namespace esphome {
 namespace powerhub {
 
-class USBCLight : public light::LightOutput,
-                  public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
+enum class LightChannel {
+  LED_USB_A,
+  LED_USB_C,
+  LED_GROVE_RED,
+  LED_GROVE_BLUE,
+  LED_RS485_CAN,
+  LED_CHARGE,
+  LED_POWER_LEFT,
+  LED_POWER_RIGHT
 };
 
-class USBALight : public light::LightOutput,
-                  public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
-
-class GroveBlueLight : public light::LightOutput,
-                       public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
-
-class GroveRedLight : public light::LightOutput,
+class PowerHubLight : public light::LightOutput,
                       public Parented<PowerHub>
 {
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
+ public:
+  light::LightTraits get_traits() override;
 
-class RS485CANLight : public light::LightOutput,
-                      public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
+  void set_channel(LightChannel channel) { this->channel_ = channel; }
 
-class BATChargeLight : public light::LightOutput,
-                       public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
+  void write_state(light::LightState *state) override;
 
-class PowerLeftLight : public light::LightOutput,
-                       public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
-
-class PowerRightLight : public light::LightOutput,
-                        public Parented<PowerHub>
-{
-public:
-    light::LightTraits get_traits() override;
-    void write_state(light::LightState *state) override;
-};
-
+ protected:
+  LightChannel channel_;
+};                      
     
 } // namespace powerhub
 } // namespace esphome

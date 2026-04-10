@@ -26,17 +26,8 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_VIN_STATUS) : text_sensor.text_sensor_schema(
                 icon=ICON_POWER_PLUG,
-            ),
-            cv.Optional(CONF_FIRMWARE_VER): text_sensor.text_sensor_schema(
-                icon=ICON_CHIP,
-                entity_category=ENTITY_CATEGORY_DIAGNOSTIC
-            ),
-            cv.Optional(CONF_BOOTLOADER_VER): text_sensor.text_sensor_schema(
-                icon=ICON_CHIP,
-                entity_category=ENTITY_CATEGORY_DIAGNOSTIC
             )
         }
-
     )
     .extend(BASE_SCHEMA)
     .extend(cv.polling_component_schema("10s"))
@@ -54,11 +45,3 @@ async def to_code(config):
     if CONF_VIN_STATUS in config:
         ts = await text_sensor.new_text_sensor(config[CONF_VIN_STATUS])
         cg.add(powerhub.set_vin_status_text_sensor(ts))
-    
-    if CONF_FIRMWARE_VER in config:
-        ts = await text_sensor.new_text_sensor(config[CONF_FIRMWARE_VER])
-        cg.add(powerhub.set_firmware_ver_text_sensor(ts))
-
-    if CONF_BOOTLOADER_VER in config:
-        ts = await text_sensor.new_text_sensor(config[CONF_BOOTLOADER_VER])
-        cg.add(powerhub.set_bootloader_ver_text_sensor(ts))

@@ -127,20 +127,8 @@ class PowerHub :  public PollingComponent, public i2c::I2CDevice {
 #ifdef USE_TEXT_SENSOR
     SUB_TEXT_SENSOR(charge_status)
     SUB_TEXT_SENSOR(vin_status)
-    SUB_TEXT_SENSOR(firmware_ver)
-    SUB_TEXT_SENSOR(bootloader_ver)
 #endif
 
-#ifdef USE_SWITCH
-    SUB_SWITCH(led_pwr)
-    SUB_SWITCH(usb_pwr)
-    SUB_SWITCH(grove_red_pwr)
-    SUB_SWITCH(grove_blue_pwr)
-    SUB_SWITCH(rs485_can_pwr)
-    SUB_SWITCH(vameter_pwr)
-    SUB_SWITCH(charge_pwr)
-    SUB_SWITCH(rs485_can_direction)
-#endif
 
 #ifdef USE_SELECT
     SUB_SELECT(usb_mode)
@@ -330,6 +318,10 @@ protected:
     // Status
     uint8_t charge_status_;
     uint8_t vin_status_;
+
+    // Cached status for text sensors (to avoid republishing unchanged values)
+    uint8_t last_charge_status_{0xFF};  // Initialize to invalid value
+    uint8_t last_vin_status_{0xFF};
 
     // LED colors
     BGR_t led_usb_c_color_;

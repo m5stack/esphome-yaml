@@ -3,26 +3,20 @@
 #include "esphome/components/select/select.h"
 #include "../powerhub.h"
 
-
 namespace esphome {
 namespace powerhub {
 
 class USBModeSelect : public select::Select,
-                       public Component,
                        public Parented<PowerHub>
 {
-
-public:
-    void setup() override {
-        // default state
-        this->publish_state("Default");
+ public:
+  void control(const std::string &value) override {
+    auto index = this->index_of(value);
+    if (index.has_value()) {
+      this->parent_->set_usb_mode(static_cast<uint8_t>(index.value()));
+      this->publish_state(value);
     }
-    void control(const std::string &value) override {
-        this->parent_->set_usb_mode(this->index_of(value).value());
-        this->publish_state(value);
-    }
-
-
+  }
 };
 } // namespace powerhub
 } // namespace esphome
