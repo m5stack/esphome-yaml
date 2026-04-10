@@ -1,0 +1,13 @@
+packages:
+  m5stack-unit-poe-cam: !include ../../common/unit-poe-cam-w-v1-rev1-base.yaml
+
+esphome:
+  project:
+    name: m5stack.m5stack-unit-poe-cam
+    version: 2026.3.0
+
+dashboard_import:
+  package_import_url: github://m5stack/esphome-yaml/common/unit-poe-cam-w-v1-rev1-base.yaml@main
+
+# Since only Ethernet was used, no 'improv via serial' or 'improv via ble' was used
+# You can either enable Wi-Fi or Ethernet

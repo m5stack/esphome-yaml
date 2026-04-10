@@ -1,6 +1,7 @@
 esphome:
   name: unit-poe-cam-w-v1-rev1
   friendly_name: M5Stack Unit POE CAM V1.1
+  name_add_mac_suffix: true
 
 esp32:
   variant: esp32
@@ -46,7 +47,9 @@ ethernet:
 i2c:
   - id: cam_i2c
     sda: GPIO14
-    scl: GPIO12
+    scl: 
+      number: GPIO12
+      ignore_strapping_warning: true
 
 
 esp32_camera:
@@ -59,8 +62,9 @@ esp32_camera:
   vsync_pin: GPIO22 
   href_pin: GPIO26
   pixel_clock_pin: GPIO21
-  reset_pin: GPIO15
-
+  reset_pin:
+    number: GPIO15
+    ignore_strapping_warning: true
 
 binary_sensor:
   - platform: gpio
@@ -74,6 +78,7 @@ output:
     pin:
       number: GPIO0
       inverted: true
+      ignore_strapping_warning: true
     id: status_led
 
 light:
