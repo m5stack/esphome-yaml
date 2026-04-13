@@ -58,7 +58,7 @@ void PowerHubTime::read_time() {
                   (2000 + time.rtc_year),
                   time.rtc_month,
                   time.rtc_day,
-                  reg_val_to_weekday(time.rtc_weekday));
+                  LOG_STR_ARG(reg_val_to_weekday(time.rtc_weekday)));
 
     ESPTime rtc_time{
         .second        = time.rtc_sec,
@@ -110,7 +110,7 @@ void PowerHubTime::write_time() {
                   time.rtc_year + 2000,
                   time.rtc_month,
                   time.rtc_day,
-                  reg_val_to_weekday(time.rtc_weekday));
+                  LOG_STR_ARG(reg_val_to_weekday(time.rtc_weekday)));
 
     this->parent_->set_rtc_time(time);
 }

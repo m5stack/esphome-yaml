@@ -15,7 +15,7 @@ DEPENDENCIES = ["powerhub"]
 CONF_USB_MODE = "usb_mode"
 ICON_USB_PORT = "mdi:usb-port"
 
-USBModeSelect = powerhub_ns.class_("USBModeSelect", select.Select, cg.Component)
+USBModeSelect = powerhub_ns.class_("USBModeSelect", select.Select)
 
 OPTIONS = [
     "Default",
@@ -42,6 +42,5 @@ async def to_code(config):
             usb_mode_conf,
             options=OPTIONS
         )
-        await cg.register_component(var, usb_mode_conf)
         await cg.register_parented(var, powerhub)
         cg.add(powerhub.set_usb_mode_select(var))

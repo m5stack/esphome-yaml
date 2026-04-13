@@ -68,7 +68,7 @@ ftservo:
 
 ## Sensor
 
-Servo telemetry is provided by the [FTServo sensor platform](../ftservo/README.md#sensor). Reference the servo `id` from the `scs9009_servo` declaration.
+Servo telemetry is provided by the [FTServo sensor platform](../ftservo/README.md#sensor). Reference the servo `id` from the `ftservo` declaration.
 
 ```yaml
 sensor:
@@ -204,7 +204,7 @@ scs9009:
   id: scs9009_bus
   uart_id: uart_bus
 
-scs9009_servo:
+ftservo:
   - id: servo_1
     scs9009_id: scs9009_bus
     address: 1

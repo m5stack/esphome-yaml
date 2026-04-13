@@ -130,7 +130,7 @@ sensor:
 
 ## Text Sensor
 
-Text sensors on `powerhub` report the power status in text format, as well as the internal firmware/bootloader version of the device.
+Text sensors on `powerhub` report the power status in text format.
 
 ```yaml
 text_sensor:
@@ -141,12 +141,6 @@ text_sensor:
     vin_status:
       name: "External Input Power Status"
       id: ext_vin_status_text_sensor
-    firmware_ver:
-      name: "Internal Firmware Version"
-      id: int_firm_ver_text_sensor
-    bootloader_ver:
-      name: "Bootloader Version"
-      id: boot_ver_text_sensor
 ```
 
 ### Configuration variables
@@ -155,11 +149,11 @@ text_sensor:
   All options from [Text Sensor](/components/text_sensor#config-text_sensor).
 - **vin_status** (*Optional*): Detect if external input power is present.
   All options from [Text Sensor](/components/text_sensor#config-text_sensor).
-- **firmware_ver** (*Optional*): Report the internal firmware version of the device.
-  All options from [Text Sensor](/components/text_sensor#config-text_sensor).
-- **bootloader_ver** (*Optional*): Bootloader version of the device.
-  All options from [Text Sensor](/components/text_sensor#config-text_sensor).
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
+
+> [!NOTE]
+> The `charge_status` and `vin_status` text sensors implement a caching mechanism to avoid republishing unchanged values. 
+> States are only published when the actual status changes, reducing MQTT message traffic and Home Assistant event processing.
 
 ## Switch
 
@@ -168,50 +162,56 @@ The `powerhub` switches allow you to enable or disable power channels from the f
 ```yaml
 switch:
   - platform: powerhub
-    led_pwr:
-      name: "LED Power"
-      id: led_pwr_switch
-    usb_pwr:
-      name: "USB Power"
-      id: usb_pwr_switch
-    grove_red_pwr:
-      name: "Port.A Power"
-      id: grove_red_pwr_switch
-    grove_blue_pwr:
-      name: "Port.C Power"
-      id: grove_blue_pwr_switch
-    rs485_can_pwr:
-      name: "RS485&CAN Power"
-      id: rs485_can_pwr_switch
-    vameter_pwr:
-      name: "VAMeter Power"
-      id: vameter_pwr_switch
-    charge_pwr:
-      name: "Charge Power"
-      id: charge_pwr_switch
-    rs485_can_direction:
-      name: "RS485&CAN Power Output"
-      id: rs485_can_direction_switch
+    channel: LED
+    name: "LED Power"
+    id: led_pwr_switch
+  
+  - platform: powerhub
+    channel: USB
+    name: "USB Power"
+    id: usb_pwr_switch
+  
+  - platform: powerhub
+    channel: GROVE_RED
+    name: "Port.A Power"
+    id: grove_red_pwr_switch
+  
+  - platform: powerhub
+    channel: GROVE_BLUE
+    name: "Port.C Power"
+    id: grove_blue_pwr_switch
+  
+  - platform: powerhub
+    channel: RS485_CAN
+    name: "RS485&CAN Power"
+    id: rs485_can_pwr_switch
+  
+  - platform: powerhub
+    channel: VAMETER
+    name: "VAMeter Power"
+    id: vameter_pwr_switch
+  
+  - platform: powerhub
+    channel: CHARGE
+    name: "Charge Power"
+    id: charge_pwr_switch
+  
+  - platform: powerhub
+    name: "RS485 CAN Direction"
+    id: rs485_can_dir_switch
 ```
 
 ### Configuration variables
 
-- **led_pwr** (*Optional*): Turn on/off the LED power. Defaults to `true`.
-  All options from [Switch](/components/switch#config-switch)
-- **usb_pwr** (*Optional*): Turn on/off the USB power.
-  All options from [Switch](/components/switch#config-switch)
-- **grove_red_pwr** (*Optional*): Turn on/off the Port.A (grove red) power.
-  All options from [Switch](/components/switch#config-switch)
-- **grove_blue_pwr** (*Optional*): Turn on/off the Port.C (grove blue) power.
-  All options from [Switch](/components/switch#config-switch)
-- **rs485_can_pwr** (*Optional*): Turn on/off the RS485 & CAN power.
-  All options from [Switch](/components/switch#config-switch)
-- **vameter_pwr** (*Optional*): Turn on/off the VAMeter power. Defaults to `true`
-  All options from [Switch](/components/switch#config-switch)
-- **charge_pwr** (*Optional*): Turn on/off the charge power. Defaults to `true`
-  All options from [Switch](/components/switch#config-switch)
-- **rs485_can_direction** (*Optional*): Control the RS485 & CAN power output direction. Turn on to enable the output.
-  All options from [Switch](/components/switch#config-switch)
+- **channel** (*Required* for power channel switches): The power channel to control. 
+  Valid values: `LED`, `USB`, `GROVE_RED`, `GROVE_BLUE`, `RS485_CAN`, `VAMETER`, `CHARGE`.
+  All options from [Switch](/components/switch#config-switch).
+- **name** (*Optional*): The name of the switch.
+  All options from [Switch](/components/switch#config-switch).
+- **id** (*Optional*, [ID](/guides/configuration-types#id)): An identifier for the switch.
+- **rs485_can_direction**: A special switch (without `channel`) that controls the RS485 & CAN power direction. 
+  Turn on to enable power output for RS485/CAN interface.
+  All other options from [Switch](/components/switch#config-switch).
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
 
 ## Select
@@ -248,13 +248,19 @@ number:
 
 ### Configuration variables
 
-- **rs485_can_output_voltage** (*Optional*): Set the output voltage of the RS485 & CAN interface. Defaults to `3000` mV.
+- **rs485_can_output_voltage** (*Optional*): Set the output voltage of the RS485 & CAN interface. 
+  Defaults to `3000` mV. The valid range is 3000 mV to 20000 mV with a step of 20 mV.
   The switch `rs485_can_direction` needs to be enabled for this to take effect.
   All options from [Number](/components/number#config-number).
-- **rs485_can_current_limit** (*Optional*): Set the output current limit of the RS485 & CAN interface. Defaults to `13` mA. 
+- **rs485_can_current_limit** (*Optional*): Set the output current limit of the RS485 & CAN interface. 
+  Defaults to `13` mA. The valid range is 13 mA to 3000 mA.
   The switch `rs485_can_direction` needs to be enabled for this to take effect.
   All options from [Number](/components/number#config-number).
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
+
+> [!NOTE]
+> The default voltage (3000 mV / 3.0V) and current limit (13 mA) are set during initialization when the device boots. 
+> These values are synchronized with the internal state, ensuring consistency between the hardware configuration and the Home Assistant frontend.
 
 ## Light
 
@@ -263,43 +269,59 @@ Each power channel on `powerhub` is equipped with a status RGB LED to indicate t
 ```yaml
 light:
   - platform: powerhub
-    usb_c_rgb:
-      name: "USB C Light"
-    usb_a_rgb:
-      name: "USB A Light"
-    grove_blue_rgb:
-      name: "Port.C Light"
-    grove_red_rgb:
-      name: "Port.A Light"
-    rs485_can_rgb:
-      name: "RS485&CAN Light"
-    bat_charge_rgb:
-      name: "Battery Charge Light"
-    pwr_l_rgb:
-      name: "Power L Light"
-    pwr_r_rgb:
-      name: "Power R Light"
+    channel: USB_A
+    name: "USB A Light"
+    id: led_usb_a
+
+  - platform: powerhub
+    channel: USB_C
+    name: "USB C Light"
+    id: led_usb_c
+
+  - platform: powerhub
+    channel: GROVE_BLUE
+    name: "Port.C Light"
+    id: led_grove_blue
+
+  - platform: powerhub
+    channel: GROVE_RED
+    name: "Port.A Light"
+    id: led_grove_red
+
+  - platform: powerhub
+    channel: RS485_CAN
+    name: "RS485&CAN Light"
+    id: led_rs485_can
+
+  - platform: powerhub
+    channel: CHARGE
+    name: "Battery Charge Light"
+    id: led_bat_charge
+    effects:
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 500ms
+          update_interval: 2s
+
+  - platform: powerhub
+    channel: POWER_LEFT
+    name: "Power L Light"
+    id: led_pwr_l
+
+  - platform: powerhub
+    channel: POWER_RIGHT
+    name: "Power R Light"
+    id: led_pwr_r
 ```
 
 ### Configuration variables
 
-- **usb_c_rgb** (*Optional*): Turn on/off RGB LED under the USB Type C interface.
-  All other options from [Light](/components/light#config-light).
-- **usb_a_rgb** (*Optional*): Turn on/off RGB LED under the USB Type A interface.
-  All other options from [Light](/components/light#config-light).
-- **grove_blue_rgb** (*Optional*): Turn on/off RGB LED under the Port.C (grove blue) interface.
-  All other options from [Light](/components/light#config-light).
-- **grove_red_rgb** (*Optional*): Turn on/off RGB LED under the Port.A (grove red) interface.
-  All other options from [Light](/components/light#config-light).
-- **rs485_can_rgb** (*Optional*): Turn on/off RGB LED under the RS485 & CAN interface.
-  All other options from [Light](/components/light#config-light).
-- **bat_charge_rgb** (*Optional*): Turn on/off RGB LED for battery charge status. This LED is located under the yellow round button.
-  All other options from [Light](/components/light#config-light).
-- **pwr_l_rgb** (*Optional*): Turn on/off RGB LED for left power indicator. This LED is located inside the left half of the Top PMU button (rectangular shape).
-  All other options from [Light](/components/light#config-light).
-- **pwr_r_rgb** (*Optional*): Turn on/off RGB LED for right power indicator. This LED is located inside the right half of the Top PMU button (rectangular shape).
-  All other options from [Light](/components/light#config-light).
+- **channel** (*Required*): The RGB LED channel to control.
+  Valid values: `USB_A`, `USB_C`, `GROVE_RED`, `GROVE_BLUE`, `RS485_CAN`, `CHARGE`, `POWER_LEFT`, `POWER_RIGHT`.
+- **name** (*Optional*): The name of the light.
+- **id** (*Optional*, [ID](/guides/configuration-types#id)): An identifier for the light.
 - **powerhub_id** (*Optional*, [ID](/guides/configuration-types#id)): The ID to PowerHub.
+- All other options from [Light](/components/light#config-light).
 
 
 The RGB LED is designed to conveniently indicate the power status of each channel, with the readings of Sensors, you can update your Light component accordingly. 
@@ -393,71 +415,21 @@ or turn on/off the corresponding LEDs when turn on/off the power switches.
 ```yaml
 switch:
   - platform: powerhub
-    ...
-    usb_pwr:
-      name: "USB Power"
-      id: usb_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_usb_a
-            brightness: 90%
-            # Color maybe
-            # red: 100%
-            # green: 100%
-            # blue: 100%
-        - light.turn_on:
-            id: led_usb_c
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_usb_a
-        - light.turn_off:
-            id: led_usb_c
-
-    grove_red_pwr:
-      name: "Port.A Power"
-      id: grove_red_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_grove_red
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_grove_red
-
-    grove_blue_pwr:
-      name: "Port.C Power"
-      id: grove_blue_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_grove_blue
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_grove_blue
-
-    rs485_can_pwr:
-      name: "RS485&CAN Power"
-      id: rs485_can_pwr_switch
-      on_turn_on:
-        - light.turn_on:
-            id: led_rs485_can
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_rs485_can
-
-    charge_pwr:
-      name: "Charge Power"
-      id: charge_pwr_switch
-      restore_mode: RESTORE_DEFAULT_ON
-      on_turn_on:
-        - light.turn_on:
-            id: led_bat_charge
-            brightness: 90%
-      on_turn_off:
-        - light.turn_off:
-            id: led_bat_charge
+    channel: USB
+    name: "USB Power"
+    id: usb_pwr_switch
+    on_turn_on:
+      - light.turn_on:
+          id: led_usb_a
+          brightness: 90%
+      - light.turn_on:
+          id: led_usb_c
+          brightness: 90%
+    on_turn_off:
+      - light.turn_off:
+          id: led_usb_a
+      - light.turn_off:
+          id: led_usb_c
     ...
 ```
 
@@ -466,15 +438,14 @@ You can also add some special effects to the light, for an example, when battery
 ```yaml
 light:
   - platform: powerhub
-    ...
-    bat_charge_rgb:
-      id: led_bat_charge
-      name: "Battery Charge Light"
-      effects:
-        - pulse:
-            name: "Slow Pulse"
-            transition_length: 500ms
-            update_interval: 2s
+    channel: CHARGE
+    name: "Battery Charge Light"
+    id: led_bat_charge
+    effects:
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 500ms
+          update_interval: 2s
     ...
 ```
 
