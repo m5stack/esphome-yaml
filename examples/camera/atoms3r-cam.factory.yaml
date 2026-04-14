@@ -1,0 +1,89 @@
+esphome:
+  name: atoms3r-cam
+  friendly_name: M5Stack AtomS3R CAM
+  project:
+    name: m5stack.atoms3r-cam
+    version: 2026.3.0
+
+esp32:
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_USE_CAPS_ALLOC: y
+      CONFIG_SPIRAM_USE_MALLOC: y
+
+# Enable logging
+logger:
+  level: DEBUG   
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+   
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+  ap:
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components@main
+    components: [early_init]
+
+captive_portal:
+
+psram:
+  mode: octal
+  speed: 80MHz 
+
+early_init:
+  id: power_up_barrier
+  pins:
+    - pin:
+        number: GPIO18
+      level: false
+  delay: 500ms
+
+i2c:
+  - id: bsp_bus
+    sda: 
+      number: GPIO45
+      ignore_strapping_warning: true
+    scl:
+      number: GPIO0
+      ignore_strapping_warning: true
+    scan: true
+  - id: cam_bus
+    sda: GPIO12
+    scl: GPIO9
+
+esp32_camera:
+  name: "Camera"
+  i2c_id: cam_bus
+  vsync_pin: GPIO10 # VSYNC
+  href_pin: GPIO14 # HREF
+  external_clock: # XCLK
+    pin: GPIO21
+    frequency: 20MHz
+  pixel_clock_pin: GPIO40 # PCLK
+  data_pins: [GPIO3, GPIO42, GPIO46, GPIO48, GPIO4, GPIO17, GPIO11, GPIO13] # Y2-9
+  max_framerate: 15.0 fps
+  resolution: 320x240
+  frame_buffer_count: 1
+  pixel_format: RGB565
+  jpeg_quality: 6
+  agc_mode: manual
+  vertical_flip: true
+  horizontal_mirror: false
