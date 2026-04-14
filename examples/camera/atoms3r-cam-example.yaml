@@ -1,0 +1,74 @@
+esphome:
+  name: atoms3r-cam
+  friendly_name: AtomS3R-CAM
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "80dgV+9nOEGy3DjakZ/OaWsS/7Cltf0Lt+Sp3YyQ8vc="
+
+ota:
+  - platform: esphome
+    password: "cce3ac2f318c38991e77b2de590af21c"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Atoms3R-Cam Fallback Hotspot"
+    password: "cHszEVmg1jad"
+
+    
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [early_init]
+
+
+captive_portal:
+
+psram:
+  mode: octal
+  speed: 80MHz 
+
+early_init:
+  id: power_up_barrier
+  pins:
+    - pin:
+        number: GPIO18
+      level: false
+  delay: 500ms
+
+i2c:
+  - id: cam_bus
+    sda: GPIO12
+    scl: GPIO9
+
+
+esp32_camera:
+  name: "Camera"
+  i2c_id: cam_bus
+  vsync_pin: GPIO10 # VSYNC
+  href_pin: GPIO14 # HREF
+  external_clock: # XCLK
+    pin: GPIO21
+    frequency: 20MHz
+  pixel_clock_pin: GPIO40 # PCLK
+  data_pins: [GPIO3, GPIO42, GPIO46, GPIO48, GPIO4, GPIO17, GPIO11, GPIO13] # Y2-9
+  max_framerate: 15.0 fps
+  resolution: 320x240
+  frame_buffer_count: 1
+  jpeg_quality: 6
+  agc_mode: manual
+  vertical_flip: true
+  horizontal_mirror: false
