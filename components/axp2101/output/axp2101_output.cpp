@@ -1,5 +1,5 @@
 #include "axp2101_output.h"
-#include <map>
+
 namespace esphome {
 namespace axp2101 {
 
@@ -8,48 +8,60 @@ static const char *TAG = "axp2101.output";
 void AXP2101OutputBase::apply_channel(PowerChannel channel, uint16_t voltage) {
   switch (channel) {
     case PowerChannel::ALDO1:
-      this->parent_->setALDO1Voltage(voltage);
       this->parent_->enableALDO1();
+      this->parent_->setALDO1Voltage(voltage);
       break;
     case PowerChannel::ALDO2:
-      this->parent_->setALDO2Voltage(voltage);
       this->parent_->enableALDO2();
+      this->parent_->setALDO2Voltage(voltage);
       break;
     case PowerChannel::ALDO3:
-      this->parent_->setALDO3Voltage(voltage);
       this->parent_->enableALDO3();
+      this->parent_->setALDO3Voltage(voltage);
       break;
     case PowerChannel::BLDO1:
-      this->parent_->setBLDO1Voltage(voltage);
       this->parent_->enableBLDO1();
+      this->parent_->setBLDO1Voltage(voltage);
       break;
     case PowerChannel::BLDO2:
-      this->parent_->setBLDO2Voltage(voltage);
       this->parent_->enableBLDO2();
+      this->parent_->setBLDO2Voltage(voltage);
       break;
     case PowerChannel::DLDO1:
-      this->parent_->setDLDO1Voltage(voltage);
       this->parent_->enableDLDO1();
+      this->parent_->setDLDO1Voltage(voltage);
       break;
     case PowerChannel::DLDO2:
-      this->parent_->setDLDO2Voltage(voltage);
       this->parent_->enableDLDO2();
+      this->parent_->setDLDO2Voltage(voltage);
       break;
     case PowerChannel::CPUSLDO:
-      this->parent_->setCPUSLDOVoltage(voltage);
       this->parent_->enableCPUSLDO();
+      this->parent_->setCPUSLDOVoltage(voltage);
       break;
     case PowerChannel::DCDC1:
-      this->parent_->setDC1Voltage(voltage);
       this->parent_->enableDC1();
+      this->parent_->setDC1Voltage(voltage);
       break;
     case PowerChannel::DCDC2:
-      this->parent_->setDC2Voltage(voltage);
       this->parent_->enableDC2();
+      this->parent_->setDC2Voltage(voltage);
       break;
     case PowerChannel::DCDC3:
-      this->parent_->setDC3Voltage(voltage);
       this->parent_->enableDC3();
+      this->parent_->setDC3Voltage(voltage);
+      break;
+    case PowerChannel::DCDC4:
+      this->parent_->enableDC4();
+      this->parent_->setDC4Voltage(voltage);
+      break;
+    case PowerChannel::DCDC5:
+      this->parent_->enableDC5();
+      this->parent_->setDC5Voltage(voltage);
+      break;
+    case PowerChannel::ALDO4:
+      this->parent_->enableALDO4();
+      this->parent_->setALDO4Voltage(voltage);
       break;
     default:
       ESP_LOGW(TAG, "Unknown channel: %d", channel);
