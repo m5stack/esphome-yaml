@@ -1,0 +1,83 @@
+esphome:
+  friendly_name: M5Stack AtomS3U
+  name: atoms3u
+  name_add_mac_suffix: true
+  project:
+    name: m5stack.atoms3u
+    version: 2026.3.0
+
+esp32:
+  variant: esp32s3
+  cpu_frequency: 240MHz
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+  ap:
+
+api:
+
+ota:
+  - platform: esphome
+
+captive_portal:
+
+logger:
+
+# Port A
+i2c:
+  sda: GPIO2
+  scl: GPIO1
+
+i2s_audio:
+  i2s_lrclk_pin: GPIO39
+
+binary_sensor:
+  - platform: gpio
+    id: usr_btn
+    name: "User Button"
+    pin:
+      number: GPIO41
+      inverted: true
+
+remote_transmitter:
+  pin: GPIO12
+  carrier_duty_percent: 50%
+  non_blocking: true
+  rmt_symbols: 48
+
+# Example IR Remote Climate
+climate:
+  - platform: coolix
+    name: "Default AC"
+    visual:
+      min_temperature: 18
+      max_temperature: 30
+      temperature_step: 1
+
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO35
+    num_leds: 1
+    chipset: ws2812
+    name: "Light"
+    rmt_symbols: 48    
+
+microphone:
+  - platform: i2s_audio
+    id: echo_microphone
+    i2s_din_pin: GPIO38
+    adc_type: external
+    pdm: true
