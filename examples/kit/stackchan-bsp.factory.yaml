@@ -1,0 +1,507 @@
+# StackChan Home Assistant Integration Example Configuration
+# This configuration shows components available on StackChan
+# Some components are still WIP
+---
+substitutions:
+  name: stackchan
+  friendly_name: M5Stack StackChan
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  project:
+    name: m5stack.stackchan-bsp
+    version: 2026.3.0
+  on_boot: 
+    then:
+      # reset
+      - output.turn_on: aw_rst
+      - delay: 20ms
+      - output.turn_on: cam_rst
+      - delay: 20ms
+      # read the RTC time once when the system boots
+      - bm8563.read_time:
+
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      # These SPIRAM configs are needed when using camera
+      CONFIG_SPIRAM_SUPPORT: y
+      CONFIG_SPIRAM_USE_CAPS_ALLOC: y
+      CONFIG_SPIRAM_USE_MALLOC: y
+
+psram:
+  mode: quad
+  speed: 80MHz
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+improv_serial:
+
+esp32_improv:
+  authorizer: none
+
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+  ap:
+
+captive_portal:
+
+# Enable logging
+logger:
+  level: DEBUG
+
+i2s_audio:
+  id: i2s_audio_bus
+  i2s_lrclk_pin: GPIO33
+  i2s_bclk_pin: GPIO34
+  i2s_mclk_pin:
+    number: GPIO0
+    ignore_strapping_warning: true
+
+i2c:
+  - id: bsp_bus
+    sda: GPIO12
+    scl: GPIO11
+    frequency: 100kHz
+    scan: true
+
+spi:
+  - id: spi_bus
+    clk_pin: GPIO36
+    mosi_pin: GPIO37
+
+uart:
+  tx_pin: GPIO6
+  rx_pin: GPIO7
+  baud_rate: 1000000
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
+    refresh: 0s
+
+axp2101:
+  id: axp2101_pmu
+  i2c_id: bsp_bus
+
+
+aw9523b:
+  id: aw9523b_hub
+  i2c_id: bsp_bus
+  p0_drive_mode: PUSH_PULL
+
+output:
+  - platform: axp2101
+    type: range
+    channel: DLDO1
+    id: lcd_backlight_output
+    min_voltage: 2600
+    max_voltage: 3300
+
+  - platform: axp2101
+    channel: ALDO1
+    voltage: 1800
+
+  - platform: axp2101
+    channel: ALDO2
+    voltage: 3300
+  
+  - platform: axp2101
+    channel: ALDO3
+    voltage: 3300
+  
+  - platform: axp2101
+    channel: ALDO4
+    voltage: 3300
+
+  - platform: axp2101
+    channel: BLDO1
+    voltage: 2800
+
+  - platform: axp2101
+    channel: BLDO2
+    voltage: 1500
+
+  - platform: axp2101
+    channel: DCDC1
+    voltage: 3300
+  
+  - platform: axp2101
+    channel: DCDC4
+    voltage: 1800
+
+  - platform: axp2101
+    channel: DCDC3
+    voltage: 3300
+
+  - platform: axp2101
+    channel: DCDC5
+    voltage: 3300
+
+  - platform: gpio
+    id: aw_rst
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 2
+
+  - platform: gpio
+    id: cam_rst
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 8
+
+si12t:
+  id: touch_hub
+  i2c_id: bsp_bus
+
+m5ioe1:
+  id: m5ioe1_hub
+  i2c_id: bsp_bus
+  reset: true
+
+switch:
+  - platform: gpio
+    name: "BUS_OUT_EN"
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 1
+    # BUS_OUT_EN = 1
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: gpio
+    name: "USB_OTG_EN"
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 5
+    # USB_OTG_EN = 0
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "BOOST_EN"
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 15
+    # BOOST_EN = 1
+    restore_mode: RESTORE_DEFAULT_ON
+  
+  - platform: gpio
+    name: "M5IOE1 Pin 1"
+    pin:
+      m5ioe1_id: m5ioe1_hub
+      number: 0
+      mode:
+        output: true
+        pullup: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: gpio
+    name: "M5IOE1 Pin 14"
+    pin:
+      m5ioe1_id: m5ioe1_hub
+      number: 13
+      mode:
+        output: true
+        pullup: true
+        open_drain: false
+    restore_mode: RESTORE_DEFAULT_ON
+
+scs9009:
+
+remote_transmitter:
+  id: ir_tx
+  pin: GPIO5
+  carrier_duty_percent: 50%
+  non_blocking: true
+
+remote_receiver:
+  id: ir_rx
+  pin: GPIO10
+
+# IR Remote Climate example
+climate:
+  - platform: coolix
+    name: "Default AC"
+    visual:
+      min_temperature: 18
+      max_temperature: 30
+      temperature_step: 1
+
+# IR Proxy
+infrared:
+  # IR transmitter instance
+  - platform: ir_rf_proxy
+    name: IR Proxy Transmitter
+    id: ir_proxy_tx
+    remote_transmitter_id: ir_tx
+  # IR receiver instance
+  - platform: ir_rf_proxy
+    name: IR Proxy Receiver
+    id: ir_proxy_rx
+    remote_receiver_id: ir_rx
+
+# Time source
+time:
+  - platform: bm8563
+    i2c_id: bsp_bus
+    # repeated synchronization is not necessary unless the external RTC
+    # is much more accurate than the internal clock
+    update_interval: never
+  - platform: homeassistant
+    # instead try to synchronize via network repeatedly ...
+    on_time_sync:
+      then:
+        # ... and update the RTC when the synchronization was successful
+        bm8563.write_time:
+
+sensor:
+  - platform: ftservo
+    id: x_servo_sensor
+    ftservo_id: x_servo
+    position:
+      name: "Servo X Position"
+      filters:
+        - delta: 3.0
+      on_value:
+        - lambda: |-
+            float val = (x - 34) * 0.3710 - 164.0f;
+            id(servo_x_angle).publish_state(roundf(val)); // using angle 
+
+  - platform: ftservo
+    id: y_servo_sensor
+    ftservo_id: y_servo
+    position:
+      name: "Servo Y Position"
+      filters:
+        - delta: 3.0
+      on_value:
+        - lambda: |-
+            float val = x * 0.3333f - 226.67f;
+            id(servo_y_angle).publish_state(roundf(val)); // using angle 
+
+  - platform: ltr_als_ps
+    address: 0x23
+    i2c_id: bsp_bus
+    update_interval: 10s
+    type: ALS_PS
+    ambient_light:
+      name: "Ambient light"
+    glass_attenuation_factor: 2.5
+    auto_mode: true
+    ps_cooldown: 5 s
+    ps_high_threshold: 500
+    ps_counts: "Proximity counts"
+
+
+  - platform: ina226
+    i2c_id: bsp_bus
+    address: 0x41
+    shunt_resistance: 0.01 ohm
+    max_current: 3.2A
+    # adc time used for both, Bus Voltage and Shunt Voltage
+    adc_time: 140us
+    adc_averaging: 128
+    update_interval: 60s
+    current:
+      name: "INA226 Current"
+    power:
+      name: "INA226 Power"
+    bus_voltage:
+      name: "INA226 Bus Voltage"
+    shunt_voltage:
+      name: "INA226 Shunt Voltage"
+
+touchscreen:
+  - platform: ft63x6
+    id: touch
+    i2c_id: bsp_bus
+    reset_pin:
+      aw9523b_id: aw9523b_hub
+      number: 0
+    calibration:
+      x_min: 0
+      x_max: 320
+      y_min: 0
+      y_max: 240
+    on_touch:
+      - lambda: |-
+          ESP_LOGD("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+                          touch.x, touch.y, touch.x_raw,touch.y_raw);  
+
+display:
+  - platform: mipi_spi
+    model: M5CORE
+    dc_pin: GPIO35
+    reset_pin:
+      aw9523b_id: aw9523b_hub
+      number: 9
+    cs_pin:
+      number: GPIO3
+      ignore_strapping_warning: true
+    data_rate: 40MHz
+    invert_colors: true
+    id: m5cores3_lcd
+    show_test_card: true
+
+light:
+  - platform: monochromatic
+    id: lcd_backlight
+    name: "LCD Backlight"
+    icon: "mdi:television"
+    output: lcd_backlight_output
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 250ms
+
+  - platform: m5ioe1
+    id: stackchan_light_bar
+    name: "StackChan Light Bar"
+    icon: mdi:led-strip
+    num_led: 12
+    effects:
+      - random:
+          name: "Random"
+          transition_length: 1s
+          update_interval: 1s
+      - addressable_rainbow:
+      - addressable_rainbow:
+          name: Rainbow Effect With Custom Values
+          speed: 10
+          width: 50
+      - addressable_twinkle:
+      - addressable_twinkle:
+          name: Twinkle Effect With Custom Values
+          twinkle_probability: 5%
+          progress_interval: 4ms
+
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    i2c_id: bsp_bus
+    bits_per_sample: 16bit
+    sample_rate: 16000
+    mic_gain: 36
+
+audio_dac:
+  - platform: aw88298
+    id: aw88298_dac
+    i2c_id: bsp_bus
+    sample_rate: 48000
+
+microphone:
+  - platform: i2s_audio
+    id: i2s_mic
+    i2s_din_pin: GPIO14
+    adc_type: external
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    i2s_audio_id: i2s_audio_bus
+
+speaker:
+  - platform: i2s_audio
+    i2s_audio_id: i2s_audio_bus
+    id: i2s_speaker
+    dac_type: external
+    i2s_dout_pin: GPIO13
+    audio_dac: aw88298_dac
+
+media_player:
+  - platform: speaker
+    name: None
+    id: va_media_player
+    volume_min: 0.5
+    volume_max: 0.8
+    announcement_pipeline:
+      speaker: i2s_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+
+ftservo:
+  - platform: scs9009
+    address: 1
+    id: x_servo
+  - platform: scs9009
+    address: 2
+    id: y_servo 
+
+number:
+  - platform: ftservo
+    ftservo_id: x_servo
+    angle:
+      id: servo_x_angle
+      name: "Servo X Angle"
+      min_value: -164
+      max_value: 164
+      use_raw_angle: false
+      angle_offset: 164
+      step: 5
+    speed:
+      id: servo_x_speed
+      name: "Servo X Speed"
+      min_value: 100
+      max_value: 1500
+      step: 100
+
+  - platform: ftservo
+    ftservo_id: y_servo
+    angle:
+      id: servo_y_angle
+      name: "Servo Y Angle"
+      min_value: 0
+      max_value: 90
+      use_raw_angle: false
+      angle_offset: 239
+      step: 5
+    speed:
+      id: servo_y_speed
+      name: "Servo Y Speed"
+      min_value: 100
+      max_value: 1500
+      step: 100
+
+text_sensor:
+  - platform: si12t
+    name: "Touch Sensor 1"
+    channel: CH_1
+    update_interval: 1s
+  - platform: si12t
+    name: "Touch Sensor 2"
+    channel: CH_2    
+    update_interval: 1s
+  - platform: si12t
+    name: "Touch Sensor 3"
+    channel: CH_3
+    update_interval: 1s
+   
+esp32_camera:
+  name: "Camera"
+  i2c_id: bsp_bus
+  vsync_pin:
+    number: GPIO46
+    ignore_strapping_warning: true
+  href_pin: GPIO38
+  external_clock:
+    pin: GPIO2
+    frequency: 20MHz
+  pixel_clock_pin:
+    number: GPIO45
+    ignore_strapping_warning: true
+  data_pins: [GPIO39, GPIO40, GPIO41, GPIO42, GPIO15, GPIO16, GPIO48, GPIO47] # D0-D7
+  max_framerate: 15.0 fps
+  resolution: 320x240
+  frame_buffer_count: 1
+  pixel_format: RGB565
+  jpeg_quality: 6
+  agc_mode: manual
