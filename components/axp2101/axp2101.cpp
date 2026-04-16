@@ -22,13 +22,13 @@ void AXP2101::AXP2101::setup()
 
     delay(10);
     // Disable unused channels
-    this->disableDC2();
-    this->disableDC3();
-    this->disableDC4();
-    this->disableDC5();
+    // this->disableDC2();
+    // this->disableDC3();
+    // this->disableDC4();
+    // this->disableDC5();
 
-    this->disableCPUSLDO();
-    this->disableDLDO1();
+    // this->disableCPUSLDO();
+    // this->disableDLDO1();
 
     this->clearIrqStatus();
 
@@ -63,7 +63,7 @@ void AXP2101::AXP2101::setup()
     - XPOWERS_CHG_LED_CTRL_CHG,
     * */
 
-    this->setChargingLedMode(XPOWERS_CHG_LED_OFF);
+    this->setChargingLedMode(XPOWERS_CHG_LED_ON);
 
     // Set the precharge charging current
     this->setPrechargeCurr(XPOWERS_AXP2101_PRECHARGE_50MA);
@@ -140,21 +140,37 @@ void AXP2101::AXP2101::loop(){ }
 
 void AXP2101::AXP2101::dump_config()
 {
-    ESP_LOGCONFIG(TAG, "AXP2101:");
-    ESP_LOGCONFIG(TAG, "DC1  : %s   Voltage:%u mV",  this->isEnableDC1()  ? "+" : "-", this->getDC1Voltage());
-    ESP_LOGCONFIG(TAG, "DC2  : %s   Voltage:%u mV",  this->isEnableDC2()  ? "+" : "-", this->getDC2Voltage());
-    ESP_LOGCONFIG(TAG, "DC3  : %s   Voltage:%u mV",  this->isEnableDC3()  ? "+" : "-", this->getDC3Voltage());
-    ESP_LOGCONFIG(TAG, "DC4  : %s   Voltage:%u mV",  this->isEnableDC4()  ? "+" : "-", this->getDC4Voltage());
-    ESP_LOGCONFIG(TAG, "DC5  : %s   Voltage:%u mV",  this->isEnableDC5()  ? "+" : "-", this->getDC5Voltage());
-    ESP_LOGCONFIG(TAG, "ALDO1: %s   Voltage:%u mV",  this->isEnableALDO1()  ? "+" : "-", this->getALDO1Voltage());
-    ESP_LOGCONFIG(TAG, "ALDO2: %s   Voltage:%u mV",  this->isEnableALDO2()  ? "+" : "-", this->getALDO2Voltage());
-    ESP_LOGCONFIG(TAG, "ALDO3: %s   Voltage:%u mV",  this->isEnableALDO3()  ? "+" : "-", this->getALDO3Voltage());
-    ESP_LOGCONFIG(TAG, "ALDO4: %s   Voltage:%u mV",  this->isEnableALDO4()  ? "+" : "-", this->getALDO4Voltage());
-    ESP_LOGCONFIG(TAG, "BLDO1: %s   Voltage:%u mV",  this->isEnableBLDO1()  ? "+" : "-", this->getBLDO1Voltage());
-    ESP_LOGCONFIG(TAG, "BLDO2: %s   Voltage:%u mV",  this->isEnableBLDO2()  ? "+" : "-", this->getBLDO2Voltage());
-    ESP_LOGCONFIG(TAG, "CPUSLDO: %s Voltage:%u mV",  this->isEnableCPUSLDO() ? "+" : "-", this->getCPUSLDOVoltage());
-    ESP_LOGCONFIG(TAG, "DLDO1: %s   Voltage:%u mV",  this->isEnableDLDO1()  ? "+" : "-", this->getDLDO1Voltage());
-    ESP_LOGCONFIG(TAG, "DLDO2: %s   Voltage:%u mV",  this->isEnableDLDO2()  ? "+" : "-", this->getDLDO2Voltage());
+    ESP_LOGCONFIG(TAG,
+        "AXP2101:\n"
+        "  DC1    : %s  Voltage: %u mV\n"
+        "  DC2    : %s  Voltage: %u mV\n"
+        "  DC3    : %s  Voltage: %u mV\n"
+        "  DC4    : %s  Voltage: %u mV\n"
+        "  DC5    : %s  Voltage: %u mV\n"
+        "  ALDO1  : %s  Voltage: %u mV\n"
+        "  ALDO2  : %s  Voltage: %u mV\n"
+        "  ALDO3  : %s  Voltage: %u mV\n"
+        "  ALDO4  : %s  Voltage: %u mV\n"
+        "  BLDO1  : %s  Voltage: %u mV\n"
+        "  BLDO2  : %s  Voltage: %u mV\n"
+        "  CPUSLDO: %s  Voltage: %u mV\n"
+        "  DLDO1  : %s  Voltage: %u mV\n"
+        "  DLDO2  : %s  Voltage: %u mV",
+        this->isEnableDC1()    ? "+" : "-", this->getDC1Voltage(),
+        this->isEnableDC2()    ? "+" : "-", this->getDC2Voltage(),
+        this->isEnableDC3()    ? "+" : "-", this->getDC3Voltage(),
+        this->isEnableDC4()    ? "+" : "-", this->getDC4Voltage(),
+        this->isEnableDC5()    ? "+" : "-", this->getDC5Voltage(),
+        this->isEnableALDO1()  ? "+" : "-", this->getALDO1Voltage(),
+        this->isEnableALDO2()  ? "+" : "-", this->getALDO2Voltage(),
+        this->isEnableALDO3()  ? "+" : "-", this->getALDO3Voltage(),
+        this->isEnableALDO4()  ? "+" : "-", this->getALDO4Voltage(),
+        this->isEnableBLDO1()  ? "+" : "-", this->getBLDO1Voltage(),
+        this->isEnableBLDO2()  ? "+" : "-", this->getBLDO2Voltage(),
+        this->isEnableCPUSLDO() ? "+" : "-", this->getCPUSLDOVoltage(),
+        this->isEnableDLDO1()  ? "+" : "-", this->getDLDO1Voltage(),
+        this->isEnableDLDO2()  ? "+" : "-", this->getDLDO2Voltage()
+    );
 
 }
 

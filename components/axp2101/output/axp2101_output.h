@@ -2,6 +2,7 @@
 
 #include "esphome/components/output/float_output.h"
 #include "esphome/components/output/binary_output.h"
+#include "esphome/core/component.h"
 #include "../axp2101.h"
 
 namespace esphome {
@@ -49,7 +50,8 @@ protected:
     PowerChannel channel_;
 };
 
-class AXP2101BinaryOutput : public output::BinaryOutput,
+class AXP2101BinaryOutput : public Component,
+                            public output::BinaryOutput,
                             public AXP2101OutputBase
 {
 
@@ -57,6 +59,8 @@ friend class AXP2101FloatOutput;
 public:
     void set_voltage(uint16_t voltage) { this->voltage_ = voltage; };
     void set_channel(PowerChannel channel) { this->channel_ = channel; }
+    void setup() override { this->apply_channel(this->channel_, this->voltage_); }
+    float get_setup_priority() const override { return setup_priority::DATA; }
 protected:
     void write_state(bool state) override;
 private:
