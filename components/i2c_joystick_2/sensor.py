@@ -2,23 +2,25 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import sensor
 
-from . import CONF_I2C_JOYSTICK_2_ID, I2CJoystick2Component, I2CJoystick2Sensor
+from . import CONF_I2C_JOYSTICK_2_ID, I2CJoystick2Component, I2CJoystick2Sensor, i2c_joystick_2_ns
 
 DEPENDENCIES = ["i2c_joystick_2"]
 
 CONF_AXIS = "axis"
 CONF_MODE = "mode"
 
-AXIS_OPTIONS = {
-    "x": 0,
-    "y": 1,
-}
+JoyStick2Axis = i2c_joystick_2_ns.enum("Axis")
+JoyStick2Modes = i2c_joystick_2_ns.enum("OutputMode")
 
+AXIS_OPTIONS = {
+    "X":  JoyStick2Axis.AXIS_X,
+    "Y":  JoyStick2Axis.AXIS_Y,
+}
 MODE_OPTIONS = {
-    "adc_16bit": 0,
-    "adc_8bit": 1,
-    "offset_12bit": 2,
-    "offset_8bit": 3,
+    "ADC_16BIT":    JoyStick2Modes.MODE_ADC_16BIT,
+    "ADC_8BIT":     JoyStick2Modes.MODE_ADC_8BIT,
+    "OFFSET_12BIT": JoyStick2Modes.MODE_OFFSET_12BIT,
+    "OFFSET_8BIT":  JoyStick2Modes.MODE_OFFSET_8BIT,
 }
 
 CONFIG_SCHEMA = (
@@ -30,8 +32,8 @@ CONFIG_SCHEMA = (
     .extend(
         {
             cv.GenerateID(CONF_I2C_JOYSTICK_2_ID): cv.use_id(I2CJoystick2Component),
-            cv.Optional(CONF_AXIS, default="x"): cv.one_of(*AXIS_OPTIONS.keys(), lower=True),
-            cv.Optional(CONF_MODE, default="offset_12bit"): cv.one_of(*MODE_OPTIONS.keys(), lower=True),
+            cv.Optional(CONF_AXIS, default="X"): cv.enum(AXIS_OPTIONS, upper=True),
+            cv.Optional(CONF_MODE, default="OFFSET_12BIT"): cv.enum(MODE_OPTIONS, upper=True, space="_"),
         }
     )
     .extend(cv.polling_component_schema("100ms"))

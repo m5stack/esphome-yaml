@@ -20,6 +20,12 @@ enum OutputMode : uint8_t {
   MODE_OFFSET_8BIT = 3,
 };
 
+enum RGBChannel : uint8_t {
+  CHANNEL_R,
+  CHANNEL_G,
+  CHANNEL_B
+};
+
 class I2CJoystick2Component : public Component, public i2c::I2CDevice {
  public:
   void setup() override;
@@ -27,12 +33,14 @@ class I2CJoystick2Component : public Component, public i2c::I2CDevice {
 
   bool read_axis_value(uint8_t axis, uint8_t mode, float *value);
   bool read_button_pressed(bool *pressed);
+  void write_rgb_channel(RGBChannel channel, uint8_t value);
 
  protected:
   bool read_u8_(uint8_t reg, uint8_t *value);
   bool read_le_u16_(uint8_t reg, uint16_t *value);
   bool read_le_i16_(uint8_t reg, int16_t *value);
   bool read_i8_(uint8_t reg, int8_t *value);
+  bool write_u8_(uint8_t reg, uint8_t value);
 
   uint8_t firmware_version_{0};
 };

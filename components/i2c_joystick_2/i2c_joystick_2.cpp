@@ -13,9 +13,18 @@ static const uint8_t JOYSTICK2_BUTTON_REG = 0x20;
 static const uint8_t JOYSTICK2_OFFSET_ADC_VALUE_12BITS_REG = 0x50;
 static const uint8_t JOYSTICK2_OFFSET_ADC_VALUE_8BITS_REG = 0x60;
 static const uint8_t JOYSTICK2_FIRMWARE_VERSION_REG = 0xFE;
+static const uint8_t JOYSTICK2_LIGHT_B = 0x30;
+static const uint8_t JOYSTICK2_LIGHT_G = 0x31;
+static const uint8_t JOYSTICK2_LIGHT_R = 0x32;
 
 void I2CJoystick2Component::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up I2C Joystick2...");
+  ESP_LOGD(TAG, "Setting up I2C Joystick2...");
+  // Read firmware version
+  if ( !read_u8_(JOYSTICK2_FIRMWARE_VERSION_REG, &this->firmware_version_) ) {
+    this->mark_failed(LOG_STR("Fail to communicate with device"));
+    return;
+  }
+
 }
 
 bool I2CJoystick2Component::read_axis_value(uint8_t axis, uint8_t mode, float *value) {
@@ -83,8 +92,38 @@ bool I2CJoystick2Component::read_button_pressed(bool *pressed) {
   return true;
 }
 
+void I2CJoystick2Component::write_rgb_channel(RGBChannel channel, uint8_t value) {
+  uint8_t reg = 0;
+  switch (channel) {
+    case CHANNEL_R:
+      reg = JOYSTICK2_LIGHT_R;
+      break;
+    case CHANNEL_G:
+      reg = JOYSTICK2_LIGHT_G;
+      break;
+    case CHANNEL_B:
+      reg = JOYSTICK2_LIGHT_B;
+      break;
+    default:
+      ESP_LOGW(TAG, "No RGB Channel specified");
+      break;
+  }
+
+  bool ret = this->write_u8_(reg, value);
+
+  if ( !ret ) {
+    ESP_LOGW(TAG, "Failed to write data to RGB channel");
+    return;
+  } 
+
+}
+
 bool I2CJoystick2Component::read_u8_(uint8_t reg, uint8_t *value) {
   return this->read_byte(reg, value);
+}
+
+bool I2CJoystick2Component::write_u8_(uint8_t reg, uint8_t value) {
+  return this->write_byte(reg, value);
 }
 
 bool I2CJoystick2Component::read_le_u16_(uint8_t reg, uint16_t *value) {
@@ -123,7 +162,9 @@ void I2CJoystick2Component::dump_config() {
     return;
   }
 
-  ESP_LOGCONFIG(TAG, "  Firmware version: %u", this->firmware_version_);
+  ESP_LOGCONFIG(TAG, "I2C Joystick2: \n"
+                     "  Firmware version: %u", 
+                     this->firmware_version_);
 }
 
 void I2CJoystick2Sensor::update() {
@@ -144,8 +185,10 @@ void I2CJoystick2Sensor::update() {
 void I2CJoystick2Sensor::dump_config() {
   LOG_SENSOR("", "Joystick2 Axis", this);
 
-  ESP_LOGCONFIG(TAG, "  Axis: %s", this->axis_ == AXIS_X ? "X" : "Y");
-  ESP_LOGCONFIG(TAG, "  Mode: %u", this->mode_);
+  ESP_LOGCONFIG(TAG, "  Axis: %s\n"
+                     "  Mode: %u", 
+                     this->axis_ == AXIS_X ? "X" : "Y",
+                     this->mode_);
 }
 
 void I2CJoystick2BinarySensor::update() {

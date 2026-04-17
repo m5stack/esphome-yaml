@@ -5,7 +5,7 @@ from esphome.const import CONF_ID
 
 CODEOWNERS = ["@ItsRebaseTime"]
 DEPENDENCIES = ["i2c"]
-AUTO_LOAD = ["binary_sensor"]
+AUTO_LOAD = ["binary_sensor", "sensor", "output"]
 MULTI_CONF = True
 
 CONF_I2C_JOYSTICK_2_ID = "i2c_joystick_2_id"

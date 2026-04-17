@@ -50,6 +50,8 @@ sensor:
     axis: x
     mode: offset_12bit
     update_interval: 100ms
+    filters:
+      - delta: 3.0        
 
   - platform: i2c_joystick_2
     i2c_joystick_2_id: joystick2
@@ -58,9 +60,29 @@ sensor:
     axis: y
     mode: offset_12bit
     update_interval: 100ms
+    filters:
+      - delta: 3.0        
 
 binary_sensor:
   - platform: i2c_joystick_2
     name: "Joystick2 Button"
     id: joystick2_button
     i2c_joystick_2_id: joystick2
+
+output:
+  - platform: i2c_joystick_2
+    channel: CHANNEL_R
+    id: red_output
+  - platform: i2c_joystick_2
+    channel: CHANNEL_G
+    id: green_output
+  - platform: i2c_joystick_2
+    channel: CHANNEL_B
+    id: blue_output
+
+light:
+  - platform: rgb
+    name: "JoyStick2 Light"
+    red: red_output
+    green: green_output
+    blue: blue_output
