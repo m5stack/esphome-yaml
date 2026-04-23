@@ -1,0 +1,201 @@
+substitutions:
+  name: "atoms3r-media"
+  friendly_name: "AtomS3R Media Player"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  variant: esp32s3
+  flash_size: 8MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components@main
+    components: [lp5562, es8311]
+    refresh: 1d
+
+api:
+  encryption:
+    key: ""
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Atomic-Audio Fallback Hotspot"
+    password: "ZKrf3ezKfWJC"
+
+
+logger:
+  level: DEBUG
+
+captive_portal:
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_large
+    size: 18
+  - file: "gfonts://Roboto"
+    id: font_medium
+    size: 14
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 11
+
+script:
+  - id: ui_show_home
+    then:
+      - component.update: atoms3r_lcd
+  - id: ui_show_loading
+    then:
+      - component.update: atoms3r_lcd
+
+binary_sensor:
+button:
+  - platform: factory_reset
+    id: factory_reset_btn
+    internal: true
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    id: user_button
+    internal: true
+    on_multi_click:
+      - timing:
+          - ON for at least 10s
+        then:
+          - button.press: factory_reset_btn
+
+i2c:
+  - id: bsp_bus
+    sda:
+      number: GPIO45
+      ignore_strapping_warning: true
+    scl:
+      number: GPIO0
+      ignore_strapping_warning: true
+    scan: true
+  - id: ext_bus
+    sda: GPIO38
+    scl: GPIO39
+
+pi4ioe5v6408:
+  - id: pi4ioe5v6408_hub
+    i2c_id: ext_bus
+    address: 0x43
+
+i2s_audio:
+  - id: i2s_audio_bus
+    i2s_lrclk_pin: GPIO6
+    i2s_bclk_pin: GPIO8
+
+spi:
+  clk_pin: GPIO15
+  mosi_pin: GPIO21
+
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    i2c_id: ext_bus
+    bits_per_sample: 16bit
+    sample_rate: 48000
+    use_microphone: false
+    use_mclk: false
+
+speaker:
+  - platform: i2s_audio
+    id: i2s_speaker
+    i2s_audio_id: i2s_audio_bus
+    i2s_dout_pin: GPIO5
+    dac_type: external
+    audio_dac: es8311_dac
+    sample_rate: 48000
+    channel: left
+
+media_player:
+  - platform: speaker
+    name: "${friendly_name}"
+    id: speaker_media_player
+    volume_min: 0.5
+    volume_max: 0.8
+    announcement_pipeline:
+      speaker: i2s_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+
+switch:
+  - platform: gpio
+    name: "Speaker Enable"
+    id: speaker_enable
+    pin:
+      pi4ioe5v6408: pi4ioe5v6408_hub
+      number: 0
+      mode:
+        output: true
+    icon: "mdi:volume-high"
+    restore_mode: RESTORE_DEFAULT_ON
+
+lp5562:
+  id: lp5562_led
+  i2c_id: bsp_bus
+  use_internal_clk: true
+  white_current: 17.5
+output:
+  - platform: lp5562
+    id: lp5562_white_channel
+    lp5562_id: lp5562_led
+    channel: white
+light:
+  - platform: monochromatic
+    name: "LCD Backlight"
+    id: lcd_backlight
+    output: lp5562_white_channel
+    icon: "mdi:television"
+    restore_mode: RESTORE_DEFAULT_ON
+
+display:
+  - platform: mipi_spi
+    id: atoms3r_lcd
+    model: ST7789V
+    dc_pin: GPIO42
+    reset_pin: GPIO48
+    cs_pin: GPIO14
+    data_rate: 40MHz
+    update_interval: 1s
+    dimensions:
+      height: 128
+      width: 128
+      offset_width: 2
+      offset_height: 1
+    invert_colors: true
+    rotation: 180°
+    lambda: |-
+      it.fill(Color::BLACK);
+      it.print(
+        it.get_width() / 2,
+        it.get_height() / 2,
+        id(font_medium),
+        Color::WHITE,
+        TextAlign::CENTER,
+        "Audio-3.5 Base"
+      );
