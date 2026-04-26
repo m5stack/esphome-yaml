@@ -58,8 +58,8 @@ substitutions:
   # to translate the servo's reported position back into degrees.
   servo_x_angle_offset: "164"
   servo_x_position_to_angle: "(x - 34.0f) * 0.3710f - 164.0f"
-  servo_y_angle_offset: "50"
-  servo_y_position_to_angle: "(x - 133.0f) * 0.337f"
+  servo_y_angle_offset: "239"
+  servo_y_position_to_angle: "x * 0.3333f - 226.67f"
 
 esphome:
   name: ${name}
