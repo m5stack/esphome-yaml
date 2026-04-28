@@ -51,6 +51,16 @@ substitutions:
   # for Greek use "Noto Sans" for other languages use a compatible font family
   font_family: Figtree
 
+  # Servo calibration — override in your local config if your StackChan's
+  # mechanical assembly puts the head at a different zero than the defaults.
+  # `*_angle_offset` is in degrees (mapped to steps via the servo's 0..360°
+  # → 0..1024 step range). `*_position_to_angle` is the inverse formula used
+  # to translate the servo's reported position back into degrees.
+  servo_x_angle_offset: "164"
+  servo_x_position_to_angle: "(x - 34.0f) * 0.3710f - 164.0f"
+  servo_y_angle_offset: "239"
+  servo_y_position_to_angle: "x * 0.3333f - 226.67f"
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
@@ -263,7 +273,7 @@ number:
       min_value: -164
       max_value: 164
       use_raw_angle: false
-      angle_offset: 164
+      angle_offset: ${servo_x_angle_offset}
       step: 5
     speed:
       id: servo_x_speed
@@ -280,7 +290,7 @@ number:
       min_value: 0
       max_value: 90
       use_raw_angle: false
-      angle_offset: 50
+      angle_offset: ${servo_y_angle_offset}
       step: 5
     speed:
       id: servo_y_speed
@@ -308,8 +318,8 @@ sensor:
         - delta: 3.0
       on_value:
         - lambda: |-
-            float val = (x - 34) * 0.3710 - 164.0f;
-            id(servo_x_angle).publish_state(roundf(val)); // using angle 
+            float val = ${servo_x_position_to_angle};
+            id(servo_x_angle).publish_state(roundf(val)); // using angle
 
   - platform: ftservo
     id: y_servo_sensor
@@ -320,8 +330,8 @@ sensor:
         - delta: 3.0
       on_value:
         - lambda: |-
-            float val = (x - 133.0) * 0.337f;
-            id(servo_y_angle).publish_state(roundf(val)); // using angle 
+            float val = ${servo_y_position_to_angle};
+            id(servo_y_angle).publish_state(roundf(val)); // using angle
 
 text_sensor:
   - platform: si12t
