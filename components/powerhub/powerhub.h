@@ -105,6 +105,7 @@ class PowerHub :  public PollingComponent, public i2c::I2CDevice {
 
 #ifdef USE_BINARY_SENSOR
     SUB_BINARY_SENSOR(button)
+    SUB_BINARY_SENSOR(vin_status)
 #endif
 
 
@@ -249,6 +250,9 @@ public:
     // Because we need to get the button status fast
     void update_pmu_button_sensor();
 
+    // Update VIN status binary sensor
+    void update_vin_status_sensor();
+
 
     // RTC related
     // Wakeup getters/setters
@@ -281,6 +285,12 @@ public:
     // i2c address
     uint8_t get_i2c_addr() const { return this->i2c_address_; }
 
+    // Set update intervals
+    void set_button_update_interval(uint32_t interval) { this->button_update_interval_ = interval; }
+    void set_charging_status_update_interval(uint32_t interval) { this->vin_status_update_interval_ = interval; }
+    void set_charge_status_update_interval(uint32_t interval) { this->charge_status_update_interval_ = interval; }
+    void set_vin_status_update_interval(uint32_t interval) { this->vin_status_update_interval_ = interval; }
+
 protected:
     // Power enable
     bool led_power_enabled_;
@@ -294,6 +304,9 @@ protected:
 
     // Used to store the last PMU button state
     bool last_button_state_{false};
+
+    // Used to store the last VIN state
+    bool last_vin_state_{false};
 
     // USB mode
     uint8_t usb_mode_;
@@ -322,6 +335,11 @@ protected:
     // Cached status for text sensors (to avoid republishing unchanged values)
     uint8_t last_charge_status_{0xFF};  // Initialize to invalid value
     uint8_t last_vin_status_{0xFF};
+
+    // Update intervals in milliseconds
+    uint32_t button_update_interval_{20};
+    uint32_t charge_status_update_interval_{500};
+    uint32_t vin_status_update_interval_{500};
 
     // LED colors
     BGR_t led_usb_c_color_;
