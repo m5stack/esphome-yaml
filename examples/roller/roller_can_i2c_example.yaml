@@ -1,0 +1,194 @@
+# M5Stack Unit RollerCAN – I2C interface example
+# The RollerCAN unit exposes the same I2C register map as the Roller485 unit,
+# except REG_BUS_CONFIG byte0=CANID and byte1=CAN BPS (0=1Mbps,1=500Kbps,2=125Kbps).
+# Default I2C address: 0x64.
+
+esphome:
+  name: roller-can-i2c-demo
+  friendly_name: Roller CAN I2C Demo
+
+esp32:
+  board: m5stack-stamps3
+
+external_components:
+  - source: github://m5stack/esphome-yaml@main
+    components:
+      - m5stack_roller
+      - m5stack_roller_can_i2c
+    refresh: 0s
+
+logger:
+api:
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+i2c:
+  id: i2c_bus
+  sda: GPIO2
+  scl: GPIO1
+  scan: true
+
+# ── Motor declarations ────────────────────────────────────────────────────────
+m5stack_roller_can_i2c:
+  - id: motor_1
+    i2c_id: i2c_bus
+    address: 0x64
+    motor_id: 1
+    update_interval: 500ms
+
+  - id: motor_2
+    i2c_id: i2c_bus
+    address: 0x65
+    motor_id: 2
+    update_interval: 500ms
+
+# ── Sensors ───────────────────────────────────────────────────────────────────
+sensor:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    speed:
+      name: Motor 1 Speed
+    position:
+      name: Motor 1 Position
+    current:
+      name: Motor 1 Current
+    vin:
+      name: Motor 1 VIN
+    temperature:
+      name: Motor 1 Temperature
+    encoder:
+      name: Motor 1 Encoder
+
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_2
+    speed:
+      name: Motor 2 Speed
+    position:
+      name: Motor 2 Position
+
+# ── Text sensors ──────────────────────────────────────────────────────────────
+text_sensor:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    motor_status:
+      name: Motor 1 Status
+    motor_mode:
+      name: Motor 1 Mode
+    motor_error:
+      name: Motor 1 Error
+
+# ── Switches ──────────────────────────────────────────────────────────────────
+switch:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    motor_output:
+      name: Motor 1 Enable
+      restore_mode: RESTORE_DEFAULT_OFF
+    stall_protection:
+      name: Motor 1 Stall Protection
+    over_range_protection:
+      name: Motor 1 Over-Range Protection
+    button_switching_mode:
+      name: Motor 1 Button Mode Switching
+
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_2
+    motor_output:
+      name: Motor 2 Enable
+
+# ── Buttons ───────────────────────────────────────────────────────────────────
+button:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    save_to_flash:
+      name: Motor 1 Save to Flash
+    release_stall_protection:
+      name: Motor 1 Release Stall
+
+# ── Mode select ────────────────────────────────────────────────────────────────
+select:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    mode:
+      name: Motor 1 Mode
+
+# ── Numbers ────────────────────────────────────────────────────────────────────
+number:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    speed:
+      name: Motor 1 Speed Setpoint
+      min_value: -21000
+      max_value: 21000
+      step: 10
+    speed_max_current:
+      name: Motor 1 Speed Max Current
+      min_value: 0
+      max_value: 1200
+      step: 10
+    position:
+      name: Motor 1 Position Setpoint
+      min_value: -21000000
+      max_value: 21000000
+      step: 1
+    position_max_current:
+      name: Motor 1 Position Max Current
+      min_value: 0
+      max_value: 1200
+      step: 10
+    current:
+      name: Motor 1 Current Setpoint
+      min_value: -1200
+      max_value: 1200
+      step: 10
+    speed_kp:
+      name: Motor 1 Speed Kp
+      min_value: 0
+      max_value: 100
+      step: 0.00001
+    speed_ki:
+      name: Motor 1 Speed Ki
+      min_value: 0
+      max_value: 100
+      step: 0.0000001
+    speed_kd:
+      name: Motor 1 Speed Kd
+      min_value: 0
+      max_value: 100
+      step: 0.00001
+    position_kp:
+      name: Motor 1 Position Kp
+      min_value: 0
+      max_value: 100
+      step: 0.00001
+    position_ki:
+      name: Motor 1 Position Ki
+      min_value: 0
+      max_value: 100
+      step: 0.0000001
+    position_kd:
+      name: Motor 1 Position Kd
+      min_value: 0
+      max_value: 100
+      step: 0.00001
+    rgb_brightness:
+      name: Motor 1 LED Brightness
+      min_value: 0
+      max_value: 100
+      step: 1
+    encoder:
+      name: Motor 1 Encoder Counter
+      min_value: -2147483648
+      max_value: 2147483647
+      step: 1
+
+# ── RGB LED ─────────────────────────────────────────────────────────────────────
+light:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    rgb:
+      name: Motor 1 LED
