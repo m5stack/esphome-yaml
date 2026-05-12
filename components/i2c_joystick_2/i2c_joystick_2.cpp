@@ -21,7 +21,7 @@ void I2CJoystick2Component::setup() {
   ESP_LOGD(TAG, "Setting up I2C Joystick2...");
   // Read firmware version
   if ( !read_u8_(JOYSTICK2_FIRMWARE_VERSION_REG, &this->firmware_version_) ) {
-    this->mark_failed(LOG_STR("Fail to communicate with device"));
+    ESP_LOGW(TAG, "Failed to read firmware version from Joystick2");
     return;
   }
 
@@ -157,18 +157,13 @@ void I2CJoystick2Component::dump_config() {
   ESP_LOGCONFIG(TAG, "I2C Joystick2:");
   LOG_I2C_DEVICE(this);
 
-  if (this->is_failed()) {
-    ESP_LOGE(TAG, "Communication with Joystick2 failed");
-    return;
-  }
-
   ESP_LOGCONFIG(TAG, "I2C Joystick2: \n"
                      "  Firmware version: %u", 
                      this->firmware_version_);
 }
 
 void I2CJoystick2Sensor::update() {
-  if (this->parent_ == nullptr || this->parent_->is_failed()) {
+  if (this->parent_ == nullptr) {
     ESP_LOGW(TAG, "Joystick2 parent component unavailable");
     return;
   }
@@ -192,7 +187,7 @@ void I2CJoystick2Sensor::dump_config() {
 }
 
 void I2CJoystick2BinarySensor::update() {
-  if (this->parent_ == nullptr || this->parent_->is_failed()) {
+  if (this->parent_ == nullptr) {
     ESP_LOGW(TAG, "Joystick2 parent component unavailable");
     return;
   }
