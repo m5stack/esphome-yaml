@@ -8,8 +8,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 
-namespace esphome {
-namespace aw9523b {
+namespace esphome::aw9523b {
 
 enum AW9523BP0DriveMode : uint8_t {
   OPEN_DRAIN = 0x00,
@@ -39,6 +38,13 @@ public:
   /// Indicate if the component should reset the state during setup
   void set_reset(bool reset) { this->reset_ = reset; }
 
+  /// interrupt pin
+  void set_interrupt_pin(InternalGPIOPin *interrupt_pin) { this->interrupt_pin_ = interrupt_pin; }
+
+  /// Setup GPIO interrupt
+  void setup_gpio_interrupt(uint8_t pin, bool enable);
+
+
   /// Set P0 output mode: 1 for push-pull, 0 for open-drain
   void set_p0_drive_mode(AW9523BP0DriveMode mode) { this->p0_drive_mode_ = mode; }
 
@@ -52,9 +58,15 @@ public:
   void write_led_current(uint8_t pin, uint8_t current);
 
 protected:
+  static void IRAM_ATTR gpio_intr(AW9523BComponent *arg);
+
   bool digital_read_hw(uint8_t pin) override;
   bool digital_read_cache(uint8_t pin) override;
   void digital_write_hw(uint8_t pin, bool value) override;
+
+  // whether to enable GPIO interrupt for specific pin
+  bool enable_gpio_interrupt_(uint8_t pin);
+  bool disable_gpio_interrupt_(uint8_t pin);
 
   /// Mask for the pin mode - 1 means output, 0 means input
   uint16_t mode_mask_{0};
@@ -62,12 +74,8 @@ protected:
   uint16_t output_mask_{0};
   /// The state read in digital_read_hw - 1 means HIGH, 0 means LOW
   uint16_t input_mask_{0};
-  /// The mask to write as input buffer state - 1 means enabled, 0 means disabled
-  uint16_t pull_enable_mask_{0};
-  /// The mask to write as pullup state - 1 means pullup, 0 means pulldown
-  uint16_t pull_up_down_mask_{0};
-  /// Interrupt mask - 0: enable interrupt, 1: disable interrupt
-  uint16_t interrupt_mask_{0};
+  /// Interrupt mask - 0: enable interrupt, 1: disable interrupt (AW9523B default after reset: all disabled = 0xFFFF)
+  uint16_t interrupt_mask_{0xFFFF};
   /// LED mode register - 1: GPIO mode, 0: LED mode
   uint16_t led_mode_mask_{0};
   /// P0 output drive mode - 0: open-drain, 1: push-pull
@@ -89,6 +97,9 @@ protected:
 
   bool read_led_modes_();
 
+  /// Interrupt pin
+  InternalGPIOPin *interrupt_pin_{nullptr};
+
 };
 
 class AW9523BGPIOPin : public GPIOPin, public Parented<AW9523BComponent> {
@@ -102,6 +113,7 @@ class AW9523BGPIOPin : public GPIOPin, public Parented<AW9523BComponent> {
   void set_pin(uint8_t pin) { this->pin_ = pin; }
   void set_inverted(bool inverted) { this->inverted_ = inverted; }
   void set_flags(gpio::Flags flags) { this->flags_ = flags; }
+  void set_use_interrupt(bool use_interrupt) { this->use_interrupt_ = use_interrupt; }
 
   gpio::Flags get_flags() const override { return this->flags_; }
 
@@ -109,7 +121,7 @@ class AW9523BGPIOPin : public GPIOPin, public Parented<AW9523BComponent> {
   uint8_t pin_;
   bool inverted_;
   gpio::Flags flags_;
+  bool use_interrupt_{false};
 };
 
-}  // namespace aw9523b
-}  // namespace esphome
+}  // namespace esphome::aw9523b

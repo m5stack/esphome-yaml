@@ -30,6 +30,7 @@ aw9523b:
   - `18.5mA`: 50% of maximum current (Imax × 0.5)
   - `9.25mA`: 25% of maximum current (Imax × 0.25)
 - **address** (*Optional*, int): The I2C address of the device. Defaults to `0x58`.
+- **interrupt_pin** (*Optional*, [Pin Schema](https://esphome.io/guides/configuration-types/#pin-schema)): The pin connected to the INT output of the AW9523B. When configured, the component becomes interrupt-driven instead of polling — it only reads the chip when a pin actually changes state, significantly reducing I²C bus traffic and CPU usage. The INT pin is active-low and open-drain, so an external or internal pull-up resistor is required. Must be an internal GPIO pin (not another expander pin).
 - All other options from [I2C Component](https://esphome.io/components/i2c#config-i2c).
 
 ## GPIO Pin
@@ -68,6 +69,7 @@ switch:
   - **input** (*Optional*, boolean): Set pin as input.
   - **output** (*Optional*, boolean): Set pin as output.
 - **inverted** (*Optional*, boolean): Invert the pin logic. Defaults to `false`.
+- **use_interrupt** (*Optional*, boolean): Whether to enable interrupt on this pin, default to `false`.
 
 ## Output
 

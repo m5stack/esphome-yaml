@@ -4,8 +4,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome {
-namespace aw9523b {
+namespace esphome::aw9523b {
 
 static const uint8_t AW9523B_INPUT_P0    = 0x00;      // P0 Input Status, read only
 static const uint8_t AW9523B_INPUT_P1    = 0x01;      // P1 Input Status, read only
@@ -88,6 +87,10 @@ void AW9523BComponent::setup()
     if ( this->reset_ ) {
       AW9523B_ERROR_FAILED(this->write_byte(AW9523B_SW_RST, 0x00));
       delay(2);
+      // After reset, INT registers default to 0x00 (all interrupts enabled).
+      // Disable all interrupts first; individual pins will enable them in pin setup().
+      uint16_t all_disabled = 0xFFFF;
+      AW9523B_ERROR_FAILED(this->write_bytes(AW9523B_INT_P0, reinterpret_cast<uint8_t *>(&all_disabled), 2));
     }
 
     // read chip id for validation
@@ -120,29 +123,48 @@ void AW9523BComponent::setup()
     // write global control register
     AW9523B_ERROR_FAILED(this->write_byte(AW9523B_CTL, ctl_data));
 
-    // read gpio modes
-    if ( !this->read_gpio_modes_() ) {
-      this->mark_failed();
-      return;
+    if ( !this->reset_ ) {
+      // No reset performed; chip state is unknown — read current register values
+      if ( !this->read_gpio_modes_() ) {
+        this->mark_failed();
+        return;
+      }
+      if ( !this->read_gpio_outputs_() ) {
+        this->mark_failed();
+        return;
+      }
+      if ( !this->read_led_modes_() ) {
+        this->mark_failed();
+        return;
+      }
     }
 
-    // read gpio outputs
-    if ( !this->read_gpio_outputs_() ) {
-      this->mark_failed();
-      return;
+    // Attach GPIO Interrupt
+    if (this->interrupt_pin_ != nullptr) {
+      this->interrupt_pin_->setup();
+      this->interrupt_pin_->attach_interrupt(&AW9523BComponent::gpio_intr, this, gpio::INTERRUPT_FALLING_EDGE);
+      // Don't invalidate cache on read — only invalidate when interrupt fires
+      this->set_invalidate_on_read_(false);
     }
-
-    // read led modes
-    if ( !this->read_led_modes_() ) {
-      this->mark_failed();
-      return;
-    }
+    // Disable loop until an input pin is configured via pin_mode()
+    // For interrupt-driven mode, loop is re-enabled by the ISR
+    // For polling mode, loop is re-enabled when pin_mode() registers an input pin
+    this->disable_loop();
 
     ESP_LOGI(TAG, "AW9523B setup complete.");
 }
 
 // Clear the cache at the start of each loop.
-void AW9523BComponent::loop() { this->reset_pin_cache_();}
+void AW9523BComponent::loop() { 
+  // Invalidate the cache so the next digital_read() triggers a fresh I2C read
+  this->reset_pin_cache_();
+  // Only disable the loop once INT has actually gone HIGH. Input transitions that straddle the
+  // I2C read leave INT asserted without re-firing a falling edge, which would strand us with
+  // stale state forever; keep looping until the line is released so we self-heal.
+  if (this->interrupt_pin_ != nullptr && this->interrupt_pin_->digital_read()) {
+    this->disable_loop();
+  }
+}
 
 void AW9523BComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "AW9523B: \n"
@@ -150,11 +172,14 @@ void AW9523BComponent::dump_config() {
                      "  LED Max Current: %s",
                      LOG_STR_ARG(p0_drive_mode_to_string(this->p0_drive_mode_)),
                      LOG_STR_ARG(led_max_current_to_string(this->led_max_current_)));
+    LOG_PIN("  Interrupt Pin: ", this->interrupt_pin_);
   LOG_I2C_DEVICE(this);
   if (this->is_failed()) {
     ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
   }
 }
+
+void IRAM_ATTR AW9523BComponent::gpio_intr(AW9523BComponent *arg) { arg->enable_loop_soon_any_context(); }
 
 // AW9523 only support INPUT and OUTPUT in GPIO mode
 void AW9523BComponent::pin_mode(uint8_t pin, gpio::Flags flags) {
@@ -345,8 +370,59 @@ bool AW9523BComponent::read_led_modes_() {
 }
 
 
+void AW9523BComponent::setup_gpio_interrupt(uint8_t pin, bool enable) {
+  bool ret;
+  if (enable) {
+    ret = this->enable_gpio_interrupt_(pin);
+  } else {
+    ret = this->disable_gpio_interrupt_(pin);
+  }
 
-void AW9523BGPIOPin::setup() { this->pin_mode(this->flags_); }
+  if (!ret) {
+    ESP_LOGW(TAG, "Failed to set/clear interrupt configuration for pin %d", pin);
+    return;
+  }
+}
+
+bool AW9523BComponent::enable_gpio_interrupt_(uint8_t pin) {
+
+  // AW9523B INT register: 0 = interrupt enabled, 1 = interrupt disabled
+  // Clear the bit to enable interrupt for this pin
+  this->interrupt_mask_ &= ~(1 << pin);
+
+  if ( !this->write_bytes(AW9523B_INT_P0,
+                          reinterpret_cast<uint8_t *>(&this->interrupt_mask_), 2) )
+  {
+    this->status_set_warning(LOG_STR("Failed to write interrupt config register"));
+    return false;
+  }
+
+  this->status_clear_warning();
+  return true;
+
+}
+
+bool AW9523BComponent::disable_gpio_interrupt_(uint8_t pin) {
+
+  // AW9523B INT register: 0 = interrupt enabled, 1 = interrupt disabled
+  // Set the bit to disable interrupt for this pin
+  this->interrupt_mask_ |= (1 << pin);
+
+  if ( !this->write_bytes(AW9523B_INT_P0,
+                          reinterpret_cast<uint8_t *>(&this->interrupt_mask_), 2) )
+  {
+    this->status_set_warning(LOG_STR("Failed to write interrupt config register"));
+    return false;
+  }
+
+  this->status_clear_warning();
+  return true;
+}
+
+void AW9523BGPIOPin::setup() { 
+  this->pin_mode(this->flags_); 
+  this->parent_->setup_gpio_interrupt(this->pin_, this->use_interrupt_);
+}
 void AW9523BGPIOPin::pin_mode(gpio::Flags flags) { this->parent_->pin_mode(this->pin_, flags); }
 bool AW9523BGPIOPin::digital_read() { return this->parent_->digital_read(this->pin_) != this->inverted_; }
 void AW9523BGPIOPin::digital_write(bool value) {
@@ -357,5 +433,4 @@ size_t AW9523BGPIOPin::dump_summary(char *buffer, size_t len) const {
   return snprintf(buffer, len, "%u via AW9523B", this->pin_);
 }
 
-} // namespace aw8523b
-} // namespace esphome
+} // namespace esphome::aw9523b

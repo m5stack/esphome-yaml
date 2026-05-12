@@ -4,8 +4,7 @@
 #include "../aw9523b.h"
 #include "esphome/core/gpio.h"
 
-namespace esphome {
-namespace aw9523b {
+namespace esphome::aw9523b {
 
 class AW9523BFloatOutput : public output::FloatOutput,
                       public Component,
@@ -22,6 +21,4 @@ protected:
   uint8_t pin_;
 };
 
-
-} // namespace aw9523b
-} // namespace esphome
+} // namespace esphome::aw9523b

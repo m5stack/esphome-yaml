@@ -12,7 +12,8 @@ from esphome.const import (
     CONF_MODE,
     CONF_NUMBER,
     CONF_OUTPUT,
-    CONF_RESET
+    CONF_RESET,
+    CONF_INTERRUPT_PIN
 )
 
 AUTO_LOAD = ["gpio_expander"]
@@ -30,6 +31,8 @@ AW9523BGPIOPin = aw9523b_ns.class_("AW9523BGPIOPin", cg.GPIOPin)
 CONF_AW9523B_ID = "aw9523b_id"
 CONF_P0_DRIVE_MODE = "p0_drive_mode"
 CONF_LED_MAX_CURRENT = "led_max_current"
+
+CONF_USE_INTERRUPT = "use_interrupt"
 
 AW9523BP0DriveMode = aw9523b_ns.enum("AW9523BP0DriveMode")
 
@@ -60,7 +63,8 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_RESET, default=True): cv.boolean,
             cv.Optional(CONF_P0_DRIVE_MODE, default="OPEN_DRAIN"): cv.enum(
                 P0_DRIVE_MODES, upper=True, space="_"),
-            cv.Optional(CONF_LED_MAX_CURRENT, default="37mA"): cv.enum(LED_MAX_CURRENTS)
+            cv.Optional(CONF_LED_MAX_CURRENT, default="37mA"): cv.enum(LED_MAX_CURRENTS),
+            cv.Optional(CONF_INTERRUPT_PIN): pins.internal_gpio_input_pin_schema
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -83,7 +87,11 @@ AW9523B_PIN_SCHEMA = pins.gpio_base_schema(
         CONF_OUTPUT,
     ],
     mode_validator=validate_mode,
-).extend(BASE_SCHEMA)
+).extend(BASE_SCHEMA).extend(
+    {
+        cv.Optional(CONF_USE_INTERRUPT, default=False):cv.boolean
+    }
+)
 
 @pins.PIN_SCHEMA_REGISTRY.register(CONF_AW9523B_ID, AW9523B_PIN_SCHEMA)
 async def aw9523b_pin_schema(config):
@@ -93,12 +101,16 @@ async def aw9523b_pin_schema(config):
     cg.add(var.set_pin(config[CONF_NUMBER]))
     cg.add(var.set_inverted(config[CONF_INVERTED]))
     cg.add(var.set_flags(pins.gpio_flags_expr(config[CONF_MODE])))
+    cg.add(var.set_use_interrupt(config[CONF_USE_INTERRUPT]))
     return var
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await i2c.register_i2c_device(var, config)
+
+    if CONF_INTERRUPT_PIN in config:
+        cg.add(var.set_interrupt_pin( await cg.gpio_pin_expression(config[CONF_INTERRUPT_PIN]) ))
 
     cg.add(var.set_p0_drive_mode(config[CONF_P0_DRIVE_MODE]))
     cg.add(var.set_led_max_current(config[CONF_LED_MAX_CURRENT]))
