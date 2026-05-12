@@ -22,6 +22,7 @@ m5ioe1:
 - **reset** (*Optional*, boolean): Perform software reset on initialization. Defaults to `true`.
 - **pwm_frequency** (*Optional*, frequency): PWM frequency for all PWM channels. Range: 1 Hz to 65535 Hz. Defaults to `500Hz`.
 - **address** (*Optional*, int): The I2C address of the device. Defaults to `0x6F`.
+- **interrupt_pin** (*Optional*, [Pin Schema](https://esphome.io/guides/configuration-types/#pin-schema)): The pin connected to the INT output of the M5IOE1. When configured, the component becomes interrupt-driven instead of polling — it only reads the chip when a pin actually changes state, significantly reducing I²C bus traffic and CPU usage. The INT pin is active-low and open-drain, so an external or internal pull-up resistor is required. Must be an internal GPIO pin (not another expander pin).
 - All other options from [I2C Component](https://esphome.io/components/i2c#config-i2c).
 
 ## GPIO Pin
@@ -66,6 +67,7 @@ switch:
   - **pulldown** (*Optional*, boolean): Enable internal pull-down resistor (input mode only).
   - **open_drain** (*Optional*, boolean): Enable open-drain mode (output mode only).
 - **inverted** (*Optional*, boolean): Invert the pin logic. Defaults to `false`.
+- **use_interrupt** (*Optional*, boolean): Whether to enable interrupt on this pin, default to `false`.
 
 ## Output
 
@@ -136,15 +138,35 @@ sensor:
   - platform: m5ioe1
     id: adc_channel_1
     m5ioe1_id: m5ioe1_hub
+    type: adc
     channel: ADC_1
     update_interval: 60s
     name: "M5IOE1 ADC Channel 1"
   - platform: m5ioe1
     id: adc_channel_2
     m5ioe1_id: m5ioe1_hub
+    type: adc
     channel: ADC_2
     update_interval: 60s
     name: "M5IOE1 ADC Channel 2"
+
+  # ADC Reference voltage 
+  - platform: m5ioe1
+    name: "ADC Reference Voltage"
+    type: adc
+    channel: REF_VOLT
+    unit_of_measurement: "mV"
+    device_class: "voltage"
+    accuracy_decimals: 1
+    filters:
+      - delta: 10
+
+  # Internal temperature of device
+  - platform: m5ioe1
+    name: "M5IOE1 Temerature"
+    type: temperature
+    filters:
+      - delta: 1
 ```
 
 ### Configuration variables
@@ -156,6 +178,7 @@ sensor:
   - `ADC_2`: ADC channel 2
   - `ADC_3`: ADC channel 3
   - `ADC_4`: ADC channel 4
+  - `REF_VOLT`: Reference voltage
 - **update_interval** (*Optional*, [Time](https://esphome.io/guides/configuration-types#config-time)): The interval to check the sensor. Defaults to `60s`.
 - All other options from [Sensor](https://esphome.io/components/sensor#config-sensor).
 
@@ -265,14 +288,34 @@ sensor:
     id: adc1
     m5ioe1_id: m5ioe1_hub
     channel: ADC_1
+    type: adc
     update_interval: 10s
     name: "M5IOE1 ADC 1"
   - platform: m5ioe1
     id: adc2
     m5ioe1_id: m5ioe1_hub
     channel: ADC_2
+    type: adc
     update_interval: 10s
     name: "M5IOE1 ADC 2"
+
+  # ADC Reference voltage 
+  - platform: m5ioe1
+    name: "ADC Reference Voltage"
+    type: adc
+    channel: REF_VOLT
+    unit_of_measurement: "mV"
+    device_class: "voltage"
+    accuracy_decimals: 1
+    filters:
+      - delta: 10
+
+  # Internal temperature of device
+  - platform: m5ioe1
+    name: "M5IOE1 Temerature"
+    type: temperature
+    filters:
+      - delta: 1
 
 # AW8737A amplifier control
 switch:

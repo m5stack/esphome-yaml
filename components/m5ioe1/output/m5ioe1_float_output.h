@@ -3,9 +3,7 @@
 #include "esphome/components/output/float_output.h"
 #include "../m5ioe1.h"
 
-namespace esphome {
-namespace m5ioe1 {
-
+namespace esphome::m5ioe1 {
 class M5IOE1FloatOutput : public output::FloatOutput,
                           public Component,
                           public Parented<M5IOE1Component>
@@ -24,5 +22,4 @@ protected:
 
 };
 
-} // namespace m5ioe1
-} // namespace esphome
+} // namespace esphome::m5ioe1

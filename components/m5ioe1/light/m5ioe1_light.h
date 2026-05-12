@@ -5,8 +5,7 @@
 
 #include "../m5ioe1.h"
 
-namespace esphome {
-namespace m5ioe1 {
+namespace esphome::m5ioe1 {
 
 class M5IOE1AddressableLight : public light::AddressableLight,
                                public Parented<M5IOE1Component>
@@ -40,5 +39,4 @@ class M5IOE1AddressableLight : public light::AddressableLight,
 };                              
 
 
-} // namespace m5ioe1
-} // namespace esphome
+} // namespace esphome::m5ioe1

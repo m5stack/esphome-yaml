@@ -2,6 +2,7 @@ from esphome import pins
 import esphome.codegen as cg
 from esphome.components import i2c
 import esphome.config_validation as cv
+import esphome.final_validate as fv
 from esphome.const import (
     CONF_ID,
     CONF_INPUT,
@@ -12,7 +13,9 @@ from esphome.const import (
     CONF_PULLDOWN,
     CONF_PULLUP,
     CONF_OPEN_DRAIN,
-    CONF_RESET
+    CONF_RESET,
+    CONF_INTERRUPT_PIN,
+    CONF_PIN
 )
 
 AUTO_LOAD = ["gpio_expander"]
@@ -54,13 +57,61 @@ ADC_CHANNEL = {
     "ADC_2" : M5IOE1ADCChannel.ADC_2,
     "ADC_2" : M5IOE1ADCChannel.ADC_3,
     "ADC_2" : M5IOE1ADCChannel.ADC_4,
+    "REF_VOLT" : M5IOE1ADCChannel.REF_VOLT
 }
+
+CONF_USE_INTERRUPT = "use_interrupt"
+CONF_INTERRUPT_TYPE = "interrupt_type"
+
+M5IOE1InterruptType = m5ioe1_ns.enum("M5IOE1InterruptType")
+
+INTERRUPT_TYPES = {
+    "RISING_EDGE" : M5IOE1InterruptType.RISING_EDGE,
+    "FALLING_EDGE": M5IOE1InterruptType.FALLING_EDGE 
+}
+
+INTERRUPT_CONFLICT_PAIRS = [
+    {0, 5}, {1, 2}, {6, 11}, {7, 8}, {9, 13}, {10, 12}
+]
 
 BASE_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_M5IOE1_ID) : cv.use_id(M5IOE1Component)
     }
 )
+
+
+# Interrupt conflict validator — runs after the full config is loaded
+def final_validate_config(config):
+    hub_id = str(config[CONF_ID])
+    enabled_interrupt_pins = []
+
+    full_config = fv.full_config.get()
+
+    for _, component_list in full_config.items():
+        if not isinstance(component_list, list):
+            component_list = [component_list]
+
+        for item in component_list:
+            if not isinstance(item, dict) or CONF_PIN not in item:
+                continue
+
+            pin_conf = item[CONF_PIN]
+            if isinstance(pin_conf, dict) and str(pin_conf.get(CONF_M5IOE1_ID, "")) == hub_id:
+                if pin_conf.get(CONF_USE_INTERRUPT):
+                    enabled_interrupt_pins.append(pin_conf[CONF_NUMBER])
+
+    for p1, p2 in [tuple(pair) for pair in INTERRUPT_CONFLICT_PAIRS]:
+        if p1 in enabled_interrupt_pins and p2 in enabled_interrupt_pins:
+            raise cv.Invalid(
+                f"GPIO{p1 + 1} (pin number: {p1}) and GPIO{p2 + 1} (pin number: {p2}) interrupt cannot be enabled simultaneously "
+                f"on hub '{hub_id}' (they share the same interrupt channel)."
+            )
+
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = final_validate_config
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -69,7 +120,8 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_RESET, default=True): cv.boolean,
             cv.Optional(CONF_PWM_FREQUENCY, default="500Hz"): cv.All(
                 cv.frequency, cv.int_range(min=1, max=65535)
-            )
+            ),
+            cv.Optional(CONF_INTERRUPT_PIN) : pins.internal_gpio_input_pin_schema,
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
@@ -97,6 +149,9 @@ M5IOE1_PIN_SCHEMA = pins.gpio_base_schema(
 ).extend(
     {
         cv.Required(CONF_M5IOE1_ID): cv.use_id(M5IOE1Component),
+        cv.Optional(CONF_USE_INTERRUPT, default=False): cv.boolean,
+        cv.Optional(CONF_INTERRUPT_TYPE, default="FALLING_EDGE"): cv.enum(
+            INTERRUPT_TYPES, upper=True, space='_')
     }
 )
 
@@ -108,6 +163,8 @@ async def aw9523b_pin_schema(config):
     cg.add(var.set_pin(config[CONF_NUMBER]))
     cg.add(var.set_inverted(config[CONF_INVERTED]))
     cg.add(var.set_flags(pins.gpio_flags_expr(config[CONF_MODE])))
+    cg.add(var.set_use_interrupt(config[CONF_USE_INTERRUPT]))
+    cg.add(var.set_interrupt_type(config[CONF_INTERRUPT_TYPE]))
     return var
 
 async def to_code(config):
@@ -118,3 +175,6 @@ async def to_code(config):
 
     if CONF_PWM_FREQUENCY in config:
         cg.add(var.set_pwm_frequency(config[CONF_PWM_FREQUENCY]))
+    
+    if CONF_INTERRUPT_PIN in config:
+        cg.add(var.set_interrupt_pin( await cg.gpio_pin_expression(config[CONF_INTERRUPT_PIN]) ))

@@ -2,8 +2,7 @@
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/core/log.h"
 
-namespace esphome {
-namespace m5ioe1 {
+namespace esphome::m5ioe1 {
 
 static const char *TAG = "m5ioe1";
 // GPIO Registers
@@ -17,6 +16,8 @@ static constexpr uint8_t REG_GPIO_O_H   = 0x06;  // GPIO Output High
 static constexpr uint8_t REG_GPIO_I_L   = 0x07;  // GPIO Input Low
 static constexpr uint8_t REG_GPIO_I_H   = 0x08;  // GPIO Input High
 static constexpr uint8_t REG_GPIO_PU_L  = 0x09;  // GPIO Pull-up Low
+static constexpr uint8_t REG_GPIO_IP_L  = 0x10;  // GPIO interrupt type Low
+static constexpr uint8_t REG_GPIO_IP_H  = 0x11;  // GPIO interrupt type High
 static constexpr uint8_t REG_GPIO_PU_H  = 0x0A;  // GPIO Pull-up High
 static constexpr uint8_t REG_GPIO_PD_L  = 0x0B;  // GPIO Pull-down Low
 static constexpr uint8_t REG_GPIO_PD_H  = 0x0C;  // GPIO Pull-down High
@@ -85,37 +86,61 @@ void M5IOE1Component::setup() {
 
   // Read chip info
   uint8_t uid[2];
-  uint8_t version;
+  uint8_t revision;
   M5IOE1_ERR_FAILED(this->read_bytes(REG_UID_L, uid, 2));
-  M5IOE1_ERR_FAILED(this->read_byte(REG_VERSION, &version));
+  M5IOE1_ERR_FAILED(this->read_byte(REG_VERSION, &revision));
   
-  if (version == 0x00 || version == 0xFF) {
-    ESP_LOGE(TAG, "Invalid version 0x%02X", version);
+  if (revision == 0x00 || revision == 0xFF) {
+    ESP_LOGE(TAG, "Invalid version 0x%02X", revision);
     this->mark_failed();
     return;
   }
 
-  char uid_str[format_hex_pretty_size(2)];
-  char ver_str[format_hex_pretty_size(1)];
-
-  format_hex_pretty_to(uid_str, uid, 2);
-  format_hex_pretty_to(ver_str, &version, 1);
+  this->device_uid_ = (uid[1] << 8) | uid[0];
+  this->firm_ver_   = revision;
 
   // configure PWM frequency
   M5IOE1_ERR_FAILED(this->write_bytes(REG_PWM_FREQ_L, 
                                     reinterpret_cast<uint8_t *>(&this->pwm_freq_), 2));
 
-  ESP_LOGD(TAG, "M5IOE1 Setup finished. Chip UID (2 bytes): %s, Firmware version: %s",
-                uid_str, ver_str);
+  // Attach GPIO Interrupt
+  if (this->interrupt_pin_ != nullptr) {
+    this->interrupt_pin_->setup();
+    this->interrupt_pin_->attach_interrupt(&M5IOE1Component::gpio_intr, this, gpio::INTERRUPT_FALLING_EDGE);
+    // Don't invalidate cache on read — only invalidate when interrupt fires
+    this->set_invalidate_on_read_(false);
+  }
+  // Disable loop until an input pin is configured via pin_mode()
+  // For interrupt-driven mode, loop is re-enabled by the ISR
+  // For polling mode, loop is re-enabled when pin_mode() registers an input pin
+  this->disable_loop();
+  
+  ESP_LOGD(TAG, "M5IOE1 Setup finished.");
 }
+
+void IRAM_ATTR M5IOE1Component::gpio_intr(M5IOE1Component *arg) { arg->enable_loop_soon_any_context(); }
 
 // Clear the cache at the start of each loop.
 void M5IOE1Component::loop() {
+  // Invalidate the cache so the next digital_read() triggers a fresh I2C read
   this->reset_pin_cache_();
+  // Only disable the loop once INT has actually gone HIGH. Input transitions that straddle the
+  // I2C read leave INT asserted without re-firing a falling edge, which would strand us with
+  // stale state forever; keep looping until the line is released so we self-heal.
+  if (this->interrupt_pin_ != nullptr && this->interrupt_pin_->digital_read()) {
+    this->disable_loop();
+  }
 }
 
 void M5IOE1Component::dump_config() {
-  ESP_LOGCONFIG(TAG, "M5IOE1 Config:");
+  ESP_LOGCONFIG(TAG, "M5IOE1 Config:\n"
+                     "  PWM Frequency: %d Hz\n"
+                     "  Device UID: %d\n"
+                     "  Firmware Version: %d",
+                     this->pwm_freq_,
+                     this->device_uid_,
+                     this->firm_ver_);
+  LOG_PIN("  Interrupt Pin: ", this->interrupt_pin_);
   LOG_I2C_DEVICE(this);
   if (this->is_failed()) {
     ESP_LOGE(TAG, ESP_LOG_MSG_COMM_FAIL);
@@ -225,6 +250,128 @@ bool M5IOE1Component::write_gpio_modes_() {
   return true;
 }
 
+void M5IOE1Component::setup_gpio_interrupt(uint8_t pin, M5IOE1InterruptType type) {
+  bool ret = true;
+  ret &= this->enable_gpio_interrupt_(pin);
+  ret &= this->config_interrupt_edge_(pin, type);
+  if ( !ret ) {
+    ESP_LOGW(TAG, "Failed to configure interrupt for pin %u", pin);
+    return;
+  }
+}
+
+bool M5IOE1Component::config_interrupt_edge_(uint8_t pin, M5IOE1InterruptType type) {
+  // Step1: read current configuration
+  uint8_t data[2];
+  if ( !this->read_bytes(REG_GPIO_IP_L, data, 2) ) {
+    this->status_set_warning(LOG_STR("Failed to read interrupt type register"));
+    return false;
+  }
+
+  // Step2: set bit / clear bit
+  uint16_t mask = (data[1] << 8) | data[0];
+
+  if ( type == RISING_EDGE ) {
+    mask |= (1 << pin);
+  } else {
+    mask &= ~(1 << pin);
+  }
+
+  // write back
+  if ( !this->write_bytes(REG_GPIO_IP_L,
+                          reinterpret_cast<uint8_t *>(&mask),
+                          2) )
+  {
+    this->status_set_warning(LOG_STR("Failed to write interrupt type register"));
+    return false;
+  }
+
+  this->status_clear_warning();
+  return true;
+}
+
+bool M5IOE1Component::enable_gpio_interrupt_(uint8_t pin) {
+  // Step 1: read current configuration
+  uint8_t data[2];
+  if ( !this->read_bytes(REG_GPIO_IE_L, data, 2) ) {
+    this->status_set_warning(LOG_STR("Failed to read GPIO interrupt config register"));
+    return false;
+  }
+
+  // Step 2: update cached value and set bit
+  this->interrupt_config_mask_ = (data[1] << 8) | data[0];
+  this->interrupt_config_mask_ |= (1 << pin);
+
+  // Step3: write back
+  if ( !this->write_bytes(REG_GPIO_IE_L, 
+                          reinterpret_cast<uint8_t *>(&this->interrupt_config_mask_),
+                        2) ) 
+  {
+    this->status_set_warning(LOG_STR("Failed to write GPIO interrupt config register"));
+    return false;
+  }
+
+
+  this->status_clear_warning();
+  return true;
+}
+
+bool M5IOE1Component::disable_gpio_interrupt_(uint8_t pin) {
+  // Step 1: read current configuration
+  uint8_t data[2];
+  if ( !this->read_bytes(REG_GPIO_IE_L, data, 2) ) {
+    this->status_set_warning(LOG_STR("Failed to read GPIO interrupt config register"));
+    return false;
+  }
+
+  // Step 2: update cached value and clear bit
+  this->interrupt_config_mask_ = (data[1] << 8) | data[0];
+  this->interrupt_config_mask_ &= ~(1 << pin);
+
+  // Step3: write back
+  if ( !this->write_bytes(REG_GPIO_IE_L, 
+                          reinterpret_cast<uint8_t *>(&this->interrupt_config_mask_),
+                        2) ) 
+  {
+    this->status_set_warning(LOG_STR("Failed to write GPIO interrupt config register"));
+    return false;
+  }
+
+
+  this->status_clear_warning();
+  return true;
+}
+
+bool M5IOE1Component::read_gpio_interrupt_() {
+  uint8_t data[2];
+  if ( !this->read_bytes(REG_GPIO_IS_L, data, 2) ) {
+    this->status_set_warning(LOG_STR("Failed to read interrupt register"));
+    return false;
+  }
+
+  this->interrupt_result_mask_ = (data[1] << 8) | data[0];
+
+  // Clear interrupt
+  if ( !this->clear_gpio_interrupt_()) {
+    return false;
+  }
+
+  this->status_clear_warning();
+
+  return true;
+}
+
+bool M5IOE1Component::clear_gpio_interrupt_() {
+  uint8_t data[2] = {0x00, 0x00};
+  if ( !this->write_bytes(REG_GPIO_IS_L, data, 2) ) {
+    this->status_set_warning(LOG_STR("Failed to clear interrupt"));
+    return false;
+  }
+
+  this->status_clear_warning();
+  return true;
+}
+
 bool M5IOE1Component::digital_read_hw(uint8_t pin) {
   if (this->is_failed())
     return false;
@@ -319,6 +466,10 @@ void M5IOE1Component::write_pwm_duty_(M5IOE1PWMChannel channel, float duty) {
 }
 
 float M5IOE1Component::read_adc_(M5IOE1ADCChannel channel) {
+
+  if ( channel == REF_VOLT ) {
+    return this->get_adc_ref_voltage();
+  }
 
   uint8_t data = static_cast<uint8_t>(channel);
 
@@ -521,10 +672,13 @@ void M5IOE1Component::enable_aw8737a_pluse_(bool enabled) {
 
 
 
-
-
 void M5IOE1GPIOPin::setup() {
   this->pin_mode(this->flags_);
+  // Enable GPIO interrupt and configure interrupt edge
+  if ( this->use_interrupt_ ) {
+    this->parent_->setup_gpio_interrupt(this->pin_, this->interrupt_type_);
+  }
+
 }
 
 void M5IOE1GPIOPin::pin_mode(gpio::Flags flags) {
@@ -540,8 +694,13 @@ void M5IOE1GPIOPin::digital_write(bool value) {
 }
 
 size_t M5IOE1GPIOPin::dump_summary(char *buffer, size_t len) const {
-  return snprintf(buffer, len, "%u via M5IOE1", this->pin_);
+  return snprintf(buffer, len, 
+                  "%u via M5IOE1\n" 
+                  "  use interrupt: %s\n"
+                  "  interrupt type: %s",
+                  this->pin_,
+                  TRUEFALSE(this->use_interrupt_),
+                  this->interrupt_type_ == 0 ? "FALLING EDGE" : "RISING EDGE");
 }
 
-} // namespace m5ioe1
-} // namespace esphome
+} // namespace esphome::m5ioe1

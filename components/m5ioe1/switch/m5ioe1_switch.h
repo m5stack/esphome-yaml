@@ -3,8 +3,7 @@
 #include "esphome/components/switch/switch.h"
 #include "../m5ioe1.h"
 
-namespace esphome {
-namespace m5ioe1 {
+namespace esphome::m5ioe1 {
 
 static const char *TAG = "m5ioe1.switch";
 
@@ -36,5 +35,4 @@ protected:
 
 };
 
-} // namespace m5ioe1
-} // namespace esphome
+} // namespace esphome::m5ioe1

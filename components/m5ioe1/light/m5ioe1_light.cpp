@@ -2,8 +2,7 @@
 #include "esphome/core/log.h"
 #include <cstring>
 
-namespace esphome {
-namespace m5ioe1 {
+namespace esphome::m5ioe1 {
 
 static const char *TAG = "m5ioe1.light";
 
@@ -79,5 +78,4 @@ void M5IOE1AddressableLight::clear_effect_data() {
   memset(this->effect_data_, 0x00, this->num_leds_);
 }
 
-}  // namespace m5ioe1
-}  // namespace esphome
+}  // namespace esphome::m5ioe1

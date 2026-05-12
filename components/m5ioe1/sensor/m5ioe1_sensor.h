@@ -2,14 +2,15 @@
 
 #include "esphome/components/sensor/sensor.h"
 #include "../m5ioe1.h"
+#include "esphome/core/component.h"
+#include "esphome/core/helpers.h"
 
 
-namespace esphome {
-namespace m5ioe1 {
+namespace esphome::m5ioe1 {
 
-class M5IOE1Sensor : public sensor::Sensor,
-                     public PollingComponent,
-                     public Parented<M5IOE1Component>
+class M5IOE1ADCSensor : public sensor::Sensor,
+                        public PollingComponent,
+                        public Parented<M5IOE1Component>
 {
 
 public:
@@ -23,6 +24,14 @@ protected:
 
 };
 
+class M5IOE1TemperatureSensor : public sensor::Sensor,
+                                public PollingComponent,
+                                public Parented<M5IOE1Component>
+{
 
-} // namespace m5ioe1
+public:
+  void update() override;
+};
+
+
 } // namespace esphome
