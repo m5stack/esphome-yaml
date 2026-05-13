@@ -5,6 +5,7 @@ from esphome.const import CONF_ID, CONF_UPDATE_INTERVAL
 
 CODEOWNERS = ["@ItsRebaseTime"]
 DEPENDENCIES = ["canbus"]
+AUTO_LOAD = ["m5stack_roller"]
 MULTI_CONF = True
 
 m5stack_roller_ns = cg.esphome_ns.namespace("m5stack_roller")
