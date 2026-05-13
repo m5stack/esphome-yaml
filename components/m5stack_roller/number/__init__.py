@@ -1,13 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import number
-from esphome.const import (
-    CONF_ID,
-    CONF_MAX_VALUE,
-    CONF_MIN_VALUE,
-    CONF_STEP,
-    UNIT_PERCENT,
-)
+from esphome.const import CONF_ID, UNIT_PERCENT
 from .. import m5stack_roller_ns, ROLLER_BASE_SCHEMA, CONF_ROLLER_BASE_ID
 
 DEPENDENCIES = []
@@ -45,78 +39,41 @@ RollerPositionKdNumber = m5stack_roller_ns.class_("RollerPositionKdNumber", numb
 RollerRgbBrightnessNumber = m5stack_roller_ns.class_("RollerRgbBrightnessNumber", number.Number, cg.Component)
 RollerEncoderNumber = m5stack_roller_ns.class_("RollerEncoderNumber", number.Number, cg.Component)
 
-def _number_schema(cls, unit, min_val, max_val, step=1.0, icon=None):
-    kwargs = {
-        CONF_MIN_VALUE: min_val,
-        CONF_MAX_VALUE: max_val,
-        CONF_STEP: step,
-    }
-    if unit:
-        kwargs["unit_of_measurement"] = unit
-    if icon:
-        kwargs["icon"] = icon
-    return number.number_schema(cls).extend(cv.COMPONENT_SCHEMA)
-
+# (conf_key, class, min_value, max_value, step, setter_method)
+_NUMBER_ENTRIES = [
+    (CONF_SPEED,              RollerSpeedNumber,              -21000,       21000,       1,        "set_speed_number"),
+    (CONF_SPEED_MAX_CURRENT,  RollerSpeedMaxCurrentNumber,     0,            1200,        10,       "set_speed_max_current_number"),
+    (CONF_POSITION,           RollerPositionNumber,           -21000000,    21000000,    1,        "set_position_number"),
+    (CONF_POSITION_MAX_CURRENT, RollerPositionMaxCurrentNumber, 0,           1200,        10,       "set_position_max_current_number"),
+    (CONF_CURRENT,            RollerCurrentNumber,            -1200,         1200,        10,       "set_current_number"),
+    (CONF_SPEED_KP,           RollerSpeedKpNumber,             0,            100,         0.00001,  "set_speed_kp_number"),
+    (CONF_SPEED_KI,           RollerSpeedKiNumber,             0,            100,         0.0000001,"set_speed_ki_number"),
+    (CONF_SPEED_KD,           RollerSpeedKdNumber,             0,            100,         0.00001,  "set_speed_kd_number"),
+    (CONF_POSITION_KP,        RollerPositionKpNumber,          0,            100,         0.00001,  "set_position_kp_number"),
+    (CONF_POSITION_KI,        RollerPositionKiNumber,          0,            100,         0.0000001,"set_position_ki_number"),
+    (CONF_POSITION_KD,        RollerPositionKdNumber,          0,            100,         0.00001,  "set_position_kd_number"),
+    (CONF_RGB_BRIGHTNESS,     RollerRgbBrightnessNumber,       0,            100,         1,        "set_rgb_brightness_number"),
+    (CONF_ENCODER,            RollerEncoderNumber,            -2147483648,   2147483647,  1,        "set_encoder_number"),
+]
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(cg.Component),
-        cv.Optional(CONF_SPEED): number.number_schema(RollerSpeedNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SPEED_MAX_CURRENT): number.number_schema(RollerSpeedMaxCurrentNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_POSITION): number.number_schema(RollerPositionNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_POSITION_MAX_CURRENT): number.number_schema(RollerPositionMaxCurrentNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_CURRENT): number.number_schema(RollerCurrentNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SPEED_KP): number.number_schema(RollerSpeedKpNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SPEED_KI): number.number_schema(RollerSpeedKiNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SPEED_KD): number.number_schema(RollerSpeedKdNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_POSITION_KP): number.number_schema(RollerPositionKpNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_POSITION_KI): number.number_schema(RollerPositionKiNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_POSITION_KD): number.number_schema(RollerPositionKdNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_RGB_BRIGHTNESS): number.number_schema(RollerRgbBrightnessNumber).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_ENCODER): number.number_schema(RollerEncoderNumber).extend(cv.COMPONENT_SCHEMA),
+        **{
+            cv.Optional(key): number.number_schema(cls, min_value=mn, max_value=mx, step=st).extend(cv.COMPONENT_SCHEMA)
+            for key, cls, mn, mx, st, _ in _NUMBER_ENTRIES
+        },
     }
 ).extend(ROLLER_BASE_SCHEMA)
-
-
-async def _register_number(config, key, set_fn, parent):
-    if key not in config:
-        return
-    n = cg.new_Pvariable(config[key][CONF_ID])
-    await cg.register_component(n, config[key])
-    await number.register_number(n, config[key],
-                                 min_value=config[key].get(CONF_MIN_VALUE, -2100000),
-                                 max_value=config[key].get(CONF_MAX_VALUE, 2100000),
-                                 step=config[key].get(CONF_STEP, 1))
-    cg.add(n.set_parent(parent))
 
 
 async def to_code(config):
     parent = await cg.get_variable(config[CONF_ROLLER_BASE_ID])
 
-    for key, _ in [
-        (CONF_SPEED, None),
-        (CONF_SPEED_MAX_CURRENT, None),
-        (CONF_POSITION, None),
-        (CONF_POSITION_MAX_CURRENT, None),
-        (CONF_CURRENT, None),
-        (CONF_SPEED_KP, None),
-        (CONF_SPEED_KI, None),
-        (CONF_SPEED_KD, None),
-        (CONF_POSITION_KP, None),
-        (CONF_POSITION_KI, None),
-        (CONF_POSITION_KD, None),
-        (CONF_RGB_BRIGHTNESS, None),
-        (CONF_ENCODER, None),
-    ]:
+    for key, cls, mn, mx, st, setter in _NUMBER_ENTRIES:
         if key not in config:
             continue
         n = cg.new_Pvariable(config[key][CONF_ID])
         await cg.register_component(n, config[key])
-        min_v = config[key].get(CONF_MIN_VALUE, -2100000.0)
-        max_v = config[key].get(CONF_MAX_VALUE, 2100000.0)
-        step_v = config[key].get(CONF_STEP, 1.0)
-        await number.register_number(n, config[key],
-                                     min_value=min_v,
-                                     max_value=max_v,
-                                     step=step_v)
+        await number.register_number(n, config[key], min_value=mn, max_value=mx, step=st)
         cg.add(n.set_parent(parent))
