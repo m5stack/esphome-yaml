@@ -17,8 +17,6 @@ RollerStallProtectionSwitch = m5stack_roller_ns.class_("RollerStallProtectionSwi
 RollerOverRangeProtectionSwitch = m5stack_roller_ns.class_("RollerOverRangeProtectionSwitch", switch.Switch, cg.Component)
 RollerButtonSwitchingModeSwitch = m5stack_roller_ns.class_("RollerButtonSwitchingModeSwitch", switch.Switch, cg.Component)
 
-SWITCH_SCHEMA_BASE = switch.switch_schema().extend(cv.COMPONENT_SCHEMA)
-
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(cg.Component),
