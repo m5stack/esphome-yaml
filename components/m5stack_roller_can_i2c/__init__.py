@@ -4,7 +4,7 @@ from esphome.components import i2c
 from esphome.const import CONF_ID, CONF_UPDATE_INTERVAL
 
 CODEOWNERS = ["@ItsRebaseTime"]
-DEPENDENCIES = ["m5stack_roller", "i2c"]
+DEPENDENCIES = ["i2c"]
 MULTI_CONF = True
 
 m5stack_roller_ns = cg.esphome_ns.namespace("m5stack_roller")

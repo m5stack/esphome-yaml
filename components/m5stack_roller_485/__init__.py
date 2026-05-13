@@ -3,7 +3,7 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_UPDATE_INTERVAL
 
 CODEOWNERS = ["@ItsRebaseTime"]
-DEPENDENCIES = ["m5stack_roller"]
+DEPENDENCIES = []
 MULTI_CONF = True
 
 m5stack_roller_ns = cg.esphome_ns.namespace("m5stack_roller")
