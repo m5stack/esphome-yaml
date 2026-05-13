@@ -60,8 +60,8 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(cg.Component),
         **{
-            cv.Optional(key): number.number_schema(cls, min_value=mn, max_value=mx, step=st).extend(cv.COMPONENT_SCHEMA)
-            for key, cls, mn, mx, st, _ in _NUMBER_ENTRIES
+            cv.Optional(key): number.number_schema(cls).extend(cv.COMPONENT_SCHEMA)
+            for key, cls, *_ in _NUMBER_ENTRIES
         },
     }
 ).extend(ROLLER_BASE_SCHEMA)
