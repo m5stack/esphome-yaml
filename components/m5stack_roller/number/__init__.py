@@ -10,7 +10,7 @@ from esphome.const import (
 )
 from .. import m5stack_roller_ns, ROLLER_BASE_SCHEMA, CONF_ROLLER_BASE_ID
 
-DEPENDENCIES = ["m5stack_roller"]
+DEPENDENCIES = []
 CODEOWNERS = ["@ItsRebaseTime"]
 
 CONF_SPEED = "speed"

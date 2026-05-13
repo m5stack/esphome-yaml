@@ -4,7 +4,7 @@ from esphome.components import text_sensor
 from esphome.const import CONF_ID
 from .. import ROLLER_BASE_SCHEMA, CONF_ROLLER_BASE_ID
 
-DEPENDENCIES = ["m5stack_roller"]
+DEPENDENCIES = []
 CODEOWNERS = ["@ItsRebaseTime"]
 
 CONF_MOTOR_STATUS = "motor_status"

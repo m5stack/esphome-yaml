@@ -4,7 +4,7 @@ from esphome.components import select
 from esphome.const import CONF_ID
 from .. import m5stack_roller_ns, ROLLER_BASE_SCHEMA, CONF_ROLLER_BASE_ID
 
-DEPENDENCIES = ["m5stack_roller"]
+DEPENDENCIES = []
 CODEOWNERS = ["@ItsRebaseTime"]
 
 CONF_MODE = "mode"
