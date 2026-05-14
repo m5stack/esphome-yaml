@@ -1,0 +1,192 @@
+---
+substitutions:
+  name: cores3-with-dual-kmeter
+  friendly_name: M5Stack CoreS3 with Dual KMeter
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.4.4
+  name_add_mac_suffix: true
+  on_boot:
+    - priority: 600
+      then:
+        - light.turn_on:
+            id: lcd_backlight
+            brightness: 80%
+
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+
+psram:
+  mode: quad
+  speed: 80MHz
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+
+captive_portal:
+
+# Enable logging
+logger:
+  level: VERBOSE
+
+i2c:
+  - id: bsp_bus
+    sda: GPIO12
+    scl: GPIO11
+    scan: true
+  - id: ext_bus
+    sda: GPIO2
+    scl: GPIO1
+
+spi:
+  - id: spi_bus
+    clk_pin: GPIO36
+    mosi_pin: GPIO37
+
+external_components:
+  - source: ../components
+    components: [axp2101, aw88298, aw9523b, dual_kmeter]
+    refresh: 1h
+
+# PMU
+axp2101:
+  id: axp2101_pmu
+  i2c_id: bsp_bus
+
+# IO Expander
+aw9523b:
+  id: aw9523b_hub
+  i2c_id: bsp_bus
+  p0_drive_mode: PUSH_PULL
+  interrupt_pin: GPIO21
+
+output:
+  - platform: axp2101
+    type: range
+    channel: DLDO1
+    id: lcd_backlight_output
+    min_voltage: 2600
+    max_voltage: 3300
+
+  - platform: axp2101
+    channel: ALDO1
+    voltage: 1800
+
+  - platform: axp2101
+    channel: ALDO2
+    voltage: 3300
+  
+  - platform: axp2101
+    channel: BLDO1
+    voltage: 2800
+  
+  - platform: axp2101
+    channel: BLDO2
+    voltage: 1500
+
+  - platform: axp2101
+    channel: DCDC1
+    voltage: 3300
+
+  - platform: axp2101
+    channel: DCDC3
+    voltage: 3300
+
+sensor:
+  - platform: dual_kmeter
+    i2c_id: bsp_bus
+    name: "KMeter 1 Temperature"
+    id: kmeter_1_temp
+    channel: KMETER_1
+    update_interval: 10s
+
+  - platform: dual_kmeter
+    i2c_id: bsp_bus
+    name: "KMeter 2 Temperature"
+    channel: KMETER_2
+    id: kmeter_2_temp
+    update_interval: 10s
+
+  
+  - platform: dual_kmeter
+    i2c_id: bsp_bus
+    name: "Internal Temperature"
+    channel: INTERNAL
+    id: kmeter_internal_temp
+    update_interval: 10s
+
+light:
+  - platform: monochromatic
+    id: lcd_backlight
+    name: "LCD Backlight"
+    icon: "mdi:television"
+    output: lcd_backlight_output
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 250ms
+
+switch:
+  - platform: gpio
+    name: "BUS_OUT_EN"
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 1
+    # BUS_OUT_EN = 1
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: gpio
+    name: "USB_OTG_EN"
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 5
+    # USB_OTG_EN = 0
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: gpio
+    name: "BOOST_EN"
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 15
+    # BOOST_EN
+    restore_mode: RESTORE_DEFAULT_ON
+
+font:
+  - file: "gfonts://Google Sans"
+    id: gsans_20
+    size: 20
+    glyphs: [°0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .:%-+]
+
+display:
+  - platform: mipi_spi
+    id: cores3_display
+    model: M5CORE
+    dc_pin: GPIO35
+    reset_pin:
+      aw9523b_id: aw9523b_hub
+      number: 9
+    cs_pin:
+      number: GPIO3
+      ignore_strapping_warning: true
+    data_rate: 40MHz
+    update_interval: 3s
+    invert_colors: true
+    lambda: |-
+      it.printf(20, 20, id(gsans_20), "Kmeter 1: %.2f °C", id(kmeter_1_temp).state);
+      it.printf(20, 60, id(gsans_20), "Kmeter 2: %.2f °C", id(kmeter_2_temp).state);
+      it.printf(20, 100, id(gsans_20), "Kmeter Internal: %.2f °C", id(kmeter_internal_temp).state);
+
