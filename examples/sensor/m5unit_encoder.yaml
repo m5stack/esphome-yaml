@@ -1,0 +1,93 @@
+esphome:
+  name: unit-encoder
+  friendly_name: Unit Encoder
+
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: ""
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Unit-Encoder Fallback Hotspot"
+    password: ""
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components
+    components: [m5unit_encoder]
+    refresh: 0s
+
+i2c:
+  sda: GPIO26
+  scl: GPIO32
+  scan: true
+
+sensor:
+  - platform: m5unit_encoder
+    id: unit_encoder_1
+    name: "Encoder Value"
+
+binary_sensor:
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    name: "Encoder Button"
+
+output:
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    led_index: 0
+    channel: red
+    id: led0_red
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    led_index: 0
+    channel: green
+    id: led0_green
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    led_index: 0
+    channel: blue
+    id: led0_blue
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    led_index: 1
+    channel: red
+    id: led1_red
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    led_index: 1
+    channel: green
+    id: led1_green
+  - platform: m5unit_encoder
+    m5unit_encoder_id: unit_encoder_1
+    led_index: 1
+    channel: blue
+    id: led1_blue
+
+light:
+  - platform: rgb
+    name: "LED 0"
+    red: led0_red
+    green: led0_green
+    blue: led0_blue
+  - platform: rgb
+    name: "LED 1"
+    red: led1_red
+    green: led1_green
+    blue: led1_blue
+
+captive_portal:
