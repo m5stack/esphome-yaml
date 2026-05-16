@@ -21,16 +21,19 @@ ICON_POWER_PLUG = "mdi:power-plug"
 CONFIG_SCHEMA = (
     cv.Schema(
         {
-            cv.Optional(CONF_CHARGE_STATUS) : text_sensor.text_sensor_schema(
-                icon=ICON_POWER_PLUG_BATTERY,
+            cv.Optional(CONF_CHARGE_STATUS): text_sensor.text_sensor_schema(icon=ICON_POWER_PLUG_BATTERY).extend(
+                {
+                    cv.Optional("update_interval", default=500): cv.positive_int,
+                }
             ),
-            cv.Optional(CONF_VIN_STATUS) : text_sensor.text_sensor_schema(
-                icon=ICON_POWER_PLUG,
-            )
+            cv.Optional(CONF_VIN_STATUS): text_sensor.text_sensor_schema(icon=ICON_POWER_PLUG).extend(
+                {
+                    cv.Optional("update_interval", default=500): cv.positive_int,
+                }
+            ),
         }
     )
     .extend(BASE_SCHEMA)
-    .extend(cv.polling_component_schema("10s"))
 )
 
 
@@ -41,7 +44,9 @@ async def to_code(config):
     if CONF_CHARGE_STATUS in config:
         ts = await text_sensor.new_text_sensor(config[CONF_CHARGE_STATUS])
         cg.add(powerhub.set_charge_status_text_sensor(ts))
+        cg.add(powerhub.set_charge_status_update_interval(config[CONF_CHARGE_STATUS]["update_interval"]))
     
     if CONF_VIN_STATUS in config:
         ts = await text_sensor.new_text_sensor(config[CONF_VIN_STATUS])
         cg.add(powerhub.set_vin_status_text_sensor(ts))
+        cg.add(powerhub.set_vin_status_update_interval(config[CONF_VIN_STATUS]["update_interval"]))
