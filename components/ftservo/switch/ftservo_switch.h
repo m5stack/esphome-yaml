@@ -3,8 +3,8 @@
 #include "esphome/components/switch/switch.h"
 #include "../ftservo.h"
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 class ServoTorqueSwitch : public switch_::Switch, 
                           public Component, 
@@ -18,5 +18,4 @@ class ServoTorqueSwitch : public switch_::Switch,
   void write_state(bool state) override;
 
 };
-}  // namespace ftservo
-}  // namespace esphome
+} // namespace esphome::ftservo

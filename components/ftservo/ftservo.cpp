@@ -3,8 +3,8 @@
 #include "esphome/core/progmem.h"
 #include <functional>
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 static const char *TAG = "ftservo";
 
@@ -33,7 +33,6 @@ void FTServo::add_error_callback(std::function<void(const LogString *)> &&error_
   this->error_callbacks_.add(std::move(error_callback));
 }
 
-
 void FTServo::move_angle(int angle) {
   // a degree is around 2.844 steps
   float unit = 2.844f;
@@ -60,5 +59,4 @@ void FTServo::move_angle(int angle) {
   this->write_torque_enable(false); // release the torque once the movement is finished
 }
 
-}
-}
+}  // namespace esphome::ftservo

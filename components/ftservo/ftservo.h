@@ -7,9 +7,10 @@
 #include "esphome/core/log.h"
 #include "esphome/components/number/number.h"
 #include "esphome/core/defines.h"
+#include "esphome/core/preferences.h"
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 typedef enum FTServoErr : uint8_t {
   FT_OK = 0,
@@ -82,12 +83,11 @@ SUB_NUMBER(time)
   CallbackManager<void(const LogString *)> error_callbacks_ {};
 
   // servo control parameters
-  int c_position_;
-  int c_angle_;
+  int c_position_{0};
+  int c_angle_{0};
   int c_speed_{500};
   int c_time_{0};
 
 };
 
-}
-}
+}  // namespace esphome::ftservo

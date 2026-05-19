@@ -4,8 +4,8 @@
 #include "esphome/core/component.h"
 #include <driver/uart.h>
 
-namespace esphome {
-namespace scs9009 {
+
+namespace esphome::scs9009 {
 
 // Instructions
 #define INST_PING       0x01
@@ -192,5 +192,4 @@ class SCS9009Component : public uart::UARTDevice,
   int max_angle_[2];
 };
 
-} // namespace scs9009
-} // namespace esphome
+} // namespace esphome::scs9009

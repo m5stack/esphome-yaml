@@ -1,7 +1,7 @@
 #include "ftservo_switch.h"
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 static const char *const TAG = "ftservo.switch";
 
@@ -23,5 +23,4 @@ void ServoTorqueSwitch::write_state(bool state) {
   this->publish_state(state);
 }
 
-}  // namespace ftservo
-}  // namespace esphome
+} // namespace esphome::ftservo

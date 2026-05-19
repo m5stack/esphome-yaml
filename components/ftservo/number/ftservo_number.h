@@ -5,8 +5,8 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/helpers.h"
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 static const char *TAG = "ftservo.number";
 
@@ -88,5 +88,4 @@ class ServoTimeNumber : public number::Number,
   }
 };                         
 
-} // namespace ftservo
-} // namespace esphome
+} // namespace esphome::ftservo

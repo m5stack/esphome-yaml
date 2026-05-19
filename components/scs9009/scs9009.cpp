@@ -2,8 +2,8 @@
 #include "esphome/components/uart/uart_component.h"
 #include "esphome/core/log.h"
 
-namespace esphome {
-namespace scs9009 {
+
+namespace esphome::scs9009 {
 
 static const char *TAG = "scs9009";
 
@@ -785,5 +785,4 @@ int SCS9009Component::read_info_value(uint8_t id, int add_input) {
   return info;
 }
 
-} // namespace scs9009
-} // namespace esphome
+} // namespace esphome::scs9009

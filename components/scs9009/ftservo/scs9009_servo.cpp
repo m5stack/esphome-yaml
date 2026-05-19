@@ -1,7 +1,7 @@
 #include "scs9009_servo.h"
 
-namespace esphome {
-namespace scs9009 {
+
+namespace esphome::scs9009 {
 
 static const char *TAG = "ftservo.scs9009";
 
@@ -14,17 +14,18 @@ void SCS9009Servo::setup() {
   }
 
   // second ping (async ping)
-  this->set_timeout(5000, [this]() {
+  this->set_interval("ping_check", 5000, [this]() {
     int res = this->parent_->ping(this->addr_);
     if ( res != -1 ) {
       this->servo_ready_ = true; // mark servo ready
       ESP_LOGD(TAG, "Servo %d is ready", this->addr_);
+      this->status_clear_warning();
+      this->cancel_interval("ping_check");
     } else {
+      this->cancel_interval("ping_check");
       this->mark_failed(LOG_STR("Communication with servo timeout (after 5s)"));
     }
   });
-
-  this->status_clear_warning();
 
 }
 
@@ -78,5 +79,4 @@ void SCS9009Servo::move(int position, uint16_t time, uint16_t speed) {
 }
 
 
-}
-}
+}  // namespace esphome::scs9009

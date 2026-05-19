@@ -5,8 +5,8 @@
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 class FTServoSensor : public sensor::Sensor,
                       public PollingComponent,
@@ -29,5 +29,4 @@ SUB_SENSOR(temperature)
 };
 
 
-} // namespace ftservo
-} // namespace esphome
+} // namespace esphome::ftservo

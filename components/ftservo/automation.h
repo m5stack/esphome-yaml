@@ -4,8 +4,8 @@
 #include "ftservo.h"
 
 
-namespace esphome {
-namespace ftservo {
+
+namespace esphome::ftservo {
 
 template<typename... Ts> 
 class MoveAction : public Action<Ts...>, 
@@ -50,5 +50,5 @@ template<typename... Ts> class IsMovingCondition : public Condition<Ts...>, publ
 
 
 }
-}
+
 

@@ -1,8 +1,7 @@
 #include "ftservo_sensor.h"
 #include "esphome/core/log.h"
 
-namespace esphome {
-namespace ftservo {
+namespace esphome::ftservo {
 
 static const char *TAG = "ftservo.sensor";
 
@@ -55,5 +54,4 @@ void FTServoSensor::dump_config() {
   ESP_LOGCONFIG(TAG, "FTServo Sensor: ");
 }
 
-} // namespace ftservo
-} // namespace esphome
+} // namespace esphome::ftservo

@@ -7,8 +7,8 @@
 #include "esphome/core/log.h"
 
 
-namespace esphome {
-namespace scs9009 {
+
+namespace esphome::scs9009 {
 
 class SCS9009Servo : public ftservo::FTServo,
                      public Component,
@@ -22,11 +22,9 @@ class SCS9009Servo : public ftservo::FTServo,
   bool read_torque_enable() override;
   void write_torque_enable(bool enable) override;
   void set_address(uint8_t addr) { this->addr_ = addr; }
-  bool can_proceed() override { return this->servo_ready_; }
  protected:
   uint8_t addr_;
   bool servo_ready_{false};
 };
 
-}
-}
+}  // namespace esphome::scs9009
