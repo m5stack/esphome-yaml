@@ -547,15 +547,15 @@ text_sensor:
               // disable some UI widgets
               lv_obj_add_state(id(ac_container), LV_STATE_DISABLED);
               lv_obj_add_state(id(temp_spin_down), LV_STATE_DISABLED);
-              lv_obj_clear_flag(id(temp_spin_down), LV_OBJ_FLAG_CLICKABLE);
+              lv_obj_remove_flag(id(temp_spin_down), LV_OBJ_FLAG_CLICKABLE);
               lv_obj_add_state(id(temp_spin_up), LV_STATE_DISABLED);
-              lv_obj_clear_flag(id(temp_spin_up), LV_OBJ_FLAG_CLICKABLE);
+              lv_obj_remove_flag(id(temp_spin_up), LV_OBJ_FLAG_CLICKABLE);
           } else {
               // restore UI widgets
-              lv_obj_clear_state(id(ac_container), LV_STATE_DISABLED);
-              lv_obj_clear_state(id(temp_spin_down), LV_STATE_DISABLED);
+              lv_obj_remove_state(id(ac_container), LV_STATE_DISABLED);
+              lv_obj_remove_state(id(temp_spin_down), LV_STATE_DISABLED);
               lv_obj_add_flag(id(temp_spin_down), LV_OBJ_FLAG_CLICKABLE);
-              lv_obj_clear_state(id(temp_spin_up), LV_STATE_DISABLED);
+              lv_obj_remove_state(id(temp_spin_up), LV_STATE_DISABLED);
               lv_obj_add_flag(id(temp_spin_up), LV_OBJ_FLAG_CLICKABLE);
           }
       - lvgl.dropdown.update:

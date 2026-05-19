@@ -55,7 +55,7 @@ script:
               if (i == id(page_num)) {
                 lv_obj_add_state(buttons[i], LV_STATE_CHECKED);
               } else {
-                lv_obj_clear_state(buttons[i], LV_STATE_CHECKED);
+                lv_obj_remove_state(buttons[i], LV_STATE_CHECKED);
               }
               bool selected = (i == active);
               lv_obj_add_style(labels[i], selected ? id(nav_label_activate) : id(nav_label_inactivate), LV_PART_MAIN);
@@ -129,7 +129,7 @@ script:
               float val = 1.0f;  // fixed brightness
 
               lv_color_t c = hsv_to_rgb(hue, sat, val);
-              lv_canvas_set_px(canvas, x, y, c);
+              lv_canvas_set_px(canvas, x, y, c, LV_OPA_COVER);
             }
           };
   # This script was used to draw a custom 'indicator' on color palette
@@ -148,7 +148,7 @@ script:
     then:
       - lambda: |-
           lv_obj_add_event_cb(id(color_palette_indicator), [](lv_event_t * e){
-            lv_obj_t * obj = lv_event_get_target(e);
+            lv_obj_t * obj = lv_event_get_target_obj(e);
 
             lv_indev_t * indev = lv_indev_get_act();
             if(indev == NULL)  return;
