@@ -56,10 +56,11 @@ substitutions:
   # `*_angle_offset` is in degrees (mapped to steps via the servo's 0..360°
   # → 0..1024 step range). `*_position_to_angle` is the inverse formula used
   # to translate the servo's reported position back into degrees.
+  # note, you can override the result with 'Servo Calibration' button  
   servo_x_angle_offset: "164"
   servo_x_position_to_angle: "(x - 34.0f) * 0.3710f - 164.0f"
-  servo_y_angle_offset: "239"
-  servo_y_position_to_angle: "x * 0.3333f - 226.67f"
+  servo_y_angle_offset: "50"
+  servo_y_position_to_angle: "(x - 140.0f) * 90.0f / 260.0f;"
 
 esphome:
   name: ${name}
@@ -72,11 +73,8 @@ esphome:
         - light.turn_on:
             id: lcd_backlight
             brightness: 80%
-        - delay: 20ms
-        - output.turn_on: aw_rst
     - priority: 100
       then:
-
         - delay: 200ms
         - script.execute: draw_display
         - delay: 30s
@@ -86,6 +84,22 @@ esphome:
             then:
               - lambda: id(init_in_progress) = false;
               - script.execute: draw_display
+    # Servo calibration data
+    - priority: -100
+      then:
+        - lambda: |-
+            if (id(use_calib_value)) {
+              ESP_LOGD("boot", "Restoring calibration: X=%d, Y=%d",
+                      id(x_servo_zero_step),
+                      id(y_servo_zero_step));
+              float x_offset = id(x_servo_zero_step) / 2.844f;
+              float y_offset = id(y_servo_zero_step) / 2.844f;
+              // override default offset setting
+              id(servo_x_angle)->set_angle_offset(static_cast<int>(x_offset));
+              id(servo_y_angle)->set_angle_offset(static_cast<int>(y_offset));
+            } else {
+              ESP_LOGD("boot", "No calibration data, using defaults.");
+            }              
 
 esp32:
   variant: esp32s3
@@ -142,6 +156,18 @@ globals:
     type: int
     restore_value: no
     initial_value: ${voice_assist_not_ready_phase_id}
+  - id: use_calib_value
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+  - id: x_servo_zero_step
+    type: int
+    restore_value: yes
+    initial_value: ${servo_x_angle_offset}
+  - id: y_servo_zero_step
+    type: int
+    restore_value: yes
+    initial_value: ${servo_y_angle_offset}    
 
 i2c:
   - id: bsp_bus
@@ -166,10 +192,6 @@ external_components:
     components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
     refresh: 1h
 
-  - source: github://pr#15703
-    components: [micro_wake_word]
-    refresh: 1h
-
   - source: github://n-IA-hane/esphome-intercom@v3.1.0
     components: [i2s_audio_duplex, esp_aec]
     refresh: 1h
@@ -184,6 +206,7 @@ aw9523b:
   id: aw9523b_hub
   i2c_id: bsp_bus
   p0_drive_mode: PUSH_PULL
+  interrupt_pin: GPIO21
 
 output:
   - platform: axp2101
@@ -217,12 +240,10 @@ output:
     channel: DCDC3
     voltage: 3300
 
-  - platform: gpio
-    id: aw_rst
-    pin:
-      aw9523b_id: aw9523b_hub
-      number: 2
-
+  - platform: m5ioe1
+    id: test_output
+    channel: PWM_1
+    pwm_polarity: ACTIVE_HIGH
 
 # M5IOE1 IO Expander
 m5ioe1:
@@ -299,6 +320,45 @@ number:
       max_value: 1500
       step: 100
 
+button:
+  - platform: template
+    name: "Servo Calibration"
+    on_press:
+      - lambda: |-
+          ESP_LOGD("ftservo", "Start calibration");
+          float x_zero = id(servo_x_position).state;
+          float y_zero = id(servo_y_position).state;
+          // assign offset
+          float x_offset = x_zero / 2.844f;
+          float y_offset = y_zero / 2.844f;
+          // override default offset setting
+          id(servo_x_angle)->set_angle_offset(static_cast<int>(x_offset));
+          id(servo_y_angle)->set_angle_offset(static_cast<int>(y_offset));
+          // indicating we are using calibration value
+          id(use_calib_value) = true;
+          id(x_servo_zero_step) = static_cast<int>(x_zero);
+          id(y_servo_zero_step) = static_cast<int>(y_zero);
+      - delay: 1s
+      - lambda: |-
+          ESP_LOGD("ftservo", "Preferences sync requested");
+          global_preferences->sync(); // sync at once
+          ESP_LOGD("ftservo", "Done reading and saving zero position, X zero: %d, Y zero %d", 
+                  id(x_servo_zero_step), id(y_servo_zero_step));
+
+  - platform: template
+    name: "Clear Calibration"
+    on_press:
+      - lambda: |-
+          ESP_LOGD("ftservo", "Restore to default settings");
+          id(use_calib_value)   = false;
+          id(x_servo_zero_step) = ${servo_x_angle_offset};
+          id(y_servo_zero_step) = ${servo_y_angle_offset};
+      - delay: 1s
+      - lambda: |-
+          ESP_LOGD("ftservo", "Preferences sync requested");
+          global_preferences->sync(); // sync at once
+          ESP_LOGD("ftservo", "Done clear calibration");
+
 sensor:
   - platform: axp2101
     id: axp2101_sensor
@@ -313,25 +373,43 @@ sensor:
     id: x_servo_sensor
     ftservo_id: x_servo
     position:
+      id: servo_x_position
       name: "Servo X Position"
       filters:
         - delta: 3.0
       on_value:
         - lambda: |-
-            float val = ${servo_x_position_to_angle};
-            id(servo_x_angle).publish_state(roundf(val)); // using angle
+            if ( !id(use_calib_value) ) {
+              float val = ${servo_x_position_to_angle};
+              id(servo_x_angle).publish_state(roundf(val)); 
+            } else {
+              float x = id(servo_x_position).state;
+              float zero = static_cast<float>(id(x_servo_zero_step));
+              float val = (x - zero) * 0.3710f;
+              id(servo_x_angle).publish_state(roundf(val));
+            }
+
 
   - platform: ftservo
     id: y_servo_sensor
     ftservo_id: y_servo
     position:
+      id: servo_y_position
       name: "Servo Y Position"
       filters:
         - delta: 3.0
       on_value:
         - lambda: |-
-            float val = ${servo_y_position_to_angle};
-            id(servo_y_angle).publish_state(roundf(val)); // using angle
+            if ( !id(use_calib_value) ) {
+              float val = ${servo_y_position_to_angle};
+              id(servo_y_angle).publish_state(roundf(val)); // using angle 
+            } else {
+              float x = id(servo_y_position).state;
+              float zero = static_cast<float>(id(y_servo_zero_step));
+              float val = (x - zero) * 90.0f / 260.0f;
+              id(servo_y_angle).publish_state(roundf(val));
+            }
+
 
 text_sensor:
   - platform: si12t
@@ -691,6 +769,14 @@ switch:
         open_drain: false
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
+
+  - platform: gpio
+    id: aw_rst
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 2
+    internal: true
+    restore_mode: RESTORE_DEFAULT_ON    
 
   - platform: template
     name: Microphone Mute

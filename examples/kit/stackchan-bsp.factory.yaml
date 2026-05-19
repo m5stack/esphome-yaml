@@ -6,6 +6,17 @@ substitutions:
   name: stackchan
   friendly_name: M5Stack StackChan
 
+  # Servo calibration — override in your local config if your StackChan's
+  # mechanical assembly puts the head at a different zero than the defaults.
+  # `*_angle_offset` is in degrees (mapped to steps via the servo's 0..360°
+  # → 0..1024 step range). `*_position_to_angle` is the inverse formula used
+  # to translate the servo's reported position back into degrees.
+  # note, you can override the result with 'Servo Calibration' button
+  servo_x_angle_offset: "164"
+  servo_x_position_to_angle: "(x - 34.0f) * 0.3710f - 164.0f"
+  servo_y_angle_offset: "50"
+  servo_y_position_to_angle: "(x - 140.0f) * 90.0f / 260.0f;"
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
@@ -13,15 +24,24 @@ esphome:
     name: m5stack.stackchan-bsp
     version: 2026.3.0
   on_boot: 
-    then:
-      # reset
-      - output.turn_on: aw_rst
-      - delay: 20ms
-      - output.turn_on: cam_rst
-      - delay: 20ms
-      # read the RTC time once when the system boots
-      - bm8563.read_time:
-
+    - priority: 600
+      then:
+        - bm8563.read_time:
+    - priority: -100
+      then:
+        - lambda: |-
+            if (id(use_calib_value)) {
+              ESP_LOGD("boot", "Restoring calibration: X=%d, Y=%d",
+                      id(x_servo_zero_step),
+                      id(y_servo_zero_step));
+              float x_offset = id(x_servo_zero_step) / 2.844f;
+              float y_offset = id(y_servo_zero_step) / 2.844f;
+              // override default offset setting
+              id(servo_x_angle)->set_angle_offset(static_cast<int>(x_offset));
+              id(servo_y_angle)->set_angle_offset(static_cast<int>(y_offset));
+            } else {
+              ESP_LOGD("boot", "No calibration data, using defaults.");
+            }
 esp32:
   variant: esp32s3
   flash_size: 16MB
@@ -61,7 +81,7 @@ captive_portal:
 
 # Enable logging
 logger:
-  level: DEBUG
+  level: VERBOSE
 
 i2s_audio:
   id: i2s_audio_bus
@@ -102,6 +122,7 @@ aw9523b:
   id: aw9523b_hub
   i2c_id: bsp_bus
   p0_drive_mode: PUSH_PULL
+  interrupt_pin: GPIO21  
 
 output:
   - platform: axp2101
@@ -151,18 +172,6 @@ output:
     channel: DCDC5
     voltage: 3300
 
-  - platform: gpio
-    id: aw_rst
-    pin:
-      aw9523b_id: aw9523b_hub
-      number: 2
-
-  - platform: gpio
-    id: cam_rst
-    pin:
-      aw9523b_id: aw9523b_hub
-      number: 8
-
 si12t:
   id: touch_hub
   i2c_id: bsp_bus
@@ -197,6 +206,22 @@ switch:
     # BOOST_EN = 1
     restore_mode: RESTORE_DEFAULT_ON
   
+  - platform: gpio
+    id: aw_rst
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 2
+    internal: true
+    restore_mode: RESTORE_DEFAULT_ON 
+
+  - platform: gpio
+    id: cam_rst
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 8
+    internal: true
+    restore_mode: RESTORE_DEFAULT_ON 
+
   - platform: gpio
     name: "M5IOE1 Pin 1"
     pin:
@@ -271,30 +296,46 @@ sensor:
     id: x_servo_sensor
     ftservo_id: x_servo
     position:
+      id: servo_x_position
       name: "Servo X Position"
       filters:
         - delta: 3.0
       on_value:
         - lambda: |-
-            float val = (x - 34) * 0.3710 - 164.0f;
-            id(servo_x_angle).publish_state(roundf(val)); // using angle 
+            if ( !id(use_calib_value) ) {
+              float val = ${servo_x_position_to_angle};
+              id(servo_x_angle).publish_state(roundf(val)); 
+            } else {
+              float x = id(servo_x_position).state;
+              float zero = static_cast<float>(id(x_servo_zero_step));
+              float val = (x - zero) * 0.3710f;
+              id(servo_x_angle).publish_state(roundf(val));
+            }
 
   - platform: ftservo
     id: y_servo_sensor
     ftservo_id: y_servo
     position:
+      id: servo_y_position
       name: "Servo Y Position"
       filters:
         - delta: 3.0
       on_value:
         - lambda: |-
-            float val = x * 0.3333f - 226.67f;
-            id(servo_y_angle).publish_state(roundf(val)); // using angle 
+            if ( !id(use_calib_value) ) {
+              float val = ${servo_y_position_to_angle};
+              id(servo_y_angle).publish_state(roundf(val)); // using angle 
+            } else {
+              float x = id(servo_y_position).state;
+              float zero = static_cast<float>(id(y_servo_zero_step));
+              float val = (x - zero) * 90.0f / 260.0f;
+              id(servo_y_angle).publish_state(roundf(val));
+            }
+
 
   - platform: ltr_als_ps
     address: 0x23
     i2c_id: bsp_bus
-    update_interval: 10s
     type: ALS_PS
     ambient_light:
       name: "Ambient light"
@@ -303,7 +344,6 @@ sensor:
     ps_cooldown: 5 s
     ps_high_threshold: 500
     ps_counts: "Proximity counts"
-
 
   - platform: ina226
     i2c_id: bsp_bus
@@ -338,7 +378,7 @@ touchscreen:
     on_touch:
       - lambda: |-
           ESP_LOGD("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
-                          touch.x, touch.y, touch.x_raw,touch.y_raw);  
+                          touch.x, touch.y, touch.x_raw,touch.y_raw);
 
 display:
   - platform: mipi_spi
@@ -445,7 +485,7 @@ number:
       min_value: -164
       max_value: 164
       use_raw_angle: false
-      angle_offset: 164
+      angle_offset: ${servo_x_angle_offset}
       step: 5
     speed:
       id: servo_x_speed
@@ -462,7 +502,7 @@ number:
       min_value: 0
       max_value: 90
       use_raw_angle: false
-      angle_offset: 239
+      angle_offset: ${servo_y_angle_offset}
       step: 5
     speed:
       id: servo_y_speed
@@ -470,6 +510,45 @@ number:
       min_value: 100
       max_value: 1500
       step: 100
+
+button:
+  - platform: template
+    name: "Servo Calibration"
+    on_press:
+      - lambda: |-
+          ESP_LOGD("ftservo", "Start calibration");
+          float x_zero = id(servo_x_position).state;
+          float y_zero = id(servo_y_position).state;
+          // assign offset
+          float x_offset = x_zero / 2.844f;
+          float y_offset = y_zero / 2.844f;
+          // override default offset setting
+          id(servo_x_angle)->set_angle_offset(static_cast<int>(x_offset));
+          id(servo_y_angle)->set_angle_offset(static_cast<int>(y_offset));
+          // indicating we are using calibration value
+          id(use_calib_value) = true;
+          id(x_servo_zero_step) = static_cast<int>(x_zero);
+          id(y_servo_zero_step) = static_cast<int>(y_zero);
+      - delay: 100ms
+      - lambda: |-
+          ESP_LOGD("ftservo", "Preferences sync requested");          
+          global_preferences->sync(); // sync at once
+          ESP_LOGD("ftservo", "Done reading and saving zero position, X zero: %d, Y zero %d", 
+                  id(x_servo_zero_step), id(y_servo_zero_step));
+
+  - platform: template
+    name: "Clear Calibration"
+    on_press:
+      - lambda: |-
+          ESP_LOGD("ftservo", "Restore to default settings");
+          id(use_calib_value)   = false;
+          id(x_servo_zero_step) = ${servo_x_angle_offset};
+          id(y_servo_zero_step) = ${servo_y_angle_offset};
+      - delay: 1s
+      - lambda: |-
+          ESP_LOGD("ftservo", "Preferences sync requested");
+          global_preferences->sync(); // sync at once
+          ESP_LOGD("ftservo", "Done clear calibration");
 
 text_sensor:
   - platform: si12t
@@ -488,6 +567,7 @@ text_sensor:
 esp32_camera:
   name: "Camera"
   i2c_id: bsp_bus
+  setup_priority: -200  
   vsync_pin:
     number: GPIO46
     ignore_strapping_warning: true
@@ -502,6 +582,30 @@ esp32_camera:
   max_framerate: 15.0 fps
   resolution: 320x240
   frame_buffer_count: 1
+  frame_buffer_location: PSRAM
   pixel_format: RGB565
-  jpeg_quality: 6
+  jpeg_quality: 12
+  brightness: 1
+  contrast: 1
+  saturation: 0
+  aec_mode: manual
+  aec_value: 800
   agc_mode: manual
+  agc_value: 30
+
+globals:
+  - id: use_calib_value
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+    update_interval: "100ms"
+  - id: x_servo_zero_step
+    type: int
+    restore_value: yes
+    initial_value: ${servo_x_angle_offset}
+    update_interval: "100ms"
+  - id: y_servo_zero_step
+    type: int
+    restore_value: yes
+    initial_value: ${servo_y_angle_offset}
+    update_interval: "100ms"    
