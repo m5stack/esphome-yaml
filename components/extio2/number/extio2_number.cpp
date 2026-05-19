@@ -2,8 +2,7 @@
 #include "esphome/components/number/number.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 static const char *TAG = "extio2.number";
 
@@ -22,7 +21,7 @@ PROGMEM_STRING_TABLE(ServoChannelStrings,
 );
 
 static const LogString *servo_channel_to_string(EXTIO2ServoChannel channel) {
-  return ServoChannelStrings::get_log_str(static_cast<uint8_t>(channel), -1);
+  return ServoChannelStrings::get_log_str(static_cast<uint8_t>(channel), ServoChannelStrings::LAST_INDEX);
 }
 
 #endif
@@ -69,5 +68,4 @@ void EXTIO2PulseNumber::control(float value) {
   this->parent_->set_servo_pulse(static_cast<uint8_t>(this->channel_), us);
 }
 
-}  // namespace extio2
-}  // namespace esphome
+}  // namespace esphome::extio2

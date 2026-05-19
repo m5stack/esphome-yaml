@@ -2,8 +2,7 @@
 #include "esphome/core/progmem.h"
 #include "../extio2.h"
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 static const char *TAG = "extio2.light";
 
@@ -22,7 +21,7 @@ PROGMEM_STRING_TABLE(LightChannelStrings,
 );
 
 static const LogString *light_channel_to_string(EXTIO2LightChannel channel) {
-  return LightChannelStrings::get_log_str(static_cast<uint8_t>(channel), -1);
+  return LightChannelStrings::get_log_str(static_cast<uint8_t>(channel), LightChannelStrings::LAST_INDEX);
 }
 
 #endif
@@ -166,5 +165,4 @@ light::ESPColorView EXTIO2AddressableLight::get_view_internal(int32_t index) con
   };
 }
 
-}  // namespace extio2
-}  // namespace esphome
+}  // namespace esphome::extio2

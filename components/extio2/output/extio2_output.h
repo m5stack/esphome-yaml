@@ -4,8 +4,7 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 enum EXTIO2PWMChannel {
   PWM_0 = 0,
@@ -33,6 +32,4 @@ class EXTIO2FloatOutput : public output::FloatOutput,
 
 };                          
 
-
-} // namespace extio2
-} // namespace esphome
+} // namespace esphome::extio2

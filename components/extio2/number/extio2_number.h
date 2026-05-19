@@ -4,8 +4,7 @@
 #include "../extio2.h"
 #include "esphome/core/helpers.h"
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 enum EXTIO2ServoChannel {
   SERVO_0 = 0,
@@ -47,5 +46,4 @@ class EXTIO2PulseNumber : public number::Number,
   EXTIO2ServoChannel channel_;  
 };
 
-}  // namespace extio2
-}  // namespace esphome
+}  // namespace esphome::extio2

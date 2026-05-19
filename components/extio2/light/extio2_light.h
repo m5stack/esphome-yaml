@@ -8,8 +8,7 @@
 #include <cstdint>
 
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 enum EXTIO2LightChannel {
   LIGHT_0 = 0,
@@ -57,6 +56,4 @@ class EXTIO2AddressableLight : public light::AddressableLight,
   uint8_t *effect_data_{nullptr};
 };
 
-
-}  // namespace extio2
-}  // namespace esphome
+}  // namespace esphome::extio2

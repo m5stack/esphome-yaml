@@ -27,11 +27,11 @@ PROGMEM_STRING_TABLE(ADCChannelStrings,
 PROGMEM_STRING_TABLE(ADCResolutionStrings, "8 bits", "12 bits", "Unkown Resolution");
 
 static const LogString *adc_channel_to_string(EXTIO2ADCChannel channel) {
-  return ADCChannelStrings::get_log_str(static_cast<uint8_t>(channel), -1);
+  return ADCChannelStrings::get_log_str(static_cast<uint8_t>(channel), ADCChannelStrings::LAST_INDEX);
 }
 
 static const LogString *adc_resolution_to_string(EXTIO2ADCResolution resolution) {
-  return ADCResolutionStrings::get_log_str(static_cast<uint8_t>(resolution), -1);
+  return ADCResolutionStrings::get_log_str(static_cast<uint8_t>(resolution), ADCResolutionStrings::LAST_INDEX);
 }
 
 #endif

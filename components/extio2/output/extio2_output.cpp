@@ -3,8 +3,7 @@
 #include <cstdint>
 
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 static const char *TAG = "extio2.output";
 
@@ -23,7 +22,7 @@ PROGMEM_STRING_TABLE(PWMChannelStrings,
 );
 
 static const LogString *pwm_channel_to_string(EXTIO2PWMChannel channel) {
-  return PWMChannelStrings::get_log_str(static_cast<uint8_t>(channel), -1);
+  return PWMChannelStrings::get_log_str(static_cast<uint8_t>(channel), PWMChannelStrings::LAST_INDEX);
 }
 
 #endif
@@ -55,5 +54,4 @@ void EXTIO2FloatOutput::dump_config() {
 }
 
 
-} // namespace extio2
-} // namespace esphome
+} // namespace esphome::extio2

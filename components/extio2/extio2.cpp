@@ -4,8 +4,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/progmem.h"
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 static const char *TAG = "extio2";
 
@@ -66,7 +65,7 @@ PROGMEM_STRING_TABLE(PWMFreqStrings,
 );
 
 static const LogString *pwm_freq_to_string(EXTIO2PWMFrequency freq) {
-  return PWMFreqStrings::get_log_str(static_cast<uint8_t>(freq), -1);
+  return PWMFreqStrings::get_log_str(static_cast<uint8_t>(freq), PWMFreqStrings::LAST_INDEX);
 }
 
 #endif
@@ -431,5 +430,4 @@ void EXTIO2Component::write_servo16_(uint8_t pin, uint16_t us) {
   this->status_clear_warning();
 }
 
-}  // namespace extio2
-}  // namespace esphome
+}  // namespace esphome::extio2

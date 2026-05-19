@@ -5,8 +5,7 @@
 #include "esphome/core/helpers.h"
 
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 enum EXTIO2ADCChannel {
   ADC_0 = 0,
@@ -41,5 +40,4 @@ class EXTIO2Sensor : public sensor::Sensor,
 
 };                    
 
-} // namespace extio2
-} // namespace esphome
+} // namespace esphome::extio2

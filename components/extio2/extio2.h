@@ -7,8 +7,7 @@
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/components/gpio_expander/cached_gpio.h"
 
-namespace esphome {
-namespace extio2 {
+namespace esphome::extio2 {
 
 enum EXTIO2PWMFrequency {
   FREQ_2KHZ = 0,
@@ -139,5 +138,4 @@ class EXTIO2Pin : public GPIOPin,
   gpio::Flags flags_;
 };
 
-} // namespace extio2
-} // namespace esphome 
+} // namespace esphome::extio2
