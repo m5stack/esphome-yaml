@@ -19,9 +19,10 @@
 #   used — the satellite UI is landscape-only.
 # - mipi_spi applies set_rotation() at runtime (MADCTL is recomputed), so the flip
 #   needs only a redraw, which `component.update` provides.
-# - The base's on_touch handler is position-agnostic (logging), so no touch
-#   coordinate mirroring is required. If you add position-sensitive touch zones,
-#   mirror x/y when `imu_orientation == 180`.
+# - Touch follows the screen: the touchscreen core doesn't track display rotation at
+#   runtime, so the same lambda mirrors both touch axes when flipped (mirror X + Y
+#   == 180°) via the public set_mirror_x/set_mirror_y setters. Position-sensitive
+#   touch zones keep working in either orientation.
 
 motion:
   - platform: bmi270
@@ -61,7 +62,10 @@ interval:
           then:
             - lambda: |-
                 id(imu_orientation_applied) = id(imu_orientation);
-                id(m5cores3_lcd).set_rotation(
-                    id(imu_orientation) == 180 ? display::DISPLAY_ROTATION_180_DEGREES
-                                               : display::DISPLAY_ROTATION_0_DEGREES);
+                const bool flipped = id(imu_orientation) == 180;
+                id(m5cores3_lcd).set_rotation(flipped ? display::DISPLAY_ROTATION_180_DEGREES
+                                                      : display::DISPLAY_ROTATION_0_DEGREES);
+                // Keep touch aligned with the screen: mirror X + Y == rotate 180.
+                id(touch).set_mirror_x(flipped);
+                id(touch).set_mirror_y(flipped);
             - component.update: m5cores3_lcd
