@@ -14,15 +14,16 @@
 # - Uses ESPHome's native `motion:` hub (BMI270 platform) — no external components.
 # - The CoreS3's BMI270 answers at 0x69 (SDO high), not the 0x68 default.
 # - Only the in-screen-plane Y axis is read: its gravity component changes SIGN
-#   between the two 180°-apart poses. The 0.30 g deadzone keeps the current
-#   orientation when the device lies flat (ambiguous). Portrait (90/270) is not
-#   used — the satellite UI is landscape-only.
+#   between the two 180°-apart poses. `on_value_range` provides the transition
+#   detection and hysteresis natively — the ±0.30 g gap between the bands is the
+#   deadzone, so a device lying flat keeps its current orientation. Portrait
+#   (90/270) is not used — the satellite UI is landscape-only.
 # - mipi_spi applies set_rotation() at runtime (MADCTL is recomputed), so the flip
 #   needs only a redraw, which `component.update` provides.
 # - Touch follows the screen: the touchscreen core doesn't track display rotation at
-#   runtime, so the same lambda mirrors both touch axes when flipped (mirror X + Y
-#   == 180°) via the public set_mirror_x/set_mirror_y setters. Position-sensitive
-#   touch zones keep working in either orientation.
+#   runtime, so each flip also mirrors both touch axes (mirror X + Y == 180°) via
+#   the public set_mirror_x/set_mirror_y setters. Position-sensitive touch zones
+#   keep working in either orientation.
 
 motion:
   - platform: bmi270
@@ -35,37 +36,18 @@ sensor:
     type: acceleration_y
     id: imu_accel_y
     internal: true
-
-globals:
-  - id: imu_orientation
-    type: int
-    restore_value: false
-    initial_value: "0"
-  - id: imu_orientation_applied
-    type: int
-    restore_value: false
-    initial_value: "-1"
-
-interval:
-  - interval: 1s
-    then:
-      - lambda: |-
-          // Gravity decides which way is up; NaN (no reading yet) leaves it alone.
-          float ay = id(imu_accel_y).state;
-          if (!isnan(ay)) {
-            if (ay > 0.30f) id(imu_orientation) = 0;
-            else if (ay < -0.30f) id(imu_orientation) = 180;
-          }
-      - if:
-          condition:
-            lambda: "return id(imu_orientation) != id(imu_orientation_applied);"
-          then:
-            - lambda: |-
-                id(imu_orientation_applied) = id(imu_orientation);
-                const bool flipped = id(imu_orientation) == 180;
-                id(m5cores3_lcd).set_rotation(flipped ? display::DISPLAY_ROTATION_180_DEGREES
-                                                      : display::DISPLAY_ROTATION_0_DEGREES);
-                // Keep touch aligned with the screen: mirror X + Y == rotate 180.
-                id(touch).set_mirror_x(flipped);
-                id(touch).set_mirror_y(flipped);
-            - component.update: m5cores3_lcd
+    on_value_range:
+      - above: 0.30
+        then:
+          - lambda: |-
+              id(m5cores3_lcd).set_rotation(display::DISPLAY_ROTATION_0_DEGREES);
+              id(touch).set_mirror_x(false);
+              id(touch).set_mirror_y(false);
+          - component.update: m5cores3_lcd
+      - below: -0.30
+        then:
+          - lambda: |-
+              id(m5cores3_lcd).set_rotation(display::DISPLAY_ROTATION_180_DEGREES);
+              id(touch).set_mirror_x(true);
+              id(touch).set_mirror_y(true);
+          - component.update: m5cores3_lcd
