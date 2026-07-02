@@ -1,0 +1,67 @@
+# Gravity-based screen rotation for the M5Stack CoreS3 / CoreS3-Lite / CoreS3-SE.
+#
+# Optional add-on package for cores3-satellite-base.yaml: reads the on-board BMI270
+# IMU and flips the display between the two landscape orientations (0 / 180) so the
+# screen is always right-side-up, whichever way the device is stood or handed over.
+#
+# Include it alongside the base package:
+#
+#   packages:
+#     m5stack-cores3: !include ../../common/cores3-satellite-base.yaml
+#     imu-rotation:   !include ../../common/cores3-imu-rotation.yaml
+#
+# Notes:
+# - Uses ESPHome's native `motion:` hub (BMI270 platform) — no external components.
+# - The CoreS3's BMI270 answers at 0x69 (SDO high), not the 0x68 default.
+# - Only the in-screen-plane Y axis is read: its gravity component changes SIGN
+#   between the two 180°-apart poses. The 0.30 g deadzone keeps the current
+#   orientation when the device lies flat (ambiguous). Portrait (90/270) is not
+#   used — the satellite UI is landscape-only.
+# - mipi_spi applies set_rotation() at runtime (MADCTL is recomputed), so the flip
+#   needs only a redraw, which `component.update` provides.
+# - The base's on_touch handler is position-agnostic (logging), so no touch
+#   coordinate mirroring is required. If you add position-sensitive touch zones,
+#   mirror x/y when `imu_orientation == 180`.
+
+motion:
+  - platform: bmi270
+    i2c_id: bsp_bus
+    address: 0x69
+    update_interval: 250ms
+
+sensor:
+  - platform: motion
+    type: acceleration_y
+    id: imu_accel_y
+    internal: true
+
+globals:
+  - id: imu_orientation
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: imu_orientation_applied
+    type: int
+    restore_value: false
+    initial_value: "-1"
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          // Gravity decides which way is up; NaN (no reading yet) leaves it alone.
+          float ay = id(imu_accel_y).state;
+          if (!isnan(ay)) {
+            if (ay > 0.30f) id(imu_orientation) = 0;
+            else if (ay < -0.30f) id(imu_orientation) = 180;
+          }
+      - if:
+          condition:
+            lambda: "return id(imu_orientation) != id(imu_orientation_applied);"
+          then:
+            - lambda: |-
+                id(imu_orientation_applied) = id(imu_orientation);
+                id(m5cores3_lcd).set_rotation(
+                    id(imu_orientation) == 180 ? display::DISPLAY_ROTATION_180_DEGREES
+                                               : display::DISPLAY_ROTATION_0_DEGREES);
+            - component.update: m5cores3_lcd
