@@ -341,7 +341,6 @@ display:
       height: 1280
       width: 720
     model: M5Stack-Tab5
-    rotation: 270°
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4
