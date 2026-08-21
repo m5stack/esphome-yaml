@@ -187,6 +187,8 @@ display:
       width: 128
       offset_width: 2
       offset_height: 1
+      pad_width: 2
+      pad_height: 1
     invert_colors: true
     rotation: 180°
     lambda: |-
