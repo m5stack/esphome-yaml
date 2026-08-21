@@ -1,0 +1,94 @@
+esphome:
+  name: m5sticks3-camera-only
+  friendly_name: M5Stick S3 Camera Only
+  environment_variables:
+    IDF_COMPONENT_STORAGE_URL: https://components-file.espressif.cn
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: arduino
+    sdkconfig_options:
+      CONFIG_CAMERA_TASK_STACK_SIZE: "2048"
+      CONFIG_CAMERA_PSRAM_DMA: "n"
+      
+external_components:
+  - source: github://m5stack/esphome-yaml/components@main
+    components: [early_init]
+
+# Configure the camera power pins before SCCB and camera initialization.
+early_init:
+  id: camera_power_up_barrier
+  pins:
+    - pin:
+        number: GPIO39
+        allow_other_uses: true
+      level: false
+    - pin:
+        number: GPIO41
+        allow_other_uses: true
+      level: true
+  delay: 500ms
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: 
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: ""
+  password: ""
+  ap:
+    ssid: ""
+    password: ""
+
+captive_portal:
+
+esp32_camera:
+  name: "OV3660 Camera"
+  id: cam
+  i2c_pins:
+    sda: GPIO48
+    scl: GPIO47
+  data_pins:
+    - GPIO21
+    - GPIO18
+    - GPIO16
+    - GPIO15
+    - GPIO14
+    - GPIO12
+    - GPIO38
+    - GPIO40
+  vsync_pin: GPIO42
+  href_pin: GPIO17
+  pixel_clock_pin: GPIO13
+  external_clock:
+    pin: GPIO46
+    frequency: 20MHz
+  power_down_pin:
+    number: GPIO39
+    allow_other_uses: true
+  reset_pin:
+    number: GPIO41
+    allow_other_uses: true
+  resolution: 320x240
+  jpeg_quality: 12
+  max_framerate: 10 fps
+  idle_framerate: 0.5 fps
+  frame_buffer_location: PSRAM
+  frame_buffer_count: 1
+  horizontal_mirror: true
+  vertical_flip: true
+  brightness: 1
+  saturation: -2
