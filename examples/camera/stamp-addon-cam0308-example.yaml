@@ -1,0 +1,105 @@
+esphome:
+  name: stamp-addon-cam0308
+  friendly_name: Stamp Addon Cam0308
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_GC0308_SUPPORT: "y"
+
+logger:
+
+api:
+  encryption:
+    key: ""
+
+ota:
+  - platform: esphome
+    password: ""
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: ""
+    password: ""
+
+external_components:
+  - source: github://m5stack/esphome-yaml/components@main
+    components: [early_init]
+
+captive_portal:
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+early_init:
+  id: power_up_barrier
+  pins:
+    - pin:
+        number: GPIO39
+        allow_other_uses: true
+      level: false
+    - pin:
+        number: GPIO41
+        allow_other_uses: true
+      level: true
+  delay: 500ms
+
+i2c:
+  - id: cam_bus
+    sda: GPIO48
+    scl: GPIO47
+    frequency: 100kHz
+
+esp32_camera:
+  name: "Camera"
+  id: gc0308_camera
+  i2c_id: cam_bus
+
+  data_pins:
+    - GPIO21
+    - GPIO18
+    - GPIO16
+    - GPIO15
+    - GPIO14
+    - GPIO12
+    - GPIO38
+    - GPIO40
+
+  vsync_pin: GPIO42
+  href_pin: GPIO17
+  pixel_clock_pin: GPIO13
+
+  external_clock:
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
+    frequency: 20MHz
+
+  power_down_pin:
+    number: GPIO39
+    allow_other_uses: true
+
+  reset_pin:
+    number: GPIO41
+    allow_other_uses: true
+
+  resolution: 320x240
+  pixel_format: RGB565
+  jpeg_quality: 12
+  max_framerate: 10 fps
+  frame_buffer_count: 1
+  frame_buffer_location: PSRAM
+
+  agc_mode: auto
+  agc_value: 10
+  aec_mode: auto
+  aec_value: 480
+
+  vertical_flip: true
+  horizontal_mirror: false
+  test_pattern: false
