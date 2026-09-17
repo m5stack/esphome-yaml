@@ -9,8 +9,8 @@ substitutions:
   error_cloud_expired_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
 
   # Micro wake word models
-  okay_nabu_model_file: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
-  stop_model_file: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+  okay_nabu_model_file: https://github.com/OHF-Voice/micro-wake-word/releases/download/okay_nabu_20241226.3/okay_nabu.json
+  stop_model_file: https://github.com/OHF-Voice/micro-wake-word/releases/download/stop/stop.json
 
   # Phases of the Voice Assistant
   # The voice assistant is ready to be triggered by a wake word
