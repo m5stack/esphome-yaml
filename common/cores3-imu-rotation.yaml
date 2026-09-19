@@ -1,0 +1,53 @@
+# Gravity-based screen rotation for the M5Stack CoreS3 / CoreS3-Lite / CoreS3-SE.
+#
+# Optional add-on package for cores3-satellite-base.yaml: reads the on-board BMI270
+# IMU and flips the display between the two landscape orientations (0 / 180) so the
+# screen is always right-side-up, whichever way the device is stood or handed over.
+#
+# Include it alongside the base package:
+#
+#   packages:
+#     m5stack-cores3: !include ../../common/cores3-satellite-base.yaml
+#     imu-rotation:   !include ../../common/cores3-imu-rotation.yaml
+#
+# Notes:
+# - Uses ESPHome's native `motion:` hub (BMI270 platform) — no external components.
+# - The CoreS3's BMI270 answers at 0x69 (SDO high), not the 0x68 default.
+# - Only the in-screen-plane Y axis is read: its gravity component changes SIGN
+#   between the two 180°-apart poses. `on_value_range` provides the transition
+#   detection and hysteresis natively — the ±0.30 g gap between the bands is the
+#   deadzone, so a device lying flat keeps its current orientation. Portrait
+#   (90/270) is not used — the satellite UI is landscape-only.
+# - mipi_spi applies set_rotation() at runtime (MADCTL is recomputed), so the flip
+#   needs only a redraw, which `component.update` provides.
+# - Touch follows the screen: the touchscreen core doesn't track display rotation at
+#   runtime, so each flip also mirrors both touch axes (mirror X + Y == 180°) via
+#   the public set_mirror_x/set_mirror_y setters. Position-sensitive touch zones
+#   keep working in either orientation.
+
+motion:
+  - platform: bmi270
+    i2c_id: bsp_bus
+    address: 0x69
+    update_interval: 250ms
+
+sensor:
+  - platform: motion
+    type: acceleration_y
+    id: imu_accel_y
+    internal: true
+    on_value_range:
+      - above: 0.30
+        then:
+          - lambda: |-
+              id(m5cores3_lcd).set_rotation(display::DISPLAY_ROTATION_0_DEGREES);
+              id(touch).set_mirror_x(false);
+              id(touch).set_mirror_y(false);
+          - component.update: m5cores3_lcd
+      - below: -0.30
+        then:
+          - lambda: |-
+              id(m5cores3_lcd).set_rotation(display::DISPLAY_ROTATION_180_DEGREES);
+              id(touch).set_mirror_x(true);
+              id(touch).set_mirror_y(true);
+          - component.update: m5cores3_lcd
