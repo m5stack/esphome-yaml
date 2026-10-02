@@ -126,6 +126,7 @@ audio_dac:
     id: es8311_dac
     bits_per_sample: 16bit
     sample_rate: 48000
+    mic_gain: 30DB  # default 42DB (max) clips on normal speech
 
 microphone:
   - platform: i2s_audio
@@ -134,6 +135,7 @@ microphone:
     i2s_din_pin: GPIO4
     bits_per_sample: 16bit
     adc_type: external
+    channel: left  # the mic is in the left slot; the default (right) reads only zeros
 
 speaker:
   - platform: i2s_audio
