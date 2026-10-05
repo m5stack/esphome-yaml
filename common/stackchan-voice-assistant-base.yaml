@@ -841,6 +841,7 @@ select:
 
 
   - platform: template
+    id: wake_word_sensitivity
     name: "Wake word sensitivity"
     optimistic: true
     initial_option: Slightly sensitive
