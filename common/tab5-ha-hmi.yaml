@@ -320,14 +320,18 @@ touchscreen:
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 5
-    transform:
-      swap_xy: true
-      mirror_x: true
+    # No swap_xy/mirror_x here: LVGL now performs the 270° rotation
+    # itself (rotation moved from `display:` to `lvgl:`), and that
+    # rotation already applies to touch input via
+    # LvglComponent::rotate_coordinates(). Applying the same
+    # swap+mirror a second time here double-rotates touches (net
+    # ~180° off). Report native (portrait) panel coordinates instead
+    # and let LVGL do the rotation once.
     calibration:
       x_min: 0
-      x_max: 1280
+      x_max: 720
       y_min: 0
-      y_max: 720
+      y_max: 1280
     id: touch
 
       
@@ -341,7 +345,6 @@ display:
       height: 1280
       width: 720
     model: M5Stack-Tab5
-    rotation: 270°
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4

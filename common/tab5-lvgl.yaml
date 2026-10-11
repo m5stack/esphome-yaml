@@ -73,6 +73,10 @@ font:
 
 
 lvgl:
+  # Rotation must be set here rather than under `display:` — LVGL owns
+  # the rotation when it manages the display, and recent ESPHome
+  # releases reject `rotation` under the display config in that case.
+  rotation: 270
   on_boot:
     - rx8130.read_time:
     - script.execute: expand_nav_btn_click_area    # Expand the click area of nav rail buttons
