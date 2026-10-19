@@ -19,5 +19,5 @@ wifi:
 
 improv_serial:
 
-improv_ble:
+esp32_improv:
   authorizer: none
