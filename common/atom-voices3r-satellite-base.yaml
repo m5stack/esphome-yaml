@@ -1,0 +1,548 @@
+---
+substitutions:
+  # Phases of the Voice Assistant
+  # The voice assistant is ready to be triggered by a wake word
+  voice_assist_idle_phase_id: "1"
+  # The voice assistant is listening for a voice command
+  voice_assist_listening_phase_id: "2"
+  # The voice assistant is currently processing the command
+  voice_assist_thinking_phase_id: "3"
+  # The voice assistant is replying to the command
+  voice_assist_replying_phase_id: "4"
+  # The voice assistant is not ready
+  voice_assist_not_ready_phase_id: "10"
+  # The voice assistant encountered an error
+  voice_assist_error_phase_id: "11"
+  # Muted phase
+  voice_assist_muted_phase_id: "12"
+  # Finished timer phase
+  voice_assist_timer_finished_phase_id: "20"
+  wake_word_triggered_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+  error_cloud_expired_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+
+esphome:
+  name: atom-voices3r
+  friendly_name: M5Stack Atom VoiceS3R Voice Assistant
+  name_add_mac_suffix: true
+  project: 
+    name: m5stack.voice-s3r-satellite
+    version: 2026.10.0
+  min_version: 2026.9.0
+
+esp32:
+  variant: ESP32S3
+  flash_size: 8MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    ## Note: Disable these configurations if you face the boot loop issue.
+    sdkconfig_options:
+        CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+        CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+        CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# Home Assistant API. The provisioning wrapper supplies the installation-time
+# network credentials and API security settings for factory/test images.
+api:
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  ap:
+
+captive_portal:
+
+logger:
+  level: INFO
+  logs:
+    esp_aec: WARN
+    audio_stack: INFO
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    id: user_button
+    internal: true
+    on_multi_click:
+      - timing:
+          - ON for at least 50ms
+          - OFF for at least 50ms
+        then:
+          - switch.turn_off: timer_ringing
+      - timing:
+          - ON for at least 10s
+        then:
+          - button.press: factory_reset_btn
+
+button:
+  - platform: factory_reset
+    id: factory_reset_btn
+    internal: true
+
+external_components:
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.10.2
+    components:
+      - esp_audio_stack
+      - esp_aec
+
+esp_aec:
+  id: aec
+  sample_rate: 16000
+  # SR preserves the speech spectrum for microWakeWord
+  mode: sr_low_cost
+  filter_length: 4
+
+i2c:
+  - id: audio_i2c
+    sda:
+      number: GPIO45
+      ignore_strapping_warning: true
+    scl:
+      number: GPIO0
+      ignore_strapping_warning: true
+    frequency: 400kHz
+    scan: true
+
+esp_audio_stack:
+  id: audio_stack
+  sample_rate: 48000
+  output_sample_rate: 16000
+  bits_per_sample: 16
+  slot_bit_width: 16
+  num_channels: 1
+  processor_id: aec
+  aec_reference: ring_buffer
+  aec_reference_buffer_ms: 80
+  buffers_in_psram: true
+  audio_task_stack_in_psram: true
+  aec_ref_ring_in_psram: true
+  telemetry: true
+  telemetry_log_interval_frames: 128
+
+  i2s_mclk_pin: GPIO11
+  i2s_bclk_pin: GPIO17
+  i2s_lrclk_pin:
+    number: GPIO3
+    ignore_strapping_warning: true
+  i2s_din_pin: GPIO4
+  i2s_dout_pin: GPIO48
+
+  codec:
+    i2c_id: audio_i2c
+    input:
+      type: es8311
+      address: 0x18
+      gain_db: 24.0
+      use_mclk: true
+      no_dac_ref: true
+    output:
+      type: es8311
+      address: 0x18
+      use_mclk: true
+      no_dac_ref: true
+
+  on_amplifier_required:
+    then:
+      - switch.turn_on: speaker_enable
+
+  on_amplifier_idle:
+    then:
+      - switch.turn_off: speaker_enable
+
+microphone:
+  - platform: esp_audio_stack
+    id: voice_mic
+    esp_audio_stack_id: audio_stack
+
+speaker:
+  - platform: esp_audio_stack
+    id: voice_spk
+    esp_audio_stack_id: audio_stack
+    sample_rate: 48000
+    bits_per_sample: 16
+    timeout: 1s
+  - platform: resampler
+    id: resampled_speaker
+    output_speaker: voice_spk
+    bits_per_sample: 16
+    sample_rate: 48000
+    task_stack_in_psram: true
+  - platform: mixer
+    id: audio_mixer
+    output_speaker: resampled_speaker
+    bits_per_sample: 16
+    num_channels: 1
+    task_stack_in_psram: true
+    source_speakers:
+      - id: announcement_source_speaker
+      - id: media_source_speaker
+
+audio_file:
+  - id: wake_word_audio
+    file: ${wake_word_triggered_sound_file}
+  - id: error_cloud_audio
+    file: ${error_cloud_expired_file}
+  - id: timer_finished_audio
+    file: ${timer_finished_sound_file}
+
+media_source:
+  - platform: audio_http
+    id: tts_source
+    buffer_size: 100000
+    persistent_ring_buffer: true
+    task_stack_in_psram: true
+  - platform: sendspin
+    id: sendspin_source
+    sendspin_id: sendspin_hub
+    sample_rate: 48000
+    decode_memory: psram
+    task_stack_in_psram: true
+
+media_player:
+  - platform: speaker_source
+    id: va_media_player
+    name: None
+    volume_min: 0.5
+    volume_max: 1.0
+    announcement_pipeline:
+      speaker: announcement_source_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+      sources:
+        - tts_source
+    media_pipeline:
+      speaker: media_source_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+      sources:
+        - sendspin_source
+  - platform: speaker
+    id: alert_media_player
+    name: None
+    internal: true
+    announcement_pipeline:
+      speaker: announcement_source_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+    files:
+      - id: wake_word_triggered_sound
+        file: ${wake_word_triggered_sound_file}
+      - id: error_cloud_expired
+        file: ${error_cloud_expired_file}
+      - id: timer_finished_sound
+        file: ${timer_finished_sound_file}
+
+switch:
+  - platform: gpio
+    id: speaker_enable
+    pin: GPIO18
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: template
+    id: mute
+    name: Microphone Mute
+    icon: mdi:microphone-off
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_off:
+      - microphone.unmute:
+      - script.execute: start_wake_word
+      - script.execute: set_idle_or_mute_phase
+    on_turn_on:
+      - script.execute: stop_wake_word
+      - microphone.mute:
+      - script.execute: set_idle_or_mute_phase
+  - platform: template
+    id: timer_ringing
+    optimistic: true
+    internal: true
+    restore_mode: ALWAYS_OFF
+    on_turn_off:
+      - lambda: |-
+          id(va_media_player)->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_OFF)
+            .set_announcement(true).perform();
+          id(va_media_player)->set_playlist_delay_ms(static_cast<uint8_t>(speaker_source::Pipeline::ANNOUNCEMENT_PIPELINE), 0);
+      - media_player.stop:
+          id: alert_media_player
+          announcement: true
+    on_turn_on:
+      - lambda: |-
+          id(va_media_player)->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+            .set_announcement(true).perform();
+          id(va_media_player)->set_playlist_delay_ms(static_cast<uint8_t>(speaker_source::Pipeline::ANNOUNCEMENT_PIPELINE), 1000);
+      - media_player.speaker.play_on_device_media_file:
+          id: alert_media_player
+          media_file: timer_finished_sound
+          announcement: true
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+
+
+sendspin:
+  id: sendspin_hub
+  task_stack_in_psram: true
+
+micro_wake_word:
+  id: mww
+  microphone: voice_mic
+  stop_after_detection: false
+  models:
+    - model: okay_nabu
+      id: okay_nabu
+    - model: hey_jarvis
+      id: hey_jarvis
+    - model: hey_mycroft
+      id: hey_mycroft
+  vad:
+  on_wake_word_detected:
+    - mixer_speaker.apply_ducking:
+        id: media_source_speaker
+        decibel_reduction: 30
+        duration: 300ms
+    - script.execute:
+        id: play_sound
+        priority: true
+        sound_file: !lambda return id(wake_word_triggered_sound);
+    - delay: 300ms
+    - wait_until:
+        condition:
+          - not:
+              media_player.is_announcing: alert_media_player
+        timeout: 5s
+    - delay: 50ms
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  microphone: voice_mic
+  media_player: va_media_player
+  micro_wake_word: mww
+  use_wake_word: false
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_tts_start:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+  on_listening:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
+  on_stt_vad_end:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+  on_end:
+    - wait_until:
+        not:
+          voice_assistant.is_running:
+    # If the end happened because of an error, let the error phase on for a second
+    - if:
+        condition:
+          lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+        then:
+          - delay: 1s
+    # on_end precedes TTS playback. Restore music only after the announcement
+    # pipeline has finished, then restart mWW after the I2S teardown settles.
+    - wait_until:
+        condition:
+          media_player.is_announcing: va_media_player
+        timeout: 5s
+    - wait_until:
+        condition:
+          not:
+            media_player.is_announcing: va_media_player
+        timeout: 120s
+    - mixer_speaker.apply_ducking:
+        id: media_source_speaker
+        decibel_reduction: 0
+        duration: 500ms
+    - delay: 500ms
+    - script.execute: start_wake_word
+    - script.execute: set_idle_or_mute_phase
+  on_error:
+    # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
+    # These two are ignored for a better user experience
+    - if:
+        condition:
+          and:
+            - lambda: return !id(init_in_progress);
+            - lambda: return code != "duplicate_wake_up_detected";
+            - lambda: return code != "stt-no-text-recognized";
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+          - if:
+              condition:
+                lambda: return code == "cloud-auth-failed";
+              then:
+                - script.execute:
+                    id: play_sound
+                    priority: true
+                    sound_file: !lambda return id(error_cloud_expired);
+          - delay: 1s
+          - script.execute: set_idle_or_mute_phase
+
+  on_client_connected:
+    - lambda: id(init_in_progress) = false;
+    - script.execute: set_idle_or_mute_phase
+    - script.execute: start_wake_word
+
+  on_client_disconnected:
+    - script.execute: stop_wake_word
+    - mixer_speaker.apply_ducking:
+        id: media_source_speaker
+        decibel_reduction: 0
+        duration: 300ms
+    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id}; 
+    - voice_assistant.stop:
+
+select:
+  - platform: template
+    entity_category: config
+    name: Wake word engine location
+    id: wake_word_engine_location
+    optimistic: true
+    restore_value: true
+    options:
+      - In Home Assistant
+      - On device
+    initial_option: On device
+    on_value:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - script.execute: stop_wake_word
+            - delay: 500ms
+            - script.execute: start_wake_word
+  - platform: template
+    name: Wake word sensitivity
+    id: wake_word_sensitivity
+    optimistic: true
+    restore_value: true
+    initial_option: Moderately sensitive
+    entity_category: config
+    options:
+      - Slightly sensitive
+      - Moderately sensitive
+      - Very sensitive
+    on_value:
+      - lambda: |-
+          if (x == "Slightly sensitive") {
+            id(okay_nabu).set_probability_cutoff(217);
+            id(hey_jarvis).set_probability_cutoff(247);
+            id(hey_mycroft).set_probability_cutoff(253);
+          } else if (x == "Moderately sensitive") {
+            id(okay_nabu).set_probability_cutoff(176);
+            id(hey_jarvis).set_probability_cutoff(235);
+            id(hey_mycroft).set_probability_cutoff(242);
+          } else if (x == "Very sensitive") {
+            id(okay_nabu).set_probability_cutoff(143);
+            id(hey_jarvis).set_probability_cutoff(212);
+            id(hey_mycroft).set_probability_cutoff(237);
+          }
+
+  - platform: template
+    id: aec_mode_select
+    name: "AEC Mode"
+    entity_category: config
+    options:
+      - "sr_low_cost"
+      - "sr_high_perf"
+    initial_option: "sr_low_cost"
+    optimistic: false
+    restore_value: true
+    set_action:
+      - esp_aec.set_mode:
+          id: aec
+          mode: !lambda 'return x;'
+      - lambda: 'id(aec_mode_select).publish_state(id(aec).get_mode_name());'
+
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: voice_assistant_phase
+    type: int
+    restore_value: no
+    initial_value: ${voice_assist_not_ready_phase_id}
+
+script:
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - not: voice_assistant.is_running
+              - switch.is_off: mute
+              - lambda: return id(wake_word_engine_location).current_option() == "On device";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - micro_wake_word.stop
+            - wait_until:
+                condition:
+                  lambda: return !id(mww).is_running();
+                timeout: 2s
+            - micro_wake_word.start
+      - if:
+          condition:
+            and:
+              - not: voice_assistant.is_running
+              - switch.is_off: mute
+              - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(true);
+            - voice_assistant.start_continuous
+
+  - id: stop_wake_word
+    then:
+      - micro_wake_word.stop
+      - wait_until:
+          condition:
+            lambda: return !id(mww).is_running();
+          timeout: 2s
+      - if:
+          condition:
+            voice_assistant.is_running:
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - voice_assistant.stop:
+
+  - id: set_idle_or_mute_phase
+    then:
+      - if:
+          condition:
+            switch.is_off: mute
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+          else:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+
+  - id: play_sound
+    parameters:
+      priority: bool
+      sound_file: "audio::AudioFile*"
+    then:
+      - lambda: |-
+          if (priority) {
+            id(alert_media_player)
+              ->make_call()
+              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+              .set_announcement(true)
+              .perform();
+          }
+          if ((id(alert_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING) || priority) {
+            id(alert_media_player)->play_file(sound_file, true, false);
+          }

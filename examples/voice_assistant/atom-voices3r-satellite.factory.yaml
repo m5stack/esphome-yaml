@@ -1,0 +1,23 @@
+packages:
+  atom-voices3r-satellite: !include ../../common/atom-voices3r-satellite-base.yaml
+
+esphome:
+  project:
+    name: m5stack.atom-voices3r-voice-assistant
+    version: 2026.10.0
+
+dashboard_import:
+  package_import_url: github://m5stack/esphome-yaml/common/atom-voices3r-satellite-base.yaml@main
+
+# Standard ESPHome provisioning path for factory/test images.
+wifi:
+  on_connect:
+    - delay: 5s
+    - ble.disable:
+  on_disconnect:
+    - ble.enable:
+
+improv_serial:
+
+improv_ble:
+  authorizer: none
