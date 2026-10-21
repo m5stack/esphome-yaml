@@ -248,17 +248,23 @@ void PowerHub::setup() {
 
 #ifdef USE_BINARY_SENSOR
     // Inteval used to read PMU button status
-    // polling every 20ms
+    // polling every button_update_interval_ ms
     this->button_binary_sensor_->publish_initial_state(false);
-    this->set_interval("pmu_button", 20, [this]() {
+    this->set_interval("pmu_button", this->button_update_interval_, [this]() {
         this->update_pmu_button_sensor();
+    });
+
+    // Interval for VIN status
+    this->vin_status_binary_sensor_->publish_initial_state(false);
+    this->set_interval("vin_status", this->vin_status_update_interval_, [this]() {
+        this->update_vin_status_sensor();
     });
 #endif
 
 #ifdef USE_TEXT_SENSOR
     // Interval used to read charge/vin status
-    // polling every 500 ms (0.5s)
-    this->set_interval("charge_vin_status", 500, [this]() {
+    // polling every charge_status_update_interval_ ms
+    this->set_interval("charge_vin_status", this->charge_status_update_interval_, [this]() {
         this->update_charge_vin_sensor();
     });
 #endif
@@ -284,6 +290,7 @@ void PowerHub::dump_config() {
 #ifdef USE_BINARY_SENSOR
     ESP_LOGCONFIG(TAG, "Binary Sensor:");
     LOG_BINARY_SENSOR("  ", "Button", this->button_binary_sensor_);
+    LOG_BINARY_SENSOR("  ", "VIN Status", this->vin_status_binary_sensor_);
 #endif
 
 #ifdef USE_SENSOR
@@ -727,6 +734,19 @@ void PowerHub::update_pmu_button_sensor() {
         if (pressed != this->last_button_state_) {
             this->last_button_state_ = pressed;
             this->button_binary_sensor_->publish_state(pressed);
+        }
+    }
+#endif
+}
+
+void PowerHub::update_vin_status_sensor() {
+#ifdef USE_BINARY_SENSOR
+    if (this->vin_status_binary_sensor_) {
+        uint8_t vin_status = this->read_vin_status();
+        bool has_input = (vin_status == 1);
+        if (has_input != this->last_vin_state_) {
+            this->last_vin_state_ = has_input;
+            this->vin_status_binary_sensor_->publish_state(has_input);
         }
     }
 #endif
