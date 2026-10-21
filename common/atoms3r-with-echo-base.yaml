@@ -183,6 +183,9 @@ microphone:
     i2s_din_pin: GPIO7
     bits_per_sample: 16bit
     adc_type: external
+    channel: left  # ES8311 sends mic samples on the LEFT slot
+                   # (M5Stack OpenAI SDK uses I2S_CHANNEL_FMT_ALL_LEFT;
+                   # ESPHome's i2s_audio.microphone defaults to RIGHT)
 
 
 speaker:
