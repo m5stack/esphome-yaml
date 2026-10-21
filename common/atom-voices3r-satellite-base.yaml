@@ -29,6 +29,17 @@ esphome:
     name: m5stack.voice-s3r-satellite
     version: 2026.10.0
   min_version: 2026.9.0
+  on_boot:
+    priority: 375
+    then:
+      # If Home Assistant has not connected within 10 minutes, clear the init flag
+      # so the on-device wake word can still be started (e.g. from the mute switch).
+      - delay: 10min
+      - if:
+          condition:
+            lambda: return id(init_in_progress);
+          then:
+            - lambda: id(init_in_progress) = false;
 
 esp32:
   variant: ESP32S3
@@ -110,8 +121,7 @@ i2c:
     scl:
       number: GPIO0
       ignore_strapping_warning: true
-    frequency: 400kHz
-    scan: true
+    frequency: 100kHz
 
 esp_audio_stack:
   id: audio_stack
@@ -119,15 +129,17 @@ esp_audio_stack:
   output_sample_rate: 16000
   bits_per_sample: 16
   slot_bit_width: 16
-  num_channels: 1
+  # ES8311 feedback puts the mic on RX slot 0 and the DAC echo on slot 1, so the
+  # bus must be read as stereo. Playback stays mono (speaker_channels defaults 1).
+  num_channels: 2
   processor_id: aec
-  aec_reference: ring_buffer
-  aec_reference_buffer_ms: 80
+  use_stereo_aec_reference: true
+  reference_channel: right
   buffers_in_psram: true
   audio_task_stack_in_psram: true
   aec_ref_ring_in_psram: true
-  telemetry: true
-  telemetry_log_interval_frames: 128
+  telemetry: false
+
 
   i2s_mclk_pin: GPIO11
   i2s_bclk_pin: GPIO17
@@ -144,12 +156,12 @@ esp_audio_stack:
       address: 0x18
       gain_db: 24.0
       use_mclk: true
-      no_dac_ref: true
+      no_dac_ref: false
     output:
       type: es8311
       address: 0x18
       use_mclk: true
-      no_dac_ref: true
+      no_dac_ref: false
 
   on_amplifier_required:
     then:
@@ -171,79 +183,99 @@ speaker:
     sample_rate: 48000
     bits_per_sample: 16
     timeout: 1s
-  - platform: resampler
-    id: resampled_speaker
-    output_speaker: voice_spk
-    bits_per_sample: 16
-    sample_rate: 48000
-    task_stack_in_psram: true
+
   - platform: mixer
     id: audio_mixer
-    output_speaker: resampled_speaker
+    output_speaker: voice_spk
     bits_per_sample: 16
     num_channels: 1
     task_stack_in_psram: true
     source_speakers:
-      - id: announcement_source_speaker
-      - id: media_source_speaker
+      - id: announcement_mixing_input
+        timeout: never
+      - id: media_mixing_input
+        timeout: never    
+
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
+    bits_per_sample: 16
+    sample_rate: 48000
+
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
+    bits_per_sample: 16
+    sample_rate: 48000
 
 audio_file:
-  - id: wake_word_audio
+  - id: wake_word_sound
     file: ${wake_word_triggered_sound_file}
-  - id: error_cloud_audio
+  - id: error_cloud_sound
     file: ${error_cloud_expired_file}
-  - id: timer_finished_audio
+  - id: timer_finished_sound
     file: ${timer_finished_sound_file}
 
 media_source:
+  - platform: audio_file
+    id: audio_file_announcement_source
   - platform: audio_http
-    id: tts_source
-    buffer_size: 100000
-    persistent_ring_buffer: true
-    task_stack_in_psram: true
+    id: http_announcement_source
+    buffer_size: 250000
+  - platform: audio_http
+    id: http_media_source
+    buffer_size: 500000
   - platform: sendspin
-    id: sendspin_source
-    sendspin_id: sendspin_hub
-    sample_rate: 48000
-    decode_memory: psram
-    task_stack_in_psram: true
+    id: sendspin_media_source
+    codecs: [FLAC, PCM]            # Prefer FLAC for Sendspin
 
 media_player:
+  - platform: sendspin
+    id: sendspin_group_media_player
   - platform: speaker_source
-    id: va_media_player
-    name: None
-    volume_min: 0.5
-    volume_max: 1.0
+    id: external_media_player
+    name: Media Player
     announcement_pipeline:
-      speaker: announcement_source_speaker
+      speaker: announcement_resampling_speaker
       format: FLAC
       sample_rate: 48000
       num_channels: 1
       sources:
-        - tts_source
+        - audio_file_announcement_source
+        - http_announcement_source
+
     media_pipeline:
-      speaker: media_source_speaker
       format: FLAC
       sample_rate: 48000
-      num_channels: 1
+      num_channels: 2
+      speaker: media_resampling_speaker
       sources:
-        - sendspin_source
-  - platform: speaker
-    id: alert_media_player
-    name: None
-    internal: true
-    announcement_pipeline:
-      speaker: announcement_source_speaker
-      format: FLAC
-      sample_rate: 48000
-      num_channels: 1
-    files:
-      - id: wake_word_triggered_sound
-        file: ${wake_word_triggered_sound_file}
-      - id: error_cloud_expired
-        file: ${error_cloud_expired_file}
-      - id: timer_finished_sound
-        file: ${timer_finished_sound_file}
+        - http_media_source
+        - sendspin_media_source
+
+    volume_increment: 0.05
+    volume_min: 0.4
+    volume_max: 0.85
+
+    on_announcement:
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 20
+          duration: 0.0s
+    on_state:
+      if:
+        condition:
+          and:
+            - switch.is_off: timer_ringing
+            - not:
+                voice_assistant.is_running:
+            - not:
+                media_player.is_announcing: external_media_player
+        then:
+          - mixer_speaker.apply_ducking:
+              id: media_mixing_input
+              decibel_reduction: 0
+              duration: 1.0s
 
 switch:
   - platform: gpio
@@ -261,7 +293,6 @@ switch:
       - script.execute: start_wake_word
       - script.execute: set_idle_or_mute_phase
     on_turn_on:
-      - script.execute: stop_wake_word
       - microphone.mute:
       - script.execute: set_idle_or_mute_phase
   - platform: template
@@ -270,27 +301,45 @@ switch:
     internal: true
     restore_mode: ALWAYS_OFF
     on_turn_off:
-      - lambda: |-
-          id(va_media_player)->make_call()
-            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_OFF)
-            .set_announcement(true).perform();
-          id(va_media_player)->set_playlist_delay_ms(static_cast<uint8_t>(speaker_source::Pipeline::ANNOUNCEMENT_PIPELINE), 0);
-      - media_player.stop:
-          id: alert_media_player
-          announcement: true
+      # Disable stop wake word
+      - micro_wake_word.disable_model: stop
+      - script.execute: disable_repeat
+      # Stop any current announcement (ie: stop the timer ring mid playback)
+      - if:
+          condition:
+            media_player.is_announcing:
+              id: external_media_player
+          then:
+            media_player.stop:
+              announcement: true
+              id: external_media_player
+      # Set back ducking ratio to zero
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 0
+          duration: 1.0s
     on_turn_on:
-      - lambda: |-
-          id(va_media_player)->make_call()
-            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
-            .set_announcement(true).perform();
-          id(va_media_player)->set_playlist_delay_ms(static_cast<uint8_t>(speaker_source::Pipeline::ANNOUNCEMENT_PIPELINE), 1000);
-      - media_player.speaker.play_on_device_media_file:
-          id: alert_media_player
-          media_file: timer_finished_sound
-          announcement: true
+      # Duck audio
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 20
+          duration: 0.0s
+      # Enable stop wake word
+      - micro_wake_word.enable_model: stop
+      # Ring timer
+      - script.execute: ring_timer
+      # If 15 minutes have passed and the timer is still ringing, stop it.
       - delay: 15min
       - switch.turn_off: timer_ringing
 
+  # Wake Word Sound Switch.
+  - platform: template
+    id: wake_sound
+    name: Wake sound
+    icon: "mdi:bullhorn"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON      
 
 sendspin:
   id: sendspin_hub
@@ -307,35 +356,64 @@ micro_wake_word:
       id: hey_jarvis
     - model: hey_mycroft
       id: hey_mycroft
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: stop
+      internal: true      
   vad:
   on_wake_word_detected:
-    - mixer_speaker.apply_ducking:
-        id: media_source_speaker
-        decibel_reduction: 30
-        duration: 300ms
-    - script.execute:
-        id: play_sound
-        priority: true
-        sound_file: !lambda return id(wake_word_triggered_sound);
-    - delay: 300ms
-    - wait_until:
+    # If the wake word is detected when the device is muted (Possible with the software mute switch): Do nothing
+    - if:
         condition:
-          - not:
-              media_player.is_announcing: alert_media_player
-        timeout: 5s
-    - delay: 50ms
-    - voice_assistant.start:
-        wake_word: !lambda return wake_word;
+          switch.is_off: mute
+        then:
+          # If a timer is ringing: Stop it, do not start the voice assistant (We can stop timer from voice!)
+          - if:
+              condition:
+                switch.is_on: timer_ringing
+              then:
+                - switch.turn_off: timer_ringing
+              # Stop voice assistant if running
+              else:
+                - if:
+                    condition:
+                      voice_assistant.is_running:
+                    then:
+                      voice_assistant.stop:
+                    # Stop any other media player announcement
+                    else:
+                      - if:
+                          condition:
+                            media_player.is_announcing:
+                              id: external_media_player
+                          then:
+                            - media_player.stop:
+                                announcement: true
+                                id: external_media_player
+                          # Start the voice assistant and play the wake sound, if enabled
+                          else:
+                            - if:
+                                condition:
+                                  switch.is_on: wake_sound
+                                then:
+                                  - script.execute:
+                                      id: play_sound
+                                      priority: true
+                                      sound_file: "wake_word_sound"
+                                  - delay: 300ms
+                            - voice_assistant.start:
+                                wake_word: !lambda return wake_word;
 
 voice_assistant:
   id: va
   microphone: voice_mic
-  media_player: va_media_player
+  media_player: external_media_player
   micro_wake_word: mww
   use_wake_word: false
-  noise_suppression_level: 2
-  auto_gain: 31dBFS
-  volume_multiplier: 2.0
+  # The microphone stream is already echo-cancelled by esp_aec, so no additional
+  # noise suppression, gain or volume scaling is applied here.
+  noise_suppression_level: 0
+  auto_gain: 0 dbfs
+  volume_multiplier: 1
   on_tts_start:
     - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
   on_listening:
@@ -346,30 +424,19 @@ voice_assistant:
     - wait_until:
         not:
           voice_assistant.is_running:
+    # Stop ducking audio.
+    - mixer_speaker.apply_ducking:
+        id: media_mixing_input
+        decibel_reduction: 0
+        duration: 1.0s
     # If the end happened because of an error, let the error phase on for a second
     - if:
         condition:
           lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
         then:
           - delay: 1s
-    # on_end precedes TTS playback. Restore music only after the announcement
-    # pipeline has finished, then restart mWW after the I2S teardown settles.
-    - wait_until:
-        condition:
-          media_player.is_announcing: va_media_player
-        timeout: 5s
-    - wait_until:
-        condition:
-          not:
-            media_player.is_announcing: va_media_player
-        timeout: 120s
-    - mixer_speaker.apply_ducking:
-        id: media_source_speaker
-        decibel_reduction: 0
-        duration: 500ms
-    - delay: 500ms
-    - script.execute: start_wake_word
-    - script.execute: set_idle_or_mute_phase
+    # Reset the voice assistant phase id and reset the LED animations.
+    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
   on_error:
     # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
     # These two are ignored for a better user experience
@@ -381,15 +448,15 @@ voice_assistant:
             - lambda: return code != "stt-no-text-recognized";
         then:
           - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
-          - if:
-              condition:
-                lambda: return code == "cloud-auth-failed";
-              then:
-                - script.execute:
-                    id: play_sound
-                    priority: true
-                    sound_file: !lambda return id(error_cloud_expired);
-          - delay: 1s
+    # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
+    - if:
+        condition:
+          - lambda: return code == "cloud-auth-failed";
+        then:
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: "error_cloud_sound"
           - script.execute: set_idle_or_mute_phase
 
   on_client_connected:
@@ -398,33 +465,13 @@ voice_assistant:
     - script.execute: start_wake_word
 
   on_client_disconnected:
-    - script.execute: stop_wake_word
-    - mixer_speaker.apply_ducking:
-        id: media_source_speaker
-        decibel_reduction: 0
-        duration: 300ms
     - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id}; 
     - voice_assistant.stop:
 
+  on_timer_finished:
+    - switch.turn_on: timer_ringing
+
 select:
-  - platform: template
-    entity_category: config
-    name: Wake word engine location
-    id: wake_word_engine_location
-    optimistic: true
-    restore_value: true
-    options:
-      - In Home Assistant
-      - On device
-    initial_option: On device
-    on_value:
-      - if:
-          condition:
-            lambda: return !id(init_in_progress);
-          then:
-            - script.execute: stop_wake_word
-            - delay: 500ms
-            - script.execute: start_wake_word
   - platform: template
     name: Wake word sensitivity
     id: wake_word_sensitivity
@@ -485,40 +532,44 @@ script:
       - if:
           condition:
             and:
-              - not: voice_assistant.is_running
+              - lambda: return !id(init_in_progress);
               - switch.is_off: mute
-              - lambda: return id(wake_word_engine_location).current_option() == "On device";
+              - lambda: return !id(mww).is_running();
           then:
-            - lambda: id(va).set_use_wake_word(false);
-            - micro_wake_word.stop
-            - wait_until:
-                condition:
-                  lambda: return !id(mww).is_running();
-                timeout: 2s
             - micro_wake_word.start
-      - if:
-          condition:
-            and:
-              - not: voice_assistant.is_running
-              - switch.is_off: mute
-              - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
-          then:
-            - lambda: id(va).set_use_wake_word(true);
-            - voice_assistant.start_continuous
 
-  - id: stop_wake_word
+  # Script executed when the timer is ringing, to playback sounds.
+  - id: ring_timer
     then:
-      - micro_wake_word.stop
-      - wait_until:
-          condition:
-            lambda: return !id(mww).is_running();
-          timeout: 2s
-      - if:
-          condition:
-            voice_assistant.is_running:
-          then:
-            - lambda: id(va).set_use_wake_word(false);
-            - voice_assistant.stop:
+      - script.execute: enable_repeat_one
+      - script.execute:
+          id: play_sound
+          priority: true
+          sound_file: "timer_finished_sound"
+
+  # Script executed when the timer is ringing, to repeat the timer finished sound.
+  - id: enable_repeat_one
+    then:
+      # Turn on the repeat mode and pause for 500 ms between playlist items/repeats
+      - media_player.repeat_one:
+          id: external_media_player
+          announcement: true
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: announcement
+          delay: 500ms
+
+  # Script execute when the timer is done ringing, to disable repeat mode.
+  - id: disable_repeat
+    then:
+      # Turn off the repeat mode and pause for 0 ms between playlist items/repeats
+      - media_player.repeat_off:
+          id: external_media_player
+          announcement: true
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: announcement
+          delay: 0ms
 
   - id: set_idle_or_mute_phase
     then:
@@ -530,19 +581,24 @@ script:
           else:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
 
+  # Script executed when we want to play sounds on the device.
   - id: play_sound
     parameters:
       priority: bool
-      sound_file: "audio::AudioFile*"
+      sound_file: string
     then:
+      - if:
+          condition:
+            lambda: return priority;
+          then:
+            - media_player.stop:
+                id: external_media_player
+                announcement: true
       - lambda: |-
-          if (priority) {
-            id(alert_media_player)
+          if ( (id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
+            id(external_media_player)
               ->make_call()
-              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+              .set_media_url("audio-file://" + sound_file)
               .set_announcement(true)
               .perform();
-          }
-          if ((id(alert_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING) || priority) {
-            id(alert_media_player)->play_file(sound_file, true, false);
           }
