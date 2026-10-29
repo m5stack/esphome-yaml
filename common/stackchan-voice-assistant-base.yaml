@@ -192,8 +192,8 @@ external_components:
     components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
     refresh: 1h
 
-  - source: github://n-IA-hane/esphome-intercom@v3.1.0
-    components: [i2s_audio_duplex, esp_aec]
+  - source: github://n-IA-hane/esphome-intercom@v2026.5.0
+    components: [i2s_audio_duplex, esp_aec, audio_processor]
     refresh: 1h
     
 # PMU
@@ -519,7 +519,7 @@ i2s_audio_duplex:
   sample_rate: 48000
   output_sample_rate: 16000     # FIR decimation to 16kHz
   correct_dc_offset: true
-  aec_id: aec
+  processor_id: aec
   buffers_in_psram: true
 
 microphone:
@@ -537,6 +537,10 @@ speaker:
     id: hw_speaker
     i2s_audio_duplex_id: i2s_duplex
     sample_rate: 48000
+    # The duplex speaker only declares stream limits, not a concrete
+    # bits_per_sample. ESPHome 2026.5+ mixer inherits this from its
+    # output_speaker, so it must be set explicitly or validation fails.
+    bits_per_sample: 16
 
   - platform: mixer
     id: audio_mixer
