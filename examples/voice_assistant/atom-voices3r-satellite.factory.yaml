@@ -1,4 +1,9 @@
 packages:
+  va_connected_wait_for_ble:
+    voice_assistant:
+      on_client_connected:
+        - wait_until:
+            not: ble.enabled
   atom-voices3r-satellite: !include ../../common/atom-voices3r-satellite-base.yaml
 
 esphome:

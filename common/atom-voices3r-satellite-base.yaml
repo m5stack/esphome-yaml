@@ -26,9 +26,9 @@ esphome:
   friendly_name: M5Stack Atom VoiceS3R Voice Assistant
   name_add_mac_suffix: true
   project: 
-    name: m5stack.voice-s3r-satellite
+    name: m5stack.voices3r-satellite
     version: 2026.10.0
-  min_version: 2026.9.0
+  min_version: 2026.10.0
   on_boot:
     priority: 375
     then:
@@ -52,6 +52,10 @@ esp32:
         CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
         CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
         CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+    advanced:
+      # Link only the flash vendor driver this board uses; otherwise the boot log
+      # warns that the detected flash chip has no driver.
+      flash_chip: gd
 
 psram:
   mode: octal
@@ -72,9 +76,6 @@ captive_portal:
 
 logger:
   level: INFO
-  logs:
-    esp_aec: WARN
-    audio_stack: INFO
 
 binary_sensor:
   - platform: gpio
@@ -101,7 +102,7 @@ button:
     internal: true
 
 external_components:
-  - source: github://n-IA-hane/esphome-audio-stack@v2026.10.2
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.11.0
     components:
       - esp_audio_stack
       - esp_aec
@@ -109,8 +110,9 @@ external_components:
 esp_aec:
   id: aec
   sample_rate: 16000
-  # SR preserves the speech spectrum for microWakeWord
-  mode: sr_low_cost
+  # fd_* adds the NLP residual suppression that the SR modes lack; without it the
+  # wake word is unreliable while music plays.
+  mode: fd_low_cost
   filter_length: 4
 
 i2c:
@@ -137,7 +139,6 @@ esp_audio_stack:
   reference_channel: right
   buffers_in_psram: true
   audio_task_stack_in_psram: true
-  aec_ref_ring_in_psram: true
   telemetry: false
 
 
@@ -154,7 +155,9 @@ esp_audio_stack:
     input:
       type: es8311
       address: 0x18
-      gain_db: 24.0
+      # Keep ADC headroom for the speaker echo that leaks into the mic; the
+      # post-AEC mic_gain restores the level, so the delivered audio is unchanged.
+      gain_db: 12
       use_mclk: true
       no_dac_ref: false
     output:
@@ -254,7 +257,9 @@ media_player:
         - sendspin_media_source
 
     volume_increment: 0.05
-    volume_min: 0.4
+    volume_min: 0.3
+    # Each extra dB of playback costs a dB of wake margin while music plays, so
+    # 0.6-0.7 is the working range; 0.85 is music-first.
     volume_max: 0.85
 
     on_announcement:
@@ -471,6 +476,17 @@ voice_assistant:
   on_timer_finished:
     - switch.turn_on: timer_ringing
 
+number:
+  # Applied after the AEC, so it lifts speech without also lifting the echo that
+  # the AEC has to cancel. 0 dB is unity gain, not mute.
+  - platform: esp_audio_stack
+    esp_audio_stack_id: audio_stack
+    mic_gain:
+      name: Mic Gain
+      min_value: -20
+      max_value: 30
+      initial_value: 24
+
 select:
   - platform: template
     name: Wake word sensitivity
@@ -506,9 +522,15 @@ select:
     options:
       - "sr_low_cost"
       - "sr_high_perf"
-    initial_option: "sr_low_cost"
+      - "voip_low_cost"
+      - "voip_high_perf"
+      - "fd_low_cost"
+      - "fd_high_perf"
+    initial_option: "fd_low_cost"
     optimistic: false
-    restore_value: true
+    # A restored template select does not run set_action at boot, so it would
+    # report a mode the AEC is not actually running.
+    restore_value: false
     set_action:
       - esp_aec.set_mode:
           id: aec
