@@ -15,7 +15,7 @@ esphome:
     version: 2026.3.0
 
 dashboard_import:
-  package_import_url: github://m5stack/esphome-yaml/common/atoms3r-with-echo-base.yaml@main
+  package_import_url: github://Sagurado/esphome-yaml/common/atoms3r-with-echo-base.yaml@main
 
 wifi:
   on_connect:
