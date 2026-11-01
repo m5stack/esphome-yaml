@@ -183,6 +183,7 @@ microphone:
     i2s_din_pin: GPIO7
     bits_per_sample: 16bit
     adc_type: external
+    channel: left
 
 
 speaker:
@@ -409,7 +410,9 @@ micro_wake_word:
     - script.execute:
         id: play_sound
         priority: true
-        sound_file: !lambda return id(wake_word_triggered_sound);
+        #sound_file: !lambda return id(wake_word_triggered_sound);
+        sound_file: !lambda return const_cast<audio::AudioFile*>(id(wake_word_triggered_sound));
+
 
     - wait_until:
         condition:
@@ -496,7 +499,8 @@ voice_assistant:
           - script.execute:
               id: play_sound
               priority: true
-              sound_file: !lambda return id(error_cloud_expired);
+              #sound_file: !lambda return id(error_cloud_expired);
+              sound_file: !lambda return const_cast<audio::AudioFile*>(id(error_cloud_expired));
           - script.execute: draw_display
           
   on_client_connected:
@@ -552,7 +556,8 @@ light:
 display:
   - platform: mipi_spi
     id: atoms3r_lcd
-    model: ST7789V
+    #model: ST7789V
+    model: ST7735
     dc_pin: GPIO42
     reset_pin: GPIO48
     cs_pin: GPIO14
@@ -562,6 +567,8 @@ display:
       width: 128
       offset_width: 2
       offset_height: 1
+      pad_width: 2
+      pad_height: 3
 
     invert_colors: true
     rotation: 180°
