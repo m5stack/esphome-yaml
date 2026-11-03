@@ -65,7 +65,7 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2026.3.0
+  min_version: 2026.10.0
   name_add_mac_suffix: true
   on_boot:
     - priority: 600
@@ -192,8 +192,8 @@ external_components:
     components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
     refresh: 1h
 
-  - source: github://n-IA-hane/esphome-intercom@v2026.5.0
-    components: [i2s_audio_duplex, esp_aec, audio_processor]
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.11.0
+    components: [esp_audio_stack, esp_aec]
     refresh: 1h
     
 # PMU
@@ -507,7 +507,7 @@ esp_aec:
   sample_rate: 16000
   mode: sr_low_cost
 
-i2s_audio_duplex:
+esp_audio_stack:
   id: i2s_duplex
   i2s_lrclk_pin: GPIO33
   i2s_bclk_pin: GPIO34
@@ -523,19 +523,18 @@ i2s_audio_duplex:
   buffers_in_psram: true
 
 microphone:
-  - platform: i2s_audio_duplex
+  - platform: esp_audio_stack
     id: mic_aec
-    i2s_audio_duplex_id: i2s_duplex
+    esp_audio_stack_id: i2s_duplex
 
-  - platform: i2s_audio_duplex
+  - platform: esp_audio_stack
     id: mic_wake_word
-    i2s_audio_duplex_id: i2s_duplex
-    pre_aec: true
+    esp_audio_stack_id: i2s_duplex
 
 speaker:
-  - platform: i2s_audio_duplex
+  - platform: esp_audio_stack
     id: hw_speaker
-    i2s_audio_duplex_id: i2s_duplex
+    esp_audio_stack_id: i2s_duplex
     sample_rate: 48000
     # The duplex speaker only declares stream limits, not a concrete
     # bits_per_sample. ESPHome 2026.5+ mixer inherits this from its
@@ -622,7 +621,7 @@ micro_wake_word:
     - script.execute:
         id: play_sound
         priority: true
-        sound_file: !lambda return id(wake_word_triggered_sound);
+        sound_file: !lambda return const_cast<audio::AudioFile *>(id(wake_word_triggered_sound));
     - delay: 50ms
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
@@ -713,7 +712,7 @@ voice_assistant:
           - script.execute:
               id: play_sound
               priority: true
-              sound_file: !lambda return id(error_cloud_expired);
+              sound_file: !lambda return const_cast<audio::AudioFile *>(id(error_cloud_expired));
           - script.execute: draw_display
 
   on_client_connected:
