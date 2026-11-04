@@ -35,7 +35,7 @@ substitutions:
   error_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/error.eaf
 
   # LCD panel fitted on the unit: gc9107 or st7735
-  lcd_variant: gc9107
+  lcd_variant: st7735
 
 esphome:
   name: atoms3r-voice-base
