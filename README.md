@@ -1,41 +1,35 @@
-<div align="center" style="margin: 20px 0;">
+<div align="center" style="margin: 20px 20px;">
   <img src="https://docs.m5stack.com/assets/m5logo2022.svg" width="128" />
 </div>
 
 <div align="center" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;">
   <img src="https://img.shields.io/badge/home%20assistant-%2341BDF5.svg?style=for-the-badge&logo=home-assistant&logoColor=white">
-  <img src="https://img.shields.io/badge/ESPHome-2026.3.0-000000?style=for-the-badge&logo=esphome&logoColor=white">
+  <img src="https://img.shields.io/badge/ESPHome-2026.10.0-000000?style=for-the-badge&logo=esphome&logoColor=white">
   <img src="https://img.shields.io/badge/espressif-E7352C.svg?style=for-the-badge&logo=espressif&logoColor=white">
-  <img src="https://img.shields.io/badge/PlatformIO-F5822A.svg?style=for-the-badge&logo=PlatformIO&logoColor=white">
 </div>
 
 <h1 align="center">
   M5Stack ESPHome Integrations 
 </h1>
-<p align="center">
-  This repository holds the ESPHome configuration files and external components for M5Stack devices.
-</p>
+
+> [!IMPORTANT]
+> Components are being migrated to [m5stack/esphome](https://github.com/m5stack/esphome/tree/m5-dev/esphome/components), check the [announcement](https://github.com/m5stack/esphome-yaml/discussions/115) for more detail. This repository contains configuration files and pre-built firmware releases only.
 
 ## 🚀 Supported Devices
 
-As of now the below devices/functionalities are supported:
-
-- [Atom EchoS3R Voice Assistant](https://docs.m5stack.com/en/homeassistant/voice_assistant/atom_echos3r_voice_assistant)
-- [M5Stack CoreS3 Voice Assistant](https://docs.m5stack.com/en/homeassistant/voice_assistant/cores3_voice_assistant)
-- [PM2.5 Air Quality Kit-SHT30](https://docs.m5stack.com/en/homeassistant/kit/pm2_5_air_quality_kit_sht30)
-- [Unit PoE CAM-W v1.1](https://docs.m5stack.com/en/homeassistant/kit/unit_poe_cam_w_v1.1)
-
-- [Tab5 Home Assistant HMI](https://docs.m5stack.com/en/homeassistant/kit/tab5_ha_hmi)
-
-[More](https://docs.m5stack.com/en/homeassistant/overview)
+Check the [M5Stack Documentation](https://docs.m5stack.com/en/homeassistant/overview) for a list of supported device.
 
 Some example configurations can be found under `examples` folder, you can clone the repo and use `esphome` locally if you want.
 
 ## ❤️ Feature Request & Contributing
 
-Wish for support for more devices? Wanna contribute to the project?
+Submit a issue and tell us what you want.
 
-You can always tell us what features you wish. And we welcome all sorts of contributions!
+Also, become a maintainer and PR the existing components to upstream ESPHome will be very helpful for our long-term maintenance efforts.
+
+To get started, please refer to [ESPHome developer documentation](https://developers.esphome.io/)
+
+And you can find the existing M5Stack components [here](https://github.com/m5stack/esphome/tree/m5-dev/esphome), some features are separated in different branches in favor of the modification & PR.
 
 ## License
 
