@@ -7,15 +7,15 @@ packages:
       on_client_connected:
         - wait_until:
             not: ble.enabled
-  m5stack-atoms3r-echo-base: !include ../../common/atoms3r-with-echo-base.yaml
+  m5stack-atoms3r-voice-base: !include ../../common/atoms3r-voice-base-satellite.yaml
 
 esphome:
   project:
-    name: m5stack.atoms3r-echo-base-voice
-    version: 2026.3.0
+    name: m5stack.atoms3r-voice-base-satellite
+    version: 2026.10.0
 
 dashboard_import:
-  package_import_url: github://m5stack/esphome-yaml/common/atoms3r-with-echo-base.yaml@main
+  package_import_url: github://m5stack/esphome-yaml/common/atoms3r-voice-base-satellite.yaml@main
 
 wifi:
   on_connect:

@@ -47,22 +47,30 @@ esp32:
   cpu_frequency: 240MHz
   framework:
     type: esp-idf
-    ## Note: Disable these configurations if you face the boot loop issue.
     sdkconfig_options:
-        CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
-        CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
-        CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+      # Moves instructions and read only data from flash into PSRAM on boot.
+      # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+      # Considerably speeds up mWW at the cost of using more PSRAM.
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
     advanced:
-      # Link only the flash vendor driver this board uses; otherwise the boot log
-      # warns that the detected flash chip has no driver.
       flash_chip: gd
 
 psram:
   mode: octal
   speed: 80MHz
 
-# Home Assistant API. The provisioning wrapper supplies the installation-time
-# network credentials and API security settings for factory/test images.
+# Home Assistant API. 
 api:
 
 ota:
