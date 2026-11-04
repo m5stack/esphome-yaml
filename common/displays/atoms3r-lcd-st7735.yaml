@@ -1,0 +1,33 @@
+- platform: mipi_spi
+  id: atoms3r_lcd
+  auto_clear_enabled: false
+  update_interval: never
+  model: CUSTOM
+  dc_pin: GPIO42
+  reset_pin: GPIO48
+  cs_pin: GPIO14
+  data_rate: 40MHz
+  dimensions:
+    width: 128
+    height: 128
+    offset_width: 2
+    offset_height: 1
+    pad_width: 2
+    pad_height: 3
+  invert_colors: true
+  init_sequence:
+    - [0x01]                 # CMD_SWRESET: Software reset
+    - delay 150ms            # 150 ms delay
+    - [0x11]                 # CMD_SLPOUT: Out of sleep mode
+    - delay 120ms            # 500 ms delay
+    - [0xB1, 0x01, 0x2C, 0x2D] # CMD_FRMCTR1: Frame rate ctrl - normal mode
+    - [0xB2, 0x01, 0x2C, 0x2D] # CMD_FRMCTR2: Frame rate control - idle mode
+    - [0xB3, 0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D] # CMD_FRMCTR3: Frame rate ctrl - partial mode
+    - [0xB4, 0x07]           # CMD_INVCTR: Display inversion ctrl (No inversion)
+    - [0xC0, 0xA2, 0x02, 0x84] # CMD_PWCTR1: Power control (-4.6V, AUTO mode)
+    - [0xC1, 0xC5]           # CMD_PWCTR2: Power control (VGH25, VGSEL, VGH)
+    - [0xC2, 0x0A, 0x00]     # CMD_PWCTR3: Power control (Opamp current, Boost freq)
+    - [0xC3, 0x8A, 0x2A]     # CMD_PWCTR4: Power control
+    - [0xC4, 0x8A, 0xEE]     # CMD_PWCTR5: Power control
+    - [0xC5, 0x0E]           # CMD_VMCTR1: VCOM control
+    - [0x26, 0x08]           # CMD_GAMSET

@@ -1,0 +1,5 @@
+- platform: mipi_spi
+  id: atoms3r_lcd
+  auto_clear_enabled: false
+  update_interval: never
+  model: M5STACK-ATOMS3R-GC9107
