@@ -1,7 +1,7 @@
 esphome:
   name: tab5-ha-hmi
   friendly_name: M5Stack Tab5 Home Assistant HMI
-  min_version: 2025.12.0
+  min_version: 2026.7.0
 
 esp32:
   variant: esp32p4
@@ -313,35 +313,44 @@ sensor:
             }
 
   
+# Tab5 has 3 panel variants: V1 = ILI9881C + GT911, V2 = ST7123 or ST7121 (TDDI).
+# Default below is ST7121 - switch the marked lines (and the display model) for the others.
+# Requires ESPHome >= 2026.7.0.
 touchscreen:
-  - platform: gt911
+  - platform: st7123          # V1: gt911
+    id: touch
+    i2c_id: bsp_bus
+    display: lcd
     interrupt_pin: GPIO23
-    update_interval: never
+    update_interval: 50ms     # V1: never
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 5
-    transform:
-      swap_xy: true
-      mirror_x: true
-    calibration:
+    # transform:              # V1 only: uncomment
+    #   swap_xy: true
+    #   mirror_x: true
+    calibration:              # native 720x1280
       x_min: 0
-      x_max: 1280
+      x_max: 720              # V1: 1280
       y_min: 0
-      y_max: 720
-    id: touch
+      y_max: 1280             # V1: 720
 
-      
 esp_ldo:
   - voltage: 2.5V
     channel: 3
 
+lvgl:
+  rotation: 270°              # must be here, display rotation is rejected with LVGL
+
 display:
   - platform: mipi_dsi
+    id: lcd
     dimensions:
       height: 1280
       width: 720
-    model: M5Stack-Tab5
-    rotation: 270°
+    # model: M5STACK-TAB5        # V1
+    # model: M5STACK-TAB5-ST7123 # V2 ST7123
+    model: M5STACK-TAB5-ST7121   # V2 ST7121 (this file)
     reset_pin:
       pi4ioe5v6408: pi4ioe1
       number: 4
