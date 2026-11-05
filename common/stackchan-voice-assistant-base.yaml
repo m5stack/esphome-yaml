@@ -204,7 +204,7 @@ external_components:
     components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
     refresh: 1h
 
-  - source: github://n-IA-hane/esphome-audio-stack@dev
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.11.1-dev
     components: [esp_audio_stack, esp_aec]
     refresh: 1h
     
@@ -507,12 +507,6 @@ audio_adc:
     bits_per_sample: 16bit
     sample_rate: 48000
     mic_gain: 36
-
-audio_dac:
-  - platform: aw88298
-    id: aw88298_dac
-    i2c_id: bsp_bus
-    sample_rate: 48000
 
 esp_aec:
   id: aec
@@ -1068,55 +1062,55 @@ script:
           }
 image:
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/error.png
+    file: ${error_illustration_file}
     id: stachchan_error
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/idle.png
+    file: ${idle_illustration_file}
     id: stachchan_idle
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/listening.png
+    file: ${listening_illustration_file}
     id: stachchan_listening
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/thinking.png
+    file: ${thinking_illustration_file}
     id: stachchan_thinking
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/replying.png
+    file: ${replying_illustration_file}
     id: stachchan_replying
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/loading.png
+    file: ${loading_illustration_file}
     id: stachchan_initializing
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/error-no-wifi.png
+    file: ${error_no_wifi_illustration_file}
     id: error_no_wifi
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/error-no-ha.png
+    file: ${error_no_ha_illustration_file}
     id: error_no_ha
     resize: 320x240
     type: RGB
     transparency: alpha_channel
   - platform: file
-    file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/muted.png
+    file: ${muted_illustration_file}
     id: stackchan_muted
     resize: 320x240
     type: RGB
