@@ -30,6 +30,33 @@ substitutions:
   replying_illustration_background_color: 'FFFFFF'
   error_illustration_background_color: '000000'
 
+  # Faces: the drawing code of the idle, listening, thinking, replying,
+  # error and muted pages. Override one to draw your own face instead of
+  # the illustration; the request / response text is drawn on top.
+  idle_face: |-
+    it.fill(id(idle_color));
+    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_idle), ImageAlign::CENTER);
+  listening_face: |-
+    it.fill(id(listening_color));
+    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_listening), ImageAlign::CENTER);
+  thinking_face: |-
+    it.fill(id(thinking_color));
+    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_thinking), ImageAlign::CENTER);
+  replying_face: |-
+    it.fill(id(replying_color));
+    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_replying), ImageAlign::CENTER);
+  error_face: |-
+    it.fill(id(error_color));
+    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_error), ImageAlign::CENTER);
+  muted_face: |-
+    it.fill(Color::BLACK);
+    it.image((it.get_width() / 2), (it.get_height() / 2), id(stackchan_muted), ImageAlign::CENTER);
+  # Color of the request / response text on the thinking and replying pages
+  illustration_text_color: '000000'
+  # "never" redraws only on state changes; animated faces need a
+  # periodic redraw, e.g. 66ms
+  display_update_interval: never
+
   # Phases of the Voice Assistant
   # The voice assistant is ready to be triggered by a wake word
   voice_assist_idle_phase_id: "1"
@@ -886,32 +913,27 @@ display:
       number: GPIO3
       ignore_strapping_warning: true
     data_rate: 40MHz
-    update_interval: never
+    update_interval: ${display_update_interval}
     invert_colors: true
     id: m5cores3_lcd
     pages:
       - id: idle_page
         lambda: |-
-          it.fill(id(idle_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_idle), ImageAlign::CENTER);
+          ${idle_face}
       - id: listening_page
         lambda: |-
-          it.fill(id(listening_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_listening), ImageAlign::CENTER);
+          ${listening_face}
       - id: thinking_page
         lambda: |-
-          it.fill(id(thinking_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_thinking), ImageAlign::CENTER);
-          it.printf(5, 200, id(font_request), Color::BLACK, "%s", id(text_request).state.c_str());
+          ${thinking_face}
+          it.printf(5, 200, id(font_request), id(text_color), "%s", id(text_request).state.c_str());
       - id: replying_page
         lambda: |-
-          it.fill(id(replying_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_replying), ImageAlign::CENTER);
-          it.printf(5, 200, id(font_response), Color::BLACK, "%s", id(text_response).state.c_str());
+          ${replying_face}
+          it.printf(5, 200, id(font_response), id(text_color), "%s", id(text_response).state.c_str());
       - id: error_page
         lambda: |-
-          it.fill(id(error_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_error), ImageAlign::CENTER);
+          ${error_face}
       - id: no_ha_page
         lambda: |-
           it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_ha), ImageAlign::CENTER);
@@ -924,8 +946,7 @@ display:
           it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_initializing), ImageAlign::CENTER);
       - id: muted_page
         lambda: |-
-          it.fill(Color::BLACK);
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stackchan_muted), ImageAlign::CENTER);
+          ${muted_face}
 
 touchscreen:
   - platform: ft63x6
@@ -1106,3 +1127,5 @@ color:
     hex: ${loading_illustration_background_color}
   - id: error_color
     hex: ${error_illustration_background_color}
+  - id: text_color
+    hex: ${illustration_text_color}
