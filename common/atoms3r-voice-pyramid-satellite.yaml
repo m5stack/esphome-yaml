@@ -1,0 +1,936 @@
+---
+substitutions:
+  name: atoms3r-voice-pyramid
+  friendly_name: AtomS3R Voice Pyramid Voice Assistant
+
+  # Casita animations
+  loading_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/loading.eaf
+  idle_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/idle.eaf
+  listening_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/listening.eaf
+  thinking_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/thinking.eaf
+  replying_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/replying.eaf
+  error_animation_file: https://raw.githubusercontent.com/m5stack/esphome-yaml/main/img/error.eaf
+
+  # LCD panel fitted on the unit: gc9107 or st7735
+  lcd_variant: st7735
+
+  # Audio files
+  wake_word_trigger_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+  error_cloud_expired_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
+
+  stop_model_file: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+
+  # Phases of the Voice Assistant
+  # The voice assistant is ready to be triggered by a wake word
+  voice_assist_idle_phase_id: "1"
+  # The voice assistant is listening for a voice command
+  voice_assist_listening_phase_id: "2"
+  # The voice assistant is currently processing the command
+  voice_assist_thinking_phase_id: "3"
+  # The voice assistant is replying to the command
+  voice_assist_replying_phase_id: "4"
+  # The voice assistant is not ready
+  voice_assist_not_ready_phase_id: "10"
+  # The voice assistant encountered an error
+  voice_assist_error_phase_id: "11"
+  # Muted phase
+  voice_assist_muted_phase_id: "12"
+  # Finished timer phase
+  voice_assist_timer_finished_phase_id: "20"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  project:
+    name: m5stack.atoms3r-voice-pyramid-satellite
+    version: 2026.10.0
+  min_version: 2026.10.0
+  on_boot:
+    priority: 500
+    then:
+      - script.execute: control_pyramid_leds
+      - delay: 30s
+      - if:
+          condition:
+            lambda: return id(init_in_progress);
+          then:
+            - lambda: id(init_in_progress) = false;
+
+esp32:
+  variant: esp32s3
+  flash_size: 8MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    advanced:
+      flash_chip: gd
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+      # Moves instructions and read only data from flash into PSRAM on boot.
+      # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+      # Considerably speeds up mWW at the cost of using more PSRAM.
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+api:
+
+ota:
+
+wifi:
+  ap:
+
+# Enable logging
+logger:
+  level: INFO
+
+captive_portal:
+
+button:
+  - platform: factory_reset
+    id: factory_reset_btn
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO41
+      mode: INPUT_PULLUP
+      inverted: true
+    id: user_button
+    internal: true
+    on_multi_click:
+      - timing:
+          - ON for at least 50ms
+          - OFF for at least 50ms
+        then:
+          - switch.turn_off: timer_ringing
+      - timing:
+          - ON for at least 10s
+        then:
+          - button.press: factory_reset_btn
+
+  - platform: m5_voice_pyramid_kit
+    m5_voice_pyramid_kit_id: pyramid
+    touch: 1
+    name: "Touch 1"
+  - platform: m5_voice_pyramid_kit
+    m5_voice_pyramid_kit_id: pyramid
+    touch: 2
+    name: "Touch 2"
+  - platform: m5_voice_pyramid_kit
+    m5_voice_pyramid_kit_id: pyramid
+    touch: 3
+    name: "Touch 3"
+  - platform: m5_voice_pyramid_kit
+    m5_voice_pyramid_kit_id: pyramid
+    touch: 4
+    name: "Touch 4"
+
+external_components:
+  - source: github://m5stack/esphome@m5-dev
+    components: [lp5562]
+    refresh: 0s
+  - source: github://m5stack/esphome@feat-voice-pyramid
+    components: [m5_voice_pyramid_kit, aw87559, si5351, m5_atoms3_voice_ui]
+    refresh: 0s
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.11.0
+    components:
+      - esp_audio_stack
+      - esp_aec
+
+# I2C Bus Configuration
+i2c:
+  - id: bsp_bus
+    sda:
+      number: GPIO45
+      ignore_strapping_warning: true
+    scl:
+      number: GPIO0
+      ignore_strapping_warning: true
+    frequency: 100kHz
+  - id: ext_bus
+    sda: GPIO38
+    scl: GPIO39
+    frequency: 400kHz    
+
+# Echo Pyramid STM32 controller (touch + addressable RGB + speaker reset)
+m5_voice_pyramid_kit:
+  id: pyramid
+  i2c_id: ext_bus
+  address: 0x1A
+  update_interval: 30ms
+  swipe_timeout: 500ms
+
+# Ehco Base GPIO Expander
+pi4ioe5v6408:
+  - id: pi4ioe5v6408_hub
+    i2c_id: ext_bus
+    address: 0x43
+
+aw87559:
+  id: audio_amp
+  i2c_id: ext_bus
+  address: 0x5B
+  # Class-D gain of the speaker amplifier, 0dB - 27dB in 1.5dB steps.
+  pa_gain: 24dB
+  reset_pin:
+    m5_voice_pyramid_kit_id: pyramid
+    number: 0
+
+si5351:
+  # Si5351A-B-GTR: 10-MSOP, three outputs, no A0/OEB/SSEN/CLKIN pin.
+  id: clock_gen
+  i2c_id: ext_bus
+  address: 0x60
+  variant: a
+  package: msop10
+  crystal:
+    # 27 MHz passive crystal, 10 pF load capacitance.
+    frequency: 27MHz
+    load_capacitance: 10pF
+  # CLK1 feeds I2S_MCLK_DAC (ES8311) and I2S_MCLK_ADC (ES7210) through 22R
+  # series resistors. CLK0 (R3 not fitted) and CLK2 are left unconnected.
+  clocks:
+    - pin: CLK1
+      frequency: 6.144MHz
+
+esp_aec:
+  id: aec
+  sample_rate: 16000
+  # SR modes have no non-linear residual suppression. Measured on voice_samples:
+  # sr_low_cost leaves the residual only ~3 dB under a normal voice while music
+  # plays, so wake-up is unreliable. fd_* adds NLP residual suppression.
+  mode: fd_low_cost
+  filter_length: 4
+
+esp_audio_stack:
+  id: audio_stack
+  sample_rate: 48000
+  output_sample_rate: 16000
+  bits_per_sample: 16
+  slot_bit_width: 16
+  # Si5351 CLK1 drives a fixed 6.144 MHz MCLK into both codecs,
+  # so the bus runs 128 x fs.
+  mclk_multiple: 128
+  processor_id: aec
+  # ES7210 runs its own TDM frame (channel order 1,3,2,4): slot 0 carries the
+  # acoustic mic (MIC1), slot 1 carries MIC3, which the on-board network feeds
+  # from DAC_P/DAC_N as the hardware echo reference. Slots 2/3 are unused.
+  use_tdm_reference: true
+  tdm_total_slots: 4
+  tdm_mic_slots: [0]
+  tdm_ref_slot: 1
+  tdm_tx_slot: 0
+  buffers_in_psram: true
+  audio_task_stack_in_psram: true
+  telemetry: false
+
+  # MCLK is generated by the on-board Si5351 clock generator.
+  i2s_bclk_pin: GPIO6
+  i2s_lrclk_pin: GPIO8
+  i2s_din_pin: GPIO5
+  i2s_dout_pin: GPIO7
+
+  codec:
+    i2c_id: ext_bus
+    input:
+      type: es7210
+      address: 0x40
+      gain_db: 24.0
+      # Only MIC1 (acoustic) and MIC3 (echo reference) are populated.
+      mic_selected: 0x05
+    output:
+      type: es8311
+      address: 0x18
+      use_mclk: true
+
+  on_amplifier_required:
+    then:
+      - switch.turn_on: speaker_enable
+
+  on_amplifier_idle:
+    then:
+      - switch.turn_off: speaker_enable
+
+spi:
+  clk_pin: GPIO15
+  mosi_pin: GPIO21
+  # miso_pin is not used
+
+microphone:
+  - platform: esp_audio_stack
+    id: voice_mic
+    esp_audio_stack_id: audio_stack
+
+speaker:
+  - platform: esp_audio_stack
+    id: voice_spk
+    esp_audio_stack_id: audio_stack
+    sample_rate: 48000
+    bits_per_sample: 16
+    timeout: 1s
+
+  - platform: mixer
+    id: audio_mixer
+    output_speaker: voice_spk
+    bits_per_sample: 16
+    num_channels: 1
+    task_stack_in_psram: true
+    source_speakers:
+      - id: announcement_mixing_input
+        timeout: never
+      - id: media_mixing_input
+        timeout: never
+
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
+    bits_per_sample: 16
+    sample_rate: 48000
+
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
+    bits_per_sample: 16
+    sample_rate: 48000
+
+media_player:
+  - platform: sendspin
+    id: sendspin_group_media_player
+  - platform: speaker_source
+    id: external_media_player
+    name: Media Player
+    announcement_pipeline:
+      speaker: announcement_resampling_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+      sources:
+        - audio_file_announcement_source
+        - http_announcement_source
+
+    media_pipeline:
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 2
+      speaker: media_resampling_speaker
+      sources:
+        - http_media_source
+        - sendspin_media_source
+
+    volume_increment: 0.05
+    volume_min: 0.0
+    volume_max: 1.0
+    volume_initial: 0.10
+
+    on_announcement:
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 20
+          duration: 0.0s
+    on_state:
+      - if:
+          condition:
+            and:
+              - switch.is_off: timer_ringing
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  media_player.is_announcing: external_media_player
+          then:
+            - mixer_speaker.apply_ducking:
+                id: media_mixing_input
+                decibel_reduction: 0
+                duration: 1.0s
+      - script.execute: control_pyramid_leds
+
+audio_file:
+  - id: wake_word_sound
+    file: ${wake_word_trigger_sound_file}
+  - id: error_cloud_sound
+    file: ${error_cloud_expired_file}
+  - id: timer_finished_sound
+    file: ${timer_finished_sound_file}
+
+media_source:
+  - platform: audio_file
+    id: audio_file_announcement_source
+  - platform: audio_http
+    id: http_announcement_source
+    buffer_size: 250000
+  - platform: audio_http
+    id: http_media_source
+    buffer_size: 500000
+  - platform: sendspin
+    id: sendspin_media_source
+    codecs: [FLAC, PCM]            # Prefer FLAC for Sendspin
+
+sendspin:
+  id: sendspin_hub
+  task_stack_in_psram: true
+
+switch:
+  # AW87559 speaker amplifier (PA), driven by the audio stack.
+  - platform: aw87559
+    id: speaker_enable
+    name: "Speaker Enable"
+    icon: "mdi:volume-high"
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: mute
+    name: Mute Microphone
+    icon: "mdi:microphone-off"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    on_turn_off:
+      - microphone.unmute:
+      - script.execute: start_wake_word
+      - script.execute: set_idle_or_mute_phase
+      - script.execute: control_pyramid_leds
+
+    on_turn_on:
+      - microphone.mute:
+      - script.execute: set_idle_or_mute_phase
+      - script.execute: control_pyramid_leds
+
+  - platform: template
+    id: timer_ringing
+    optimistic: true
+    internal: true
+    restore_mode: ALWAYS_OFF
+    on_turn_off:
+      # Disable stop wake word
+      - micro_wake_word.disable_model: stop
+      - script.execute: disable_repeat
+      # Stop any current announcement (ie: stop the timer ring mid playback)
+      - if:
+          condition:
+            media_player.is_announcing:
+              id: external_media_player
+          then:
+            - media_player.stop:
+                announcement: true
+                id: external_media_player
+      # Set back ducking ratio to zero
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 0
+          duration: 1.0s
+      - script.execute: control_pyramid_leds
+    on_turn_on:
+      # Duck audio
+      - mixer_speaker.apply_ducking:
+          id: media_mixing_input
+          decibel_reduction: 20
+          duration: 0.0s
+      # Enable stop wake word
+      - micro_wake_word.enable_model: stop
+      # Ring timer
+      - script.execute: ring_timer
+      - script.execute: control_pyramid_leds
+      # If 15 minutes have passed and the timer is still ringing, stop it.
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+
+  # Wake Word Sound Switch.
+  - platform: template
+    id: wake_sound
+    name: Wake sound
+    icon: "mdi:bullhorn"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+number:
+  # Applied after the AEC, so it lifts speech without also lifting the echo that
+  # the AEC has to cancel. 0 dB is unity gain, not mute. The ES7210 input stage
+  # already runs at gain_db 24, so lower this if the delivered level clips.
+  - platform: esp_audio_stack
+    esp_audio_stack_id: audio_stack
+    mic_gain:
+      name: Mic Gain
+      min_value: -20
+      max_value: 30
+      initial_value: 24
+
+select:
+  - platform: template
+    name: Wake word sensitivity
+    id: wake_word_sensitivity
+    optimistic: true
+    restore_value: true
+    initial_option: Moderately sensitive
+    entity_category: config
+    options:
+      - Slightly sensitive
+      - Moderately sensitive
+      - Very sensitive
+    on_value:
+      - lambda: |-
+          if (x == "Slightly sensitive") {
+            id(okay_nabu).set_probability_cutoff(217);
+            id(hey_jarvis).set_probability_cutoff(247);
+          } else if (x == "Moderately sensitive") {
+            id(okay_nabu).set_probability_cutoff(176);
+            id(hey_jarvis).set_probability_cutoff(235);
+          } else if (x == "Very sensitive") {
+            id(okay_nabu).set_probability_cutoff(143);
+            id(hey_jarvis).set_probability_cutoff(212);
+          }
+
+  - platform: template
+    id: aec_mode_select
+    name: "AEC Mode"
+    entity_category: config
+    options:
+      - "sr_low_cost"
+      - "sr_high_perf"
+      - "voip_low_cost"
+      - "voip_high_perf"
+      - "fd_low_cost"
+      - "fd_high_perf"
+    initial_option: "sr_low_cost"
+    optimistic: false
+    restore_value: false
+    set_action:
+      - esp_aec.set_mode:
+          id: aec
+          mode: !lambda 'return x;'
+      - lambda: 'id(aec_mode_select).publish_state(id(aec).get_mode_name());'
+
+micro_wake_word:
+  id: mww
+  microphone: voice_mic
+  stop_after_detection: false
+  models:
+    - model: okay_nabu
+      id: okay_nabu
+    - model: hey_jarvis
+      id: hey_jarvis
+    - model: ${stop_model_file}
+      id: stop
+      internal: true
+  vad:
+  on_wake_word_detected:
+    # If the wake word is detected when the device is muted (Possible with the software mute switch): Do nothing
+    - if:
+        condition:
+          switch.is_off: mute
+        then:
+          # If a timer is ringing: Stop it, do not start the voice assistant (We can stop timer from voice!)
+          - if:
+              condition:
+                switch.is_on: timer_ringing
+              then:
+                - switch.turn_off: timer_ringing
+              # Stop voice assistant if running
+              else:
+                - if:
+                    condition:
+                      voice_assistant.is_running:
+                    then:
+                      voice_assistant.stop:
+                    # Stop any other media player announcement
+                    else:
+                      - if:
+                          condition:
+                            media_player.is_announcing:
+                              id: external_media_player
+                          then:
+                            - media_player.stop:
+                                announcement: true
+                                id: external_media_player
+                          # Start the voice assistant and play the wake sound, if enabled
+                          else:
+                            - if:
+                                condition:
+                                  switch.is_on: wake_sound
+                                then:
+                                  - script.execute:
+                                      id: play_sound
+                                      priority: true
+                                      sound_file: "wake_word_sound"
+                                  - delay: 300ms
+                            - voice_assistant.start:
+                                wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  microphone: voice_mic
+  media_player: external_media_player
+  micro_wake_word: mww
+  use_wake_word: false
+  # The microphone stream is already echo-cancelled by esp_aec, so no additional
+  # noise suppression, gain or volume scaling is applied here.
+  noise_suppression_level: 0
+  auto_gain: 0 dbfs
+  volume_multiplier: 1
+  on_tts_start:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+    - script.execute: control_pyramid_leds
+  on_listening:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
+    - script.execute: control_pyramid_leds
+  on_stt_vad_end:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute: control_pyramid_leds
+  on_end:
+    - wait_until:
+        not:
+          voice_assistant.is_running:
+    # Stop ducking audio.
+    - mixer_speaker.apply_ducking:
+        id: media_mixing_input
+        decibel_reduction: 0
+        duration: 1.0s
+    # If the end happened because of an error, let the error phase on for a second
+    - if:
+        condition:
+          lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+        then:
+          - delay: 1s
+    # Reset the voice assistant phase id and reset the LED animations.
+    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+    - script.execute: control_pyramid_leds
+  on_error:
+    # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
+    # These two are ignored for a better user experience
+    - if:
+        condition:
+          and:
+            - lambda: return !id(init_in_progress);
+            - lambda: return code != "duplicate_wake_up_detected";
+            - lambda: return code != "stt-no-text-recognized";
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+    # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
+    - if:
+        condition:
+          - lambda: return code == "cloud-auth-failed";
+        then:
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: "error_cloud_sound"
+          - script.execute: set_idle_or_mute_phase
+    - script.execute: control_pyramid_leds
+
+  on_client_connected:
+    - lambda: id(init_in_progress) = false;
+    - script.execute: set_idle_or_mute_phase
+    - script.execute: start_wake_word
+    - script.execute: control_pyramid_leds
+
+  on_client_disconnected:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id}; 
+    - voice_assistant.stop:
+    - script.execute: control_pyramid_leds
+
+  on_timer_finished:
+    - switch.turn_on: timer_ringing
+    - lambda: id(voice_assistant_phase) = ${voice_assist_timer_finished_phase_id};
+    - script.execute: control_pyramid_leds
+    - wait_until:
+        media_player.is_announcing:
+          id: external_media_player
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  - id: voice_assistant_phase
+    type: int
+    restore_value: no
+    initial_value: ${voice_assist_not_ready_phase_id}
+      
+sensor:
+  - platform: m5_voice_pyramid_kit
+    type: swipe_event
+    m5_voice_pyramid_kit_id: pyramid
+    name: "Touch Swipe Event"
+    entity_category: diagnostic
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: return x == 1;
+            then:
+              - script.execute: pyramid_volume_up
+        - if:
+            condition:
+              lambda: return x == 2;
+            then:
+              - script.execute: pyramid_volume_down
+        - if:
+            condition:
+              lambda: return x == 3;
+            then:
+              - script.execute: pyramid_brightness_up
+        - if:
+            condition:
+              lambda: return x == 4;
+            then:
+              - script.execute: pyramid_brightness_down
+
+
+lp5562:
+  id: lp5562_led
+  i2c_id: bsp_bus
+  use_internal_clk: true
+  white_current: 17.5
+
+output:
+  - platform: lp5562
+    id: lp5562_white_channel
+    lp5562_id: lp5562_led
+    channel: white
+
+light:
+  - platform: monochromatic
+    name: "LCD Backlight"
+    output: lp5562_white_channel
+    icon: "mdi:television"
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: m5_voice_pyramid_kit
+    id: pyramid_rgb1
+    m5_voice_pyramid_kit_id: pyramid
+    channel: 1
+    name: "Pyramid RGB 1"
+    restore_mode: RESTORE_DEFAULT_OFF
+    # Static colors only; no running effects.
+    default_transition_length: 0s
+    gamma_correct: 1.0
+
+  - platform: m5_voice_pyramid_kit
+    id: pyramid_rgb2
+    m5_voice_pyramid_kit_id: pyramid
+    channel: 2
+    name: "Pyramid RGB 2"
+    restore_mode: RESTORE_DEFAULT_OFF
+    # Static colors only; no running effects.
+    default_transition_length: 0s
+    gamma_correct: 1.0
+
+display: !include displays/atoms3r-lcd-${lcd_variant}.yaml
+
+m5_atoms3_voice_ui:
+  id: atoms3r_voice_ui
+  display_id: atoms3r_lcd
+  voice_assistant_id: va
+  frame_delay: 33ms
+  phase_id: voice_assistant_phase
+  phase_mapping:
+    idle: ${voice_assist_idle_phase_id}
+    listening: ${voice_assist_listening_phase_id}
+    thinking: ${voice_assist_thinking_phase_id}
+    replying: ${voice_assist_replying_phase_id}
+    loading: ${voice_assist_not_ready_phase_id}
+    error: ${voice_assist_error_phase_id}
+    muted: ${voice_assist_muted_phase_id}
+    timer_finished: ${voice_assist_timer_finished_phase_id}
+  animations:
+    idle: ${idle_animation_file}
+    listening: ${listening_animation_file}
+    thinking: ${thinking_animation_file}
+    replying: ${replying_animation_file}
+    loading: ${loading_animation_file}
+    error: ${error_animation_file}
+
+script:
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_off: mute
+              - lambda: return !id(mww).is_running();
+          then:
+            - micro_wake_word.start
+
+  # ------------------------- Touch swipe handling -------------------------
+
+  # Left side swipes control the main media player volume.
+  - id: pyramid_volume_up
+    then:
+      - media_player.volume_up:
+          id: external_media_player
+
+  - id: pyramid_volume_down
+    then:
+      - media_player.volume_down:
+          id: external_media_player
+
+  # Right side swipes dim the pyramid light entities. Brightness is owned by
+  # the light itself, so no separate master-brightness entity is needed.
+  - id: pyramid_brightness_up
+    then:
+      - if:
+          condition:
+            light.is_on: pyramid_rgb1
+          then:
+            - light.dim_relative:
+                id: pyramid_rgb1
+                relative_brightness: 5%
+                transition_length: 0ms
+      - if:
+          condition:
+            light.is_on: pyramid_rgb2
+          then:
+            - light.dim_relative:
+                id: pyramid_rgb2
+                relative_brightness: 5%
+                transition_length: 0ms
+
+  - id: pyramid_brightness_down
+    then:
+      - if:
+          condition:
+            light.is_on: pyramid_rgb1
+          then:
+            - light.dim_relative:
+                id: pyramid_rgb1
+                relative_brightness: -5%
+                transition_length: 0ms
+      - if:
+          condition:
+            light.is_on: pyramid_rgb2
+          then:
+            - light.dim_relative:
+                id: pyramid_rgb2
+                relative_brightness: -5%
+                transition_length: 0ms
+
+  # ------------------------- LED state handling -------------------------
+
+  # Static colors only: one I2C write per state change, never on a timer.
+  - id: control_pyramid_leds
+    then:
+      - lambda: |-
+          const int phase = id(voice_assistant_phase);
+          const auto media_state = id(external_media_player).state;
+
+          float red = 0.0f;
+          float green = 0.0f;
+          float blue = 0.0f;
+          bool on = false;
+
+          if (id(timer_ringing).state) {
+            red = 1.0f; green = 0.2f; blue = 0.0f; on = true;
+          } else if (phase == ${voice_assist_listening_phase_id}) {
+            red = 0.0f; green = 0.75f; blue = 1.0f; on = true;
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            red = 0.55f; green = 0.10f; blue = 1.0f; on = true;
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            red = 0.0f; green = 0.65f; blue = 1.0f; on = true;
+          } else if (phase == ${voice_assist_error_phase_id}) {
+            red = 1.0f; green = 0.0f; blue = 0.0f; on = true;
+          } else if (media_state == media_player::MediaPlayerState::MEDIA_PLAYER_STATE_PLAYING ||
+                     media_state == media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING) {
+            red = 1.0f; green = 0.35f; blue = 0.0f; on = true;
+          } else if (id(mute).state || phase == ${voice_assist_muted_phase_id} ||
+                     phase == ${voice_assist_not_ready_phase_id}) {
+            red = 0.35f; green = 0.0f; blue = 0.0f; on = true;
+          }
+
+          auto apply = [&](auto *light) {
+            if (!on) {
+              auto call = light->turn_off();
+              call.set_transition_length(0);
+              call.perform();
+              return;
+            }
+            auto call = light->turn_on();
+            call.set_rgb(red, green, blue);
+            call.set_transition_length(0);
+            call.perform();
+          };
+          apply(id(pyramid_rgb1));
+          apply(id(pyramid_rgb2));
+
+  # Script executed when the timer is ringing, to playback sounds.
+  - id: ring_timer
+    then:
+      - script.execute: enable_repeat_one
+      - script.execute:
+          id: play_sound
+          priority: true
+          sound_file: "timer_finished_sound"
+
+  # Script executed when the timer is ringing, to repeat the timer finished sound.
+  - id: enable_repeat_one
+    then:
+      # Turn on the repeat mode and pause for 500 ms between playlist items/repeats
+      - media_player.repeat_one:
+          id: external_media_player
+          announcement: true
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: announcement
+          delay: 500ms
+
+  # Script execute when the timer is done ringing, to disable repeat mode.
+  - id: disable_repeat
+    then:
+      # Turn off the repeat mode and pause for 0 ms between playlist items/repeats
+      - media_player.repeat_off:
+          id: external_media_player
+          announcement: true
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: announcement
+          delay: 0ms
+
+  # Restore the resting phase without hiding an alarm or showing ready while disconnected.
+  - id: set_idle_or_mute_phase
+    then:
+      - lambda: |-
+          if (id(timer_ringing).state) {
+            id(voice_assistant_phase) = ${voice_assist_timer_finished_phase_id};
+          } else if (id(va).get_api_connection() == nullptr) {
+            id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id};
+          } else {
+            id(voice_assistant_phase) = id(mute).state
+              ? ${voice_assist_muted_phase_id} : ${voice_assist_idle_phase_id};
+          }
+
+  # Script executed when we want to play sounds on the device.
+  - id: play_sound
+    parameters:
+      priority: bool
+      sound_file: string
+    then:
+      - if:
+          condition:
+            lambda: return priority;
+          then:
+            - media_player.stop:
+                id: external_media_player
+                announcement: true
+      - lambda: |-
+          if ( (id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
+            id(external_media_player)
+              ->make_call()
+              .set_media_url("audio-file://" + sound_file)
+              .set_announcement(true)
+              .perform();
+          }
