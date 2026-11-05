@@ -204,7 +204,7 @@ external_components:
     components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
     refresh: 1h
 
-  - source: github://n-IA-hane/esphome-audio-stack@v2026.11.1-dev
+  - source: github://n-IA-hane/esphome-audio-stack@dev
     components: [esp_audio_stack, esp_aec]
     refresh: 1h
     
