@@ -648,24 +648,51 @@ speaker:
     output_speaker: tts_speaker_mix
     task_stack_in_psram: true
 
+audio_file:
+  - id: wake_word_triggered_sound
+    file: ${wake_word_triggered_sound_file}
+  - id: error_cloud_expired
+    file: ${error_cloud_expired_file}
+
+media_source:
+  - platform: audio_file
+    id: audio_file_announcement_source
+  - platform: audio_http
+    id: http_announcement_source
+    buffer_size: 250000
+  - platform: audio_http
+    id: http_media_source
+    buffer_size: 500000
+  - platform: sendspin
+    id: sendspin_media_source
+    codecs: [FLAC, PCM]
+
 media_player:
-  - platform: speaker
-    name: None
+  - platform: sendspin
+    id: sendspin_group_media_player
+
+  - platform: speaker_source
     id: speaker_media_player
-    task_stack_in_psram: true
+    name: Media Player
     media_pipeline:
       speaker: media_speaker
       sample_rate: 48000
+      num_channels: 2
       format: FLAC
+      sources:
+        - http_media_source
+        - sendspin_media_source
     announcement_pipeline:
       speaker: tts_speaker
-      format: FLAC
       sample_rate: 48000
-    files:
-      - id: wake_word_triggered_sound
-        file: ${wake_word_triggered_sound_file}
-      - id: error_cloud_expired
-        file: ${error_cloud_expired_file}
+      num_channels: 1
+      format: FLAC
+      sources:
+        - audio_file_announcement_source
+        - http_announcement_source
+    volume_increment: 0.05
+    volume_min: 0.3
+    volume_max: 0.85
     on_announcement:
       - if:
           condition:
@@ -673,12 +700,27 @@ media_player:
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
             - script.execute: draw_display
-    on_pause:
-      - media_player.stop:
-      - delay: 200ms
-      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      # Duck the music so announcements and TTS stay intelligible.
+      - mixer_speaker.apply_ducking:
+          id: media_speaker_mix
+          decibel_reduction: 20
+          duration: 0.0s
+    on_state:
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  media_player.is_announcing:
+                    id: speaker_media_player
+          then:
+            - mixer_speaker.apply_ducking:
+                id: media_speaker_mix
+                decibel_reduction: 0
+                duration: 1.0s
     on_idle:
-      # Since VA isn't running, this is the end of user-initiated media playback. Restart the wake word.
+      # Since VA isn't running, this is the end of user-initiated media playback.
       - if:
           condition:
             not:
@@ -686,6 +728,11 @@ media_player:
           then:
             - script.execute: set_idle_or_mute_phase
             - script.execute: draw_display
+            - script.execute: start_wake_word
+
+sendspin:
+  id: sendspin_hub
+  task_stack_in_psram: true
 
 micro_wake_word:
   id: mww
@@ -731,7 +778,7 @@ micro_wake_word:
                       - script.execute:
                           id: play_sound
                           priority: true
-                          sound_file: !lambda return id(wake_word_triggered_sound);
+                          sound_file: "wake_word_triggered_sound"
                       - delay: 50ms
                       - voice_assistant.start:
                           wake_word: !lambda return wake_word;
@@ -774,6 +821,11 @@ voice_assistant:
     - wait_until:
         not:
           voice_assistant.is_running:
+    # Stop ducking the music.
+    - mixer_speaker.apply_ducking:
+        id: media_speaker_mix
+        decibel_reduction: 0
+        duration: 1.0s
     # If the end happened because of an error, let the error phase on for a second
     - if:
         condition:
@@ -826,7 +878,7 @@ voice_assistant:
           - script.execute:
               id: play_sound
               priority: true
-              sound_file: !lambda return id(error_cloud_expired);
+              sound_file: "error_cloud_expired"
           - script.execute: draw_display
 
   on_client_connected:
@@ -1129,19 +1181,22 @@ script:
   - id: play_sound
     parameters:
       priority: bool
-      sound_file: "std::add_const_t<audio::AudioFile>*"
+      sound_file: string
     then:
+      - if:
+          condition:
+            lambda: return priority;
+          then:
+            - media_player.stop:
+                id: speaker_media_player
+                announcement: true
       - lambda: |-
-          if (priority) {
-            id(speaker_media_player)
-              ->make_call()
-              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
-              .set_announcement(true)
-              .perform();
-          }
           if ( (id(speaker_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
             id(speaker_media_player)
-              ->play_file(sound_file, true, false);
+              ->make_call()
+              .set_media_url("audio-file://" + sound_file)
+              .set_announcement(true)
+              .perform();
           }
 image:
   - platform: file
