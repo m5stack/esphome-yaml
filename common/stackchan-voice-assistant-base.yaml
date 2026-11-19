@@ -68,6 +68,26 @@ esphome:
   min_version: 2026.10.0
   name_add_mac_suffix: true
   on_boot:
+    # The AFE feed task runs one priority step above loopTask (6 vs 5) so a
+    # 64 ms AFE block is never preempted mid-deadline. Raise loopTask off the
+    # ESPHome default of 1 so afe_feed can never starve it into a task watchdog.
+    - priority: 800
+      then:
+        - lambda: |-
+            const TaskHandle_t task = xTaskGetCurrentTaskHandle();
+            const char *name = pcTaskGetName(task);
+            if (name == nullptr || std::string(name) != "loopTask" || xPortGetCoreID() != 1) {
+              ESP_LOGE("afe_boot", "Unexpected boot task %s on core %d; priority unchanged",
+                       name == nullptr ? "<null>" : name, xPortGetCoreID());
+              return;
+            }
+            vTaskPrioritySet(task, 5);
+            const UBaseType_t priority = uxTaskPriorityGet(task);
+            if (priority != 5) {
+              ESP_LOGE("afe_boot", "Failed to set loopTask priority: %u", static_cast<unsigned>(priority));
+              return;
+            }
+            ESP_LOGI("afe_boot", "loopTask core=%d priority=%u", xPortGetCoreID(), static_cast<unsigned>(priority));
     - priority: 600
       then:
         - light.turn_on:
@@ -187,6 +207,7 @@ i2c:
   - id: bsp_bus
     sda: GPIO12
     scl: GPIO11
+    frequency: 100kHz
   - id: ext_bus
     sda: GPIO2
     scl: GPIO1
@@ -207,7 +228,7 @@ external_components:
     refresh: 1h
 
   - source: github://n-IA-hane/esphome-audio-stack@dev
-    components: [esp_audio_stack, esp_aec]
+    components: [esp_audio_stack, esp_afe]
     refresh: 1h
     
 # PMU
@@ -253,11 +274,6 @@ output:
   - platform: axp2101
     channel: DCDC3
     voltage: 3300
-
-  - platform: m5ioe1
-    id: test_output
-    channel: PWM_1
-    pwm_polarity: ACTIVE_HIGH
 
 # M5IOE1 IO Expander
 m5ioe1:
@@ -333,6 +349,18 @@ number:
       min_value: 100
       max_value: 1500
       step: 100
+
+  # Post-AFE gain. It cannot repair ADC clipping and can itself clip the final
+  # output; 18 dB analog gain plus this 6 dB restores the level the wake word
+  # engine sees.
+  - platform: esp_audio_stack
+    esp_audio_stack_id: i2s_duplex
+    mic_gain:
+      id: mic_gain_number
+      name: "Mic Gain"
+      min_value: -20
+      max_value: 30
+      initial_value: 6
 
 button:
   - platform: template
@@ -502,18 +530,27 @@ light:
     default_transition_length: 1s
     flash_transition_length: 0s
 
-audio_adc:
-  - platform: es7210
-    id: es7210_adc
-    i2c_id: bsp_bus
-    bits_per_sample: 16bit
-    sample_rate: 48000
-    mic_gain: 36
-
-esp_aec:
-  id: aec
-  sample_rate: 16000
-  mode: sr_low_cost
+esp_afe:
+  id: afe
+  # Full ESP-SR front end at the default sr/low_cost profile with AEC on.
+  # Single-mic AEC only. Espressif's ESP32-S3 benchmark puts 2-mic MMR/BSS at
+  # feed 23.7% + fetch 22.9% of one core versus 8.8% + 9.8% for MR, and the
+  # dual-mic feed path dropped 14.6% of its output frames while music played.
+  # Single-mic AEC measured 0% dropped frames with 28 dB of echo return loss.
+  aec_nlp_level: normal
+  # The codec gain staging and the post-AFE mic_gain number handle level, so
+  # the AFE should not add its own noise suppression or automatic gain.
+  ns_enabled: false
+  agc_enabled: false
+  # allocate more psram and save internal sram
+  memory_alloc_mode: more_psram
+  # Internal AFE task; Core 0 keeps it off the loopTask/feed pair.
+  task_core: 0
+  # feed runs one priority step above loopTask (raised to 5 in on_boot) and on
+  # its own core, so a block is never preempted mid-deadline.
+  feed_task_core: 1
+  feed_task_priority: 6
+  fetch_task_core: 0
 
 esp_audio_stack:
   id: i2s_duplex
@@ -521,13 +558,12 @@ esp_audio_stack:
   output_sample_rate: 16000
   bits_per_sample: 16
   slot_bit_width: 16
-  processor_id: aec
+  processor_id: afe
   # The CoreS3 wires its microphones to ES7210 MIC1/MIC2 and the AW88298 speaker
   # output back into MIC3 (AEC_P/AEC_N). esp_codec_dev serialises the four TDM
   # slots in ADC order 1,3,2,4, so MIC1 is slot 0, the hardware reference is
-  # slot 1 and MIC2 would be slot 2. esp_aec processes a single microphone, so
-  # only MIC1 and the reference are captured; a second microphone needs
-  # esp_afe with mic_num: 2.
+  # slot 1 and MIC2 would be slot 2. The AFE runs **single-mic**, so only MIC1 and
+  # the reference are captured; a second microphone needs mic_num: 2 with BSS.
   use_tdm_reference: true
   tdm_total_slots: 4
   tdm_mic_slots: [0]
@@ -552,14 +588,19 @@ esp_audio_stack:
       address: 0x40
       # ADC1 carries the microphone, ADC3 the playback reference.
       mic_selected: 0x05
-      gain_db: 24
+      # 24 dB left only ~1 dB of headroom (music peaked at -0.88 dBFS right
+      # before the ADC). 18 dB buys ~7 dB, and mic_gain restores the level.
+      gain_db: 18
       ref_channel: 2
-      ref_gain_db: 0
+      # The reference is line level and its SNR helps the AEC, so it keeps 24 dB.
+      ref_gain_db: 24
     output:
       type: aw88298
       address: 0x36
+      # Same DAC config as the CoreS3 BSP (m5stack_core_s3/src/bsp_audio.c,
+      # where pa_voltage/codec_dac_voltage use the esp_codec_dev defaults).
       pa_gain: 0 dB
-      pa_voltage: 3.3V
+      pa_voltage: 5.0V
       codec_dac_voltage: 3.3V
       # AW_RST is driven by the IO expander (AW9523B P0_2).
       reset_pin:
@@ -568,12 +609,10 @@ esp_audio_stack:
         mode: OUTPUT
 
 microphone:
+  # Single microphone entity on the AFE-processed stream, shared by the voice
+  # assistant and micro wake word.
   - platform: esp_audio_stack
-    id: mic_aec
-    esp_audio_stack_id: i2s_duplex
-
-  - platform: esp_audio_stack
-    id: mic_wake_word
+    id: voice_mic
     esp_audio_stack_id: i2s_duplex
 
 speaker:
@@ -650,7 +689,7 @@ media_player:
 
 micro_wake_word:
   id: mww
-  microphone: mic_wake_word
+  microphone: voice_mic
   stop_after_detection: false
   models:
     - model: ${hi_stackchan_model_file}
@@ -663,23 +702,51 @@ micro_wake_word:
       id: hey_mycroft
   vad:
   on_wake_word_detected:
-    - script.execute:
-        id: play_sound
-        priority: true
-        sound_file: !lambda return id(wake_word_triggered_sound);
-    - delay: 50ms
-    - voice_assistant.start:
-        wake_word: !lambda return wake_word;
+    # If the wake word is detected while muted (possible with the software mute
+    # switch), do nothing.
+    - if:
+        condition:
+          # `mute` ON = microphone muted, so only act when the switch is off.
+          switch.is_off: mute
+        then:
+          # Stop the running voice assistant, otherwise start it.
+          - if:
+              condition:
+                voice_assistant.is_running:
+              then:
+                - voice_assistant.stop:
+              # Stop any other media player announcement. This only dismisses
+              # the announcement; say the wake word again to start a command.
+              else:
+                - if:
+                    condition:
+                      media_player.is_announcing:
+                        id: speaker_media_player
+                    then:
+                      - media_player.stop:
+                          announcement: true
+                          id: speaker_media_player
+                    # Start the voice assistant and play the wake sound.
+                    else:
+                      - script.execute:
+                          id: play_sound
+                          priority: true
+                          sound_file: !lambda return id(wake_word_triggered_sound);
+                      - delay: 50ms
+                      - voice_assistant.start:
+                          wake_word: !lambda return wake_word;
 
 voice_assistant:
   id: va
-  microphone: mic_aec
+  microphone: voice_mic
   media_player: speaker_media_player
   micro_wake_word: mww
   use_wake_word: false
-  noise_suppression_level: 2
-  auto_gain: 31dBFS
-  volume_multiplier: 2.0
+  # The microphone stream is already processed by esp_afe, so no additional
+  # noise suppression, gain or volume scaling is applied here.
+  noise_suppression_level: 0
+  auto_gain: 0 dbfs
+  volume_multiplier: 1
   on_listening:
     - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
     - text_sensor.template.publish:
@@ -729,6 +796,8 @@ voice_assistant:
     - text_sensor.template.publish:
         id: text_response
         state: ""
+    # Keep the wake word engine listening for the next command.
+    - script.execute: start_wake_word
   on_error:
     # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
     # These two are ignored for a better user experience
@@ -764,7 +833,7 @@ voice_assistant:
     - lambda: id(init_in_progress) = false;
     - script.execute: set_idle_or_mute_phase
     - script.execute: draw_display
-    - micro_wake_word.start:
+    - script.execute: start_wake_word
 
   on_client_disconnected:
     - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id}; 
@@ -825,13 +894,14 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_off:
         - microphone.unmute:
-            id: mic_wake_word
+            id: voice_mic
+        - script.execute: start_wake_word
         - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
         - script.execute: draw_display
         
     on_turn_on:
         - microphone.mute:
-            id: mic_wake_word
+            id: voice_mic
         - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
         - script.execute: draw_display
 
@@ -1044,6 +1114,17 @@ script:
             - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
           else:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_off: mute
+              - lambda: return !id(mww).is_running();
+          then:
+            - micro_wake_word.start
 
   - id: play_sound
     parameters:
