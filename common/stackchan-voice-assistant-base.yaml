@@ -287,14 +287,17 @@ si12t:
   i2c_id: bsp_bus
 
 remote_transmitter:
+  id: ir_tx
   pin: GPIO5
   carrier_duty_percent: 50%
   non_blocking: true
 
 remote_receiver:
+  id: ir_rx
   pin: GPIO10
-  dump: coolix
 
+# You can add your own IR devices here
+# like IR climate below
 climate:
   - platform: coolix
     name: "Default AC"
@@ -302,6 +305,20 @@ climate:
       min_temperature: 18
       max_temperature: 30
       temperature_step: 1
+
+# Expose the raw IR timings to Home Assistant so the device also works as a
+# universal IR remote: learn any protocol in HA, replay it through the TX pin.
+# Note that this component is EXPERIMENTAL.
+infrared:
+  - platform: ir_rf_proxy
+    id: ir_proxy_tx
+    name: "IR Proxy Transmitter"
+    remote_transmitter_id: ir_tx
+  - platform: ir_rf_proxy
+    id: ir_proxy_rx
+    name: "IR Proxy Receiver"
+    receiver_frequency: 38kHz
+    remote_receiver_id: ir_rx
 
 # The SCS9009 Servo
 scs9009:
