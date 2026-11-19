@@ -92,9 +92,29 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2026.3.0
+  min_version: 2026.10.0
   name_add_mac_suffix: true
   on_boot:
+    # The AFE feed task runs one priority step above loopTask (6 vs 5) so a
+    # 64 ms AFE block is never preempted mid-deadline. Raise loopTask off the
+    # ESPHome default of 1 so afe_feed can never starve it into a task watchdog.
+    - priority: 800
+      then:
+        - lambda: |-
+            const TaskHandle_t task = xTaskGetCurrentTaskHandle();
+            const char *name = pcTaskGetName(task);
+            if (name == nullptr || std::string(name) != "loopTask" || xPortGetCoreID() != 1) {
+              ESP_LOGE("afe_boot", "Unexpected boot task %s on core %d; priority unchanged",
+                       name == nullptr ? "<null>" : name, xPortGetCoreID());
+              return;
+            }
+            vTaskPrioritySet(task, 5);
+            const UBaseType_t priority = uxTaskPriorityGet(task);
+            if (priority != 5) {
+              ESP_LOGE("afe_boot", "Failed to set loopTask priority: %u", static_cast<unsigned>(priority));
+              return;
+            }
+            ESP_LOGI("afe_boot", "loopTask core=%d priority=%u", xPortGetCoreID(), static_cast<unsigned>(priority));
     - priority: 600
       then:
         - light.turn_on:
@@ -134,13 +154,27 @@ esp32:
   cpu_frequency: 240MHz
   framework:
     type: esp-idf
+    advanced:
+      flash_chip: generic    
     ## Note: Disable these configurations if you face the boot loop issue.
     sdkconfig_options:
-      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"       # Default is 32KB
-      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"   # Default is 32B; 64B reduces cache misses
-      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"     # Move code to PSRAM, frees internal SRAM
-      CONFIG_SPIRAM_RODATA: "y"                 # Move read-only data to PSRAM
-      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"    # TLS buffers in PSRAM (saves ~40KB internal)
+      # 64 KB data cache, 64 byte cache lines and a 32 KB instruction cache
+      # reduce PSRAM access latency for mWW.
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+      # Execute code and read-only data from PSRAM: frees internal SRAM and
+      # lets instructions run during flash operations. Speeds up mWW at the
+      # cost of PSRAM.
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+      # Keep Bluetooth and mbedTLS buffers out of internal SRAM as well.
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
 
 psram:
   mode: quad
@@ -183,6 +217,11 @@ globals:
     type: int
     restore_value: no
     initial_value: ${voice_assist_not_ready_phase_id}
+  # Shared animation cursor so switching effects does not jump the pattern.
+  - id: led_animation_index
+    type: int
+    restore_value: no
+    initial_value: "0"
   - id: use_calib_value
     type: bool
     restore_value: yes
@@ -200,6 +239,7 @@ i2c:
   - id: bsp_bus
     sda: GPIO12
     scl: GPIO11
+    frequency: 100kHz
   - id: ext_bus
     sda: GPIO2
     scl: GPIO1
@@ -215,12 +255,12 @@ uart:
   baud_rate: 1000000
 
 external_components:
-  - source: github://m5stack/esphome-yaml/components
+  - source: github://m5stack/esphome@m5-dev
     components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
     refresh: 1h
 
-  - source: github://n-IA-hane/esphome-intercom@v2026.5.0
-    components: [i2s_audio_duplex, esp_aec, audio_processor]
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.12.0-dev
+    components: [esp_audio_stack, esp_afe]
     refresh: 1h
     
 # PMU
@@ -267,11 +307,6 @@ output:
     channel: DCDC3
     voltage: 3300
 
-  - platform: m5ioe1
-    id: test_output
-    channel: PWM_1
-    pwm_polarity: ACTIVE_HIGH
-
 # M5IOE1 IO Expander
 m5ioe1:
   id: m5ioe1_hub
@@ -284,14 +319,17 @@ si12t:
   i2c_id: bsp_bus
 
 remote_transmitter:
+  id: ir_tx
   pin: GPIO5
   carrier_duty_percent: 50%
   non_blocking: true
 
 remote_receiver:
+  id: ir_rx
   pin: GPIO10
-  dump: coolix
 
+# You can add your own IR devices here
+# like IR climate below
 climate:
   - platform: coolix
     name: "Default AC"
@@ -299,6 +337,20 @@ climate:
       min_temperature: 18
       max_temperature: 30
       temperature_step: 1
+
+# Expose the raw IR timings to Home Assistant so the device also works as a
+# universal IR remote: learn any protocol in HA, replay it through the TX pin.
+# Note that this component is EXPERIMENTAL.
+infrared:
+  - platform: ir_rf_proxy
+    id: ir_proxy_tx
+    name: "IR Proxy Transmitter"
+    remote_transmitter_id: ir_tx
+  - platform: ir_rf_proxy
+    id: ir_proxy_rx
+    name: "IR Proxy Receiver"
+    receiver_frequency: 38kHz
+    remote_receiver_id: ir_rx
 
 # The SCS9009 Servo
 scs9009:
@@ -346,6 +398,18 @@ number:
       min_value: 100
       max_value: 1500
       step: 100
+
+  # Post-AFE gain. It cannot repair ADC clipping and can itself clip the final
+  # output; 18 dB analog gain plus this 6 dB restores the level the wake word
+  # engine sees.
+  - platform: esp_audio_stack
+    esp_audio_stack_id: i2s_duplex
+    mic_gain:
+      id: mic_gain_number
+      name: "Mic Gain"
+      min_value: -20
+      max_value: 30
+      initial_value: 6
 
 button:
   - platform: template
@@ -515,54 +579,248 @@ light:
     default_transition_length: 1s
     flash_transition_length: 0s
 
-audio_adc:
-  - platform: es7210
-    id: es7210_adc
-    i2c_id: bsp_bus
-    bits_per_sample: 16bit
-    sample_rate: 48000
-    mic_gain: 36
+  # Voice assistant patterns, drawn on top of the light bar. The bar is 12 LEDs
+  # in two 6-LED halves (left 0-5, right 6-11), so every pattern works on a
+  # position p = 0-5 and paints both halves at once. Their colour follows the
+  # user facing light bar when it is on and falls back to the default
+  # assistant cyan otherwise.
+  - platform: partition
+    id: voice_assistant_leds
+    internal: true
+    default_transition_length: 0ms
+    segments:
+      - id: stackchan_light_bar
+        from: 0
+        to: 5
+      - id: stackchan_light_bar
+        from: 6
+        to: 11
+    effects:
+      # Loading fill, both halves grow from the outer ends towards the middle.
+      - addressable_lambda:
+          name: "Initializing"
+          update_interval: 150ms
+          lambda: |-
+            static uint8_t step = 0;
+            if (initial_run)
+              step = 0;
+            const Color color(24, 187, 242);
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p <= step) ? color : Color::BLACK;
+            }
+            step = (step + 1) % 7;
+      # Fast comet towards the middle, mirrored on both halves.
+      - addressable_lambda:
+          name: "Listening"
+          update_interval: 40ms
+          lambda: |-
+            const auto cv = id(stackchan_light_bar).current_values;
+            const Color color = cv.get_state() > 0.0f
+                                    ? Color(cv.get_red() * 255, cv.get_green() * 255, cv.get_blue() * 255)
+                                    : Color(24, 187, 242);
+            const int head = id(led_animation_index) % 6;
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              const int d = (p - head + 6) % 6;
+              if (d == 0) {
+                it[i] = color;
+              } else if (d == 5) {
+                it[i] = color * 160;
+              } else if (d == 4) {
+                it[i] = color * 80;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            id(led_animation_index) = (id(led_animation_index) + 1) % 6;
+      # The two LEDs nearest the middle breathe while the command is processed.
+      - addressable_lambda:
+          name: "Thinking"
+          update_interval: 16ms
+          lambda: |-
+            static uint8_t step = 0;
+            static bool down = true;
+            const uint8_t steps = 8;
+            if (initial_run) {
+              step = 0;
+              down = true;
+            }
+            const auto cv = id(stackchan_light_bar).current_values;
+            const Color color = cv.get_state() > 0.0f
+                                    ? Color(cv.get_red() * 255, cv.get_green() * 255, cv.get_blue() * 255)
+                                    : Color(24, 187, 242);
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p == 5) ? color * uint8_t(255 / steps * (steps - step)) : Color::BLACK;
+            }
+            if (down) {
+              step++;
+            } else {
+              step--;
+            }
+            if (step == 0 || step == steps) {
+              down = !down;
+            }
+      # Same comet as listening, but running the other way.
+      - addressable_lambda:
+          name: "Replying"
+          update_interval: 40ms
+          lambda: |-
+            const auto cv = id(stackchan_light_bar).current_values;
+            const Color color = cv.get_state() > 0.0f
+                                    ? Color(cv.get_red() * 255, cv.get_green() * 255, cv.get_blue() * 255)
+                                    : Color(24, 187, 242);
+            const int head = (6 - id(led_animation_index) % 6) % 6;
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              const int d = (p - head + 6) % 6;
+              if (d == 0) {
+                it[i] = color;
+              } else if (d == 5) {
+                it[i] = color * 160;
+              } else if (d == 4) {
+                it[i] = color * 80;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            id(led_animation_index) = (id(led_animation_index) + 1) % 6;
+      # Fast red pulse over the whole bar.
+      - addressable_lambda:
+          name: "Error"
+          update_interval: 10ms
+          lambda: |-
+            static uint8_t step = 0;
+            static bool down = true;
+            const uint8_t steps = 10;
+            if (initial_run) {
+              step = 0;
+              down = true;
+            }
+            const Color color(255, 0, 0);
+            for (int i = 0; i < 12; i++) {
+              it[i] = color * uint8_t(255 / steps * (steps - step));
+            }
+            if (down) {
+              step++;
+            } else {
+              step--;
+            }
+            if (step == 0 || step == steps) {
+              down = !down;
+            }
+      # Microphone muted: a steady red pair next to the middle.
+      - addressable_lambda:
+          name: "Muted"
+          update_interval: 500ms
+          lambda: |-
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p == 5) ? Color(255, 0, 0) : Color::BLACK;
+            }
+      # No Home Assistant connection: a slow red dot walking along the bar.
+      - addressable_lambda:
+          name: "Not Ready"
+          update_interval: 120ms
+          lambda: |-
+            const int head = id(led_animation_index) % 6;
+            const Color color(255, 0, 0);
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p == head) ? color : Color::BLACK;
+            }
+            id(led_animation_index) = (id(led_animation_index) + 1) % 6;
 
-audio_dac:
-  - platform: aw88298
-    id: aw88298_dac
-    i2c_id: bsp_bus
-    sample_rate: 48000
+esp_afe:
+  id: afe
+  # Full ESP-SR front end at the default sr/low_cost profile with AEC on.
+  # Single-mic AEC only. Espressif's ESP32-S3 benchmark puts 2-mic MMR/BSS at
+  # feed 23.7% + fetch 22.9% of one core versus 8.8% + 9.8% for MR, and the
+  # dual-mic feed path dropped 14.6% of its output frames while music played.
+  # Single-mic AEC measured 0% dropped frames with 28 dB of echo return loss.
+  aec_nlp_level: normal
+  # The codec gain staging and the post-AFE mic_gain number handle level, so
+  # the AFE should not add its own noise suppression or automatic gain.
+  ns_enabled: false
+  agc_enabled: false
+  # allocate more psram and save internal sram
+  memory_alloc_mode: more_psram
+  # Internal AFE task; Core 0 keeps it off the loopTask/feed pair.
+  task_core: 0
+  # feed runs one priority step above loopTask (raised to 5 in on_boot) and on
+  # its own core, so a block is never preempted mid-deadline.
+  feed_task_core: 1
+  feed_task_priority: 6
+  fetch_task_core: 0
 
-esp_aec:
-  id: aec
-  sample_rate: 16000
-  mode: sr_low_cost
-
-i2s_audio_duplex:
+esp_audio_stack:
   id: i2s_duplex
-  i2s_lrclk_pin: GPIO33
-  i2s_bclk_pin: GPIO34
+  sample_rate: 48000
+  output_sample_rate: 16000
+  bits_per_sample: 16
+  slot_bit_width: 16
+  processor_id: afe
+  # The CoreS3 wires its microphones to ES7210 MIC1/MIC2 and the AW88298 speaker
+  # output back into MIC3 (AEC_P/AEC_N). esp_codec_dev serialises the four TDM
+  # slots in ADC order 1,3,2,4, so MIC1 is slot 0, the hardware reference is
+  # slot 1 and MIC2 would be slot 2. The AFE runs **single-mic**, so only MIC1 and
+  # the reference are captured; a second microphone needs mic_num: 2 with BSS.
+  use_tdm_reference: true
+  tdm_total_slots: 4
+  tdm_mic_slots: [0]
+  tdm_ref_slot: 1
+  tdm_tx_slot: 0
+  buffers_in_psram: true
+  audio_task_stack_in_psram: true
+  telemetry: false
+
   i2s_mclk_pin:
     number: GPIO0
     ignore_strapping_warning: true
-  i2s_din_pin: GPIO14           # mic data
-  i2s_dout_pin: GPIO13          # speaker data
-  sample_rate: 48000
-  output_sample_rate: 16000     # FIR decimation to 16kHz
-  correct_dc_offset: true
-  processor_id: aec
-  buffers_in_psram: true
+  i2s_bclk_pin: GPIO34
+  i2s_lrclk_pin: GPIO33
+  i2s_din_pin: GPIO14
+  i2s_dout_pin: GPIO13
+
+  codec:
+    i2c_id: bsp_bus
+    input:
+      type: es7210
+      address: 0x40
+      # ADC1 carries the microphone, ADC3 the playback reference.
+      mic_selected: 0x05
+      # 24 dB left only ~1 dB of headroom (music peaked at -0.88 dBFS right
+      # before the ADC). 18 dB buys ~7 dB, and mic_gain restores the level.
+      gain_db: 18
+      ref_channel: 2
+      # The reference is line level and its SNR helps the AEC, so it keeps 24 dB.
+      ref_gain_db: 24
+    output:
+      type: aw88298
+      address: 0x36
+      # Same DAC config as the CoreS3 BSP (m5stack_core_s3/src/bsp_audio.c,
+      # where pa_voltage/codec_dac_voltage use the esp_codec_dev defaults).
+      pa_gain: 0 dB
+      pa_voltage: 5.0V
+      codec_dac_voltage: 3.3V
+      # AW_RST is driven by the IO expander (AW9523B P0_2).
+      reset_pin:
+        aw9523b_id: aw9523b_hub
+        number: 2
+        mode: OUTPUT
 
 microphone:
-  - platform: i2s_audio_duplex
-    id: mic_aec
-    i2s_audio_duplex_id: i2s_duplex
-
-  - platform: i2s_audio_duplex
-    id: mic_wake_word
-    i2s_audio_duplex_id: i2s_duplex
-    pre_aec: true
+  # Single microphone entity on the AFE-processed stream, shared by the voice
+  # assistant and micro wake word.
+  - platform: esp_audio_stack
+    id: voice_mic
+    esp_audio_stack_id: i2s_duplex
 
 speaker:
-  - platform: i2s_audio_duplex
+  - platform: esp_audio_stack
     id: hw_speaker
-    i2s_audio_duplex_id: i2s_duplex
+    esp_audio_stack_id: i2s_duplex
     sample_rate: 48000
     # The duplex speaker only declares stream limits, not a concrete
     # bits_per_sample. ESPHome 2026.5+ mixer inherits this from its
@@ -592,24 +850,51 @@ speaker:
     output_speaker: tts_speaker_mix
     task_stack_in_psram: true
 
+audio_file:
+  - id: wake_word_triggered_sound
+    file: ${wake_word_triggered_sound_file}
+  - id: error_cloud_expired
+    file: ${error_cloud_expired_file}
+
+media_source:
+  - platform: audio_file
+    id: audio_file_announcement_source
+  - platform: audio_http
+    id: http_announcement_source
+    buffer_size: 250000
+  - platform: audio_http
+    id: http_media_source
+    buffer_size: 500000
+  - platform: sendspin
+    id: sendspin_media_source
+    codecs: [FLAC, PCM]
+
 media_player:
-  - platform: speaker
-    name: None
+  - platform: sendspin
+    id: sendspin_group_media_player
+
+  - platform: speaker_source
     id: speaker_media_player
-    task_stack_in_psram: true
+    name: Media Player
     media_pipeline:
       speaker: media_speaker
       sample_rate: 48000
+      num_channels: 2
       format: FLAC
+      sources:
+        - http_media_source
+        - sendspin_media_source
     announcement_pipeline:
       speaker: tts_speaker
-      format: FLAC
       sample_rate: 48000
-    files:
-      - id: wake_word_triggered_sound
-        file: ${wake_word_triggered_sound_file}
-      - id: error_cloud_expired
-        file: ${error_cloud_expired_file}
+      num_channels: 1
+      format: FLAC
+      sources:
+        - audio_file_announcement_source
+        - http_announcement_source
+    volume_increment: 0.05
+    volume_min: 0.3
+    volume_max: 0.85
     on_announcement:
       - if:
           condition:
@@ -617,12 +902,27 @@ media_player:
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
             - script.execute: draw_display
-    on_pause:
-      - media_player.stop:
-      - delay: 200ms
-      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      # Duck the music so announcements and TTS stay intelligible.
+      - mixer_speaker.apply_ducking:
+          id: media_speaker_mix
+          decibel_reduction: 20
+          duration: 0.0s
+    on_state:
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  media_player.is_announcing:
+                    id: speaker_media_player
+          then:
+            - mixer_speaker.apply_ducking:
+                id: media_speaker_mix
+                decibel_reduction: 0
+                duration: 1.0s
     on_idle:
-      # Since VA isn't running, this is the end of user-initiated media playback. Restart the wake word.
+      # Since VA isn't running, this is the end of user-initiated media playback.
       - if:
           condition:
             not:
@@ -630,10 +930,15 @@ media_player:
           then:
             - script.execute: set_idle_or_mute_phase
             - script.execute: draw_display
+            - script.execute: start_wake_word
+
+sendspin:
+  id: sendspin_hub
+  task_stack_in_psram: true
 
 micro_wake_word:
   id: mww
-  microphone: mic_wake_word
+  microphone: voice_mic
   stop_after_detection: false
   models:
     - model: ${hi_stackchan_model_file}
@@ -646,23 +951,51 @@ micro_wake_word:
       id: hey_mycroft
   vad:
   on_wake_word_detected:
-    - script.execute:
-        id: play_sound
-        priority: true
-        sound_file: !lambda return id(wake_word_triggered_sound);
-    - delay: 50ms
-    - voice_assistant.start:
-        wake_word: !lambda return wake_word;
+    # If the wake word is detected while muted (possible with the software mute
+    # switch), do nothing.
+    - if:
+        condition:
+          # `mute` ON = microphone muted, so only act when the switch is off.
+          switch.is_off: mute
+        then:
+          # Stop the running voice assistant, otherwise start it.
+          - if:
+              condition:
+                voice_assistant.is_running:
+              then:
+                - voice_assistant.stop:
+              # Stop any other media player announcement. This only dismisses
+              # the announcement; say the wake word again to start a command.
+              else:
+                - if:
+                    condition:
+                      media_player.is_announcing:
+                        id: speaker_media_player
+                    then:
+                      - media_player.stop:
+                          announcement: true
+                          id: speaker_media_player
+                    # Start the voice assistant and play the wake sound.
+                    else:
+                      - script.execute:
+                          id: play_sound
+                          priority: true
+                          sound_file: "wake_word_triggered_sound"
+                      - delay: 50ms
+                      - voice_assistant.start:
+                          wake_word: !lambda return wake_word;
 
 voice_assistant:
   id: va
-  microphone: mic_aec
+  microphone: voice_mic
   media_player: speaker_media_player
   micro_wake_word: mww
   use_wake_word: false
-  noise_suppression_level: 2
-  auto_gain: 31dBFS
-  volume_multiplier: 2.0
+  # The microphone stream is already processed by esp_afe, so no additional
+  # noise suppression, gain or volume scaling is applied here.
+  noise_suppression_level: 0
+  auto_gain: 0 dbfs
+  volume_multiplier: 1
   on_listening:
     - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
     - text_sensor.template.publish:
@@ -690,6 +1023,11 @@ voice_assistant:
     - wait_until:
         not:
           voice_assistant.is_running:
+    # Stop ducking the music.
+    - mixer_speaker.apply_ducking:
+        id: media_speaker_mix
+        decibel_reduction: 0
+        duration: 1.0s
     # If the end happened because of an error, let the error phase on for a second
     - if:
         condition:
@@ -698,11 +1036,6 @@ voice_assistant:
           - delay: 1s
     # Reset the voice assistant phase id and reset the LED animations.
     - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
-    - if:
-        condition:
-          - lambda: return id(wake_word_engine_location).current_option() == "On device";
-        then:
-          - lambda: id(va).set_use_wake_word(false);
     # - script.execute: set_idle_or_mute_phase
     - script.execute: draw_display
     # Clear text sensors
@@ -712,6 +1045,8 @@ voice_assistant:
     - text_sensor.template.publish:
         id: text_response
         state: ""
+    # Keep the wake word engine listening for the next command.
+    - script.execute: start_wake_word
   on_error:
     # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
     # These two are ignored for a better user experience
@@ -732,6 +1067,7 @@ voice_assistant:
                 - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
               else:
                 - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+          - script.execute: control_leds
         # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
     - if:
         condition:
@@ -740,14 +1076,14 @@ voice_assistant:
           - script.execute:
               id: play_sound
               priority: true
-              sound_file: !lambda return id(error_cloud_expired);
+              sound_file: "error_cloud_expired"
           - script.execute: draw_display
 
   on_client_connected:
     - lambda: id(init_in_progress) = false;
     - script.execute: set_idle_or_mute_phase
     - script.execute: draw_display
-    - micro_wake_word.start:
+    - script.execute: start_wake_word
 
   on_client_disconnected:
     - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id}; 
@@ -801,14 +1137,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     internal: true
 
-  - platform: gpio
-    id: aw_rst
-    pin:
-      aw9523b_id: aw9523b_hub
-      number: 2
-    internal: true
-    restore_mode: RESTORE_DEFAULT_ON    
-
   - platform: template
     name: Microphone Mute
     id: mute
@@ -816,61 +1144,18 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_off:
         - microphone.unmute:
-            id: mic_wake_word
+            id: voice_mic
+        - script.execute: start_wake_word
         - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
         - script.execute: draw_display
         
     on_turn_on:
         - microphone.mute:
-            id: mic_wake_word
+            id: voice_mic
         - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
         - script.execute: draw_display
 
 select:
-  - platform: template
-    entity_category: config
-    name: Wake word engine location
-    id: wake_word_engine_location
-    icon: "mdi:account-voice"
-    optimistic: true
-    restore_value: true
-    options:
-      - In Home Assistant
-      - On device
-    initial_option: On device
-    on_value:
-      - if:
-          condition:
-            lambda: return !id(init_in_progress);
-          then:
-            - wait_until:
-                lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
-            - if:
-                condition:
-                  lambda: return x == "In Home Assistant";
-                then:
-                  - micro_wake_word.stop
-                  - delay: 500ms
-                  - if:
-                      condition:
-                        switch.is_off: mute
-                      then:
-                        - lambda: id(va).set_use_wake_word(true);
-                        - voice_assistant.start_continuous:
-            - if:
-                condition:
-                  lambda: return x == "On device";
-                then:
-                  - lambda: id(va).set_use_wake_word(false);
-                  - voice_assistant.stop
-                  - delay: 500ms
-                  - if:
-                      condition:
-                        switch.is_off: mute
-                      then:
-                        - micro_wake_word.start
-
-
   - platform: template
     id: wake_word_sensitivity
     name: "Wake word sensitivity"
@@ -887,19 +1172,25 @@ select:
       # Note probability cutoffs are set as a quantized uint8 value, each comment has the corresponding floating point cutoff
       # False Accepts per Hour values are tested against all units and channels from the Dinner Party Corpus.
       # These cutoffs apply only to the specific models included in the firmware: okay_nabu@20241226.3, hey_jarvis@v2, hey_mycroft@v2
+      # hi_stackchan has no DipCo figures. Its cutoffs were measured here on LibriSpeech dev-clean (5.8 hours, one
+      # continuous stream, ESPHome's detection logic). It is noticeably more trigger happy than the other models, so the
+      # steps are smaller and the middle tier keeps the model's manifest default of 0.97.
       lambda: |-
         if (x == "Slightly sensitive") {
           id(okay_nabu).set_probability_cutoff(217);    // 0.85 -> 0.000 FAPH on DipCo (Manifest's default)
           id(hey_jarvis).set_probability_cutoff(247);   // 0.97 -> 0.563 FAPH on DipCo (Manifest's default)
           id(hey_mycroft).set_probability_cutoff(253);  // 0.99 -> 0.567 FAPH on DipCo
+          id(hi_stackchan).set_probability_cutoff(252);  // 0.99 -> 1.0 FAPH on LibriSpeech dev-clean
         } else if (x == "Moderately sensitive") {
           id(okay_nabu).set_probability_cutoff(176);    // 0.69 -> 0.376 FAPH on DipCo
           id(hey_jarvis).set_probability_cutoff(235);   // 0.92 -> 0.939 FAPH on DipCo
           id(hey_mycroft).set_probability_cutoff(242);  // 0.95 -> 1.502 FAPH on DipCo (Manifest's default)
+          id(hi_stackchan).set_probability_cutoff(247);  // 0.97 -> 2.1 FAPH on LibriSpeech dev-clean (Manifest's default)
         } else if (x == "Very sensitive") {
           id(okay_nabu).set_probability_cutoff(143);    // 0.56 -> 0.751 FAPH on DipCo
           id(hey_jarvis).set_probability_cutoff(212);   // 0.83 -> 1.502 FAPH on DipCo
           id(hey_mycroft).set_probability_cutoff(237);  // 0.93 -> 1.878 FAPH on DipCo
+          id(hi_stackchan).set_probability_cutoff(240);  // 0.94 -> 3.1 FAPH on LibriSpeech dev-clean
         }
 
 display:
@@ -960,14 +1251,70 @@ touchscreen:
       x_max: 320
       y_min: 0
       y_max: 240
-    on_touch:
-      - lambda: |-
-          ESP_LOGD("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
-                          touch.x, touch.y, touch.x_raw, touch.y_raw);  
 
 script:
+  # Drives the light bar from the voice assistant phase. Called from
+  # draw_display, which already runs on every phase and connection change.
+  - id: control_leds
+    then:
+      - lambda: |-
+          const int phase = id(voice_assistant_phase);
+          const auto bar = id(stackchan_light_bar).current_values;
+          const bool bar_on = bar.get_state() > 0.0f;
+          // Follow the user facing bar colour when it is on, otherwise use the
+          // default assistant cyan so the patterns stay visible.
+          float red = bar_on ? bar.get_red() : 24.0f / 255.0f;
+          float green = bar_on ? bar.get_green() : 187.0f / 255.0f;
+          float blue = bar_on ? bar.get_blue() : 242.0f / 255.0f;
+          float brightness = bar.get_brightness() < 0.2f ? 0.2f : bar.get_brightness();
+
+          std::string effect;
+          if (id(init_in_progress)) {
+            if (wifi::global_wifi_component->is_connected()) {
+              effect = "Initializing";
+            } else {
+              red = 1.0f;
+              green = 0.89f;
+              blue = 0.71f;
+              effect = "none";
+            }
+          } else if (!api::global_api_server->is_connected()) {
+            red = 1.0f;
+            green = 0.0f;
+            blue = 0.0f;
+            effect = "Not Ready";
+          } else if (phase == ${voice_assist_listening_phase_id}) {
+            effect = "Listening";
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            effect = "Thinking";
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            effect = "Replying";
+          } else if (phase == ${voice_assist_error_phase_id}) {
+            red = 1.0f;
+            green = 0.0f;
+            blue = 0.0f;
+            effect = "Error";
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            effect = "Muted";
+          } else {
+            // Idle: hand the bar back to whatever the user set it to.
+            id(voice_assistant_leds).turn_off().perform();
+            if (bar_on) {
+              id(stackchan_light_bar).turn_on().perform();
+            }
+            return;
+          }
+
+          auto call = id(voice_assistant_leds).make_call();
+          call.set_state(true);
+          call.set_brightness(brightness);
+          call.set_rgb(red, green, blue);
+          call.set_effect(effect);
+          call.perform();
+
   - id: draw_display
     then:
+      - script.execute: control_leds
       - if:
           condition:
             lambda: return !id(init_in_progress);
@@ -1030,68 +1377,90 @@ script:
           else:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
 
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_off: mute
+              - lambda: return !id(mww).is_running();
+          then:
+            - micro_wake_word.start
+
   - id: play_sound
     parameters:
       priority: bool
-      sound_file: "audio::AudioFile*"
+      sound_file: string
     then:
+      - if:
+          condition:
+            lambda: return priority;
+          then:
+            - media_player.stop:
+                id: speaker_media_player
+                announcement: true
       - lambda: |-
-          if (priority) {
+          if ( (id(speaker_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
             id(speaker_media_player)
               ->make_call()
-              .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_STOP)
+              .set_media_url("audio-file://" + sound_file)
               .set_announcement(true)
               .perform();
           }
-          if ( (id(speaker_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
-            id(speaker_media_player)
-              ->play_file(sound_file, true, false);
-          }
-
 image:
-  - file: ${error_illustration_file}
+  - platform: file
+    file: ${error_illustration_file}
     id: stachchan_error
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${idle_illustration_file}
+  - platform: file
+    file: ${idle_illustration_file}
     id: stachchan_idle
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${listening_illustration_file}
+  - platform: file
+    file: ${listening_illustration_file}
     id: stachchan_listening
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${thinking_illustration_file}
+  - platform: file
+    file: ${thinking_illustration_file}
     id: stachchan_thinking
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${replying_illustration_file}
+  - platform: file
+    file: ${replying_illustration_file}
     id: stachchan_replying
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${loading_illustration_file}
+  - platform: file
+    file: ${loading_illustration_file}
     id: stachchan_initializing
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${error_no_wifi_illustration_file}
+  - platform: file
+    file: ${error_no_wifi_illustration_file}
     id: error_no_wifi
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${error_no_ha_illustration_file}
+  - platform: file
+    file: ${error_no_ha_illustration_file}
     id: error_no_ha
     resize: 320x240
     type: RGB
     transparency: alpha_channel
-  - file: ${muted_illustration_file}
+  - platform: file
+    file: ${muted_illustration_file}
     id: stackchan_muted
-    resize: 320x240    
+    resize: 320x240
     type: RGB
     transparency: alpha_channel
 
