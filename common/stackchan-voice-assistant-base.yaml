@@ -190,6 +190,11 @@ globals:
     type: int
     restore_value: no
     initial_value: ${voice_assist_not_ready_phase_id}
+  # Shared animation cursor so switching effects does not jump the pattern.
+  - id: led_animation_index
+    type: int
+    restore_value: no
+    initial_value: "0"
   - id: use_calib_value
     type: bool
     restore_value: yes
@@ -547,6 +552,159 @@ light:
     default_transition_length: 1s
     flash_transition_length: 0s
 
+  # Voice assistant patterns, drawn on top of the light bar. The bar is 12 LEDs
+  # in two 6-LED halves (left 0-5, right 6-11), so every pattern works on a
+  # position p = 0-5 and paints both halves at once. Their colour follows the
+  # user facing light bar when it is on and falls back to the default
+  # assistant cyan otherwise.
+  - platform: partition
+    id: voice_assistant_leds
+    internal: true
+    default_transition_length: 0ms
+    segments:
+      - id: stackchan_light_bar
+        from: 0
+        to: 5
+      - id: stackchan_light_bar
+        from: 6
+        to: 11
+    effects:
+      # Loading fill, both halves grow from the outer ends towards the middle.
+      - addressable_lambda:
+          name: "Initializing"
+          update_interval: 150ms
+          lambda: |-
+            static uint8_t step = 0;
+            if (initial_run)
+              step = 0;
+            const Color color(24, 187, 242);
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p <= step) ? color : Color::BLACK;
+            }
+            step = (step + 1) % 7;
+      # Fast comet towards the middle, mirrored on both halves.
+      - addressable_lambda:
+          name: "Listening"
+          update_interval: 40ms
+          lambda: |-
+            const auto cv = id(stackchan_light_bar).current_values;
+            const Color color = cv.get_state() > 0.0f
+                                    ? Color(cv.get_red() * 255, cv.get_green() * 255, cv.get_blue() * 255)
+                                    : Color(24, 187, 242);
+            const int head = id(led_animation_index) % 6;
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              const int d = (p - head + 6) % 6;
+              if (d == 0) {
+                it[i] = color;
+              } else if (d == 5) {
+                it[i] = color * 160;
+              } else if (d == 4) {
+                it[i] = color * 80;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            id(led_animation_index) = (id(led_animation_index) + 1) % 6;
+      # The two LEDs nearest the middle breathe while the command is processed.
+      - addressable_lambda:
+          name: "Thinking"
+          update_interval: 16ms
+          lambda: |-
+            static uint8_t step = 0;
+            static bool down = true;
+            const uint8_t steps = 8;
+            if (initial_run) {
+              step = 0;
+              down = true;
+            }
+            const auto cv = id(stackchan_light_bar).current_values;
+            const Color color = cv.get_state() > 0.0f
+                                    ? Color(cv.get_red() * 255, cv.get_green() * 255, cv.get_blue() * 255)
+                                    : Color(24, 187, 242);
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p == 5) ? color * uint8_t(255 / steps * (steps - step)) : Color::BLACK;
+            }
+            if (down) {
+              step++;
+            } else {
+              step--;
+            }
+            if (step == 0 || step == steps) {
+              down = !down;
+            }
+      # Same comet as listening, but running the other way.
+      - addressable_lambda:
+          name: "Replying"
+          update_interval: 40ms
+          lambda: |-
+            const auto cv = id(stackchan_light_bar).current_values;
+            const Color color = cv.get_state() > 0.0f
+                                    ? Color(cv.get_red() * 255, cv.get_green() * 255, cv.get_blue() * 255)
+                                    : Color(24, 187, 242);
+            const int head = (6 - id(led_animation_index) % 6) % 6;
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              const int d = (p - head + 6) % 6;
+              if (d == 0) {
+                it[i] = color;
+              } else if (d == 5) {
+                it[i] = color * 160;
+              } else if (d == 4) {
+                it[i] = color * 80;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            id(led_animation_index) = (id(led_animation_index) + 1) % 6;
+      # Fast red pulse over the whole bar.
+      - addressable_lambda:
+          name: "Error"
+          update_interval: 10ms
+          lambda: |-
+            static uint8_t step = 0;
+            static bool down = true;
+            const uint8_t steps = 10;
+            if (initial_run) {
+              step = 0;
+              down = true;
+            }
+            const Color color(255, 0, 0);
+            for (int i = 0; i < 12; i++) {
+              it[i] = color * uint8_t(255 / steps * (steps - step));
+            }
+            if (down) {
+              step++;
+            } else {
+              step--;
+            }
+            if (step == 0 || step == steps) {
+              down = !down;
+            }
+      # Microphone muted: a steady red pair next to the middle.
+      - addressable_lambda:
+          name: "Muted"
+          update_interval: 500ms
+          lambda: |-
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p == 5) ? Color(255, 0, 0) : Color::BLACK;
+            }
+      # No Home Assistant connection: a slow red dot walking along the bar.
+      - addressable_lambda:
+          name: "Not Ready"
+          update_interval: 120ms
+          lambda: |-
+            const int head = id(led_animation_index) % 6;
+            const Color color(255, 0, 0);
+            for (int i = 0; i < 12; i++) {
+              const int p = (i < 6) ? i : (11 - i);
+              it[i] = (p == head) ? color : Color::BLACK;
+            }
+            id(led_animation_index) = (id(led_animation_index) + 1) % 6;
+
 esp_afe:
   id: afe
   # Full ESP-SR front end at the default sr/low_cost profile with AEC on.
@@ -887,6 +1045,7 @@ voice_assistant:
                 - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
               else:
                 - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+          - script.execute: control_leds
         # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
     - if:
         condition:
@@ -1114,14 +1273,70 @@ touchscreen:
       x_max: 320
       y_min: 0
       y_max: 240
-    on_touch:
-      - lambda: |-
-          ESP_LOGD("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
-                          touch.x, touch.y, touch.x_raw, touch.y_raw);  
 
 script:
+  # Drives the light bar from the voice assistant phase. Called from
+  # draw_display, which already runs on every phase and connection change.
+  - id: control_leds
+    then:
+      - lambda: |-
+          const int phase = id(voice_assistant_phase);
+          const auto bar = id(stackchan_light_bar).current_values;
+          const bool bar_on = bar.get_state() > 0.0f;
+          // Follow the user facing bar colour when it is on, otherwise use the
+          // default assistant cyan so the patterns stay visible.
+          float red = bar_on ? bar.get_red() : 24.0f / 255.0f;
+          float green = bar_on ? bar.get_green() : 187.0f / 255.0f;
+          float blue = bar_on ? bar.get_blue() : 242.0f / 255.0f;
+          float brightness = bar.get_brightness() < 0.2f ? 0.2f : bar.get_brightness();
+
+          std::string effect;
+          if (id(init_in_progress)) {
+            if (wifi::global_wifi_component->is_connected()) {
+              effect = "Initializing";
+            } else {
+              red = 1.0f;
+              green = 0.89f;
+              blue = 0.71f;
+              effect = "none";
+            }
+          } else if (!api::global_api_server->is_connected()) {
+            red = 1.0f;
+            green = 0.0f;
+            blue = 0.0f;
+            effect = "Not Ready";
+          } else if (phase == ${voice_assist_listening_phase_id}) {
+            effect = "Listening";
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            effect = "Thinking";
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            effect = "Replying";
+          } else if (phase == ${voice_assist_error_phase_id}) {
+            red = 1.0f;
+            green = 0.0f;
+            blue = 0.0f;
+            effect = "Error";
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            effect = "Muted";
+          } else {
+            // Idle: hand the bar back to whatever the user set it to.
+            id(voice_assistant_leds).turn_off().perform();
+            if (bar_on) {
+              id(stackchan_light_bar).turn_on().perform();
+            }
+            return;
+          }
+
+          auto call = id(voice_assistant_leds).make_call();
+          call.set_state(true);
+          call.set_brightness(brightness);
+          call.set_rgb(red, green, blue);
+          call.set_effect(effect);
+          call.perform();
+
   - id: draw_display
     then:
+      - script.execute: control_leds
       - if:
           condition:
             lambda: return !id(init_in_progress);
