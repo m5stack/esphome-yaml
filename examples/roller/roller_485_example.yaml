@@ -1,0 +1,192 @@
+# M5Stack Unit Roller485 – RS-485 bus example
+# Up to 255 motors on one RS-485 bus via uart_multi.
+# Source: https://github.com/ItsRebaseTime/esphome-rs485-motors (branch: address_change)
+#         https://github.com/m5stack/esphome-yaml
+#
+# Wiring: TX→RS485 DE/TX, RX→RS485 RO, RTS pin controls DE/RE (optional).
+# Default UART baud: 115200 (RS-485 module default).
+
+esphome:
+  name: roller-485-demo
+  friendly_name: Roller 485 Demo
+
+esp32:
+  board: m5stack-stamps3
+
+external_components:
+  - source: github://ItsRebaseTime/esphome-rs485-motors@address_change
+    components: [uart_multi]
+    refresh: 0s
+  - source: github://m5stack/esphome-yaml@main
+    components:
+      - m5stack_roller
+      - m5stack_roller_485
+    refresh: 0s
+
+logger:
+api:
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+uart:
+  id: uart_bus
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+  baud_rate: 115200
+
+uart_multi:
+  id: rs485_bus
+  uart_id: uart_bus
+  update_interval: 200ms   # how often to cycle through readback requests
+  tx_queue_size: 10
+
+# ── Motor declarations ───────────────────────────────────────────────────────
+m5stack_roller_485:
+  - id: motor_1
+    uart_multi_id: rs485_bus
+    motor_id: 1             # RS-485 ID of the motor (1–255)
+    host_id: 0              # ID this ESP presents on the bus (0–255)
+    update_interval: 500ms  # readback polling period
+
+  - id: motor_2
+    uart_multi_id: rs485_bus
+    motor_id: 2
+    update_interval: 500ms
+
+# ── Sensors (readback) ───────────────────────────────────────────────────────
+sensor:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    speed:
+      name: Motor 1 Speed
+      unit_of_measurement: rpm
+    position:
+      name: Motor 1 Position
+      unit_of_measurement: "°"
+    current:
+      name: Motor 1 Current
+      unit_of_measurement: mA
+    vin:
+      name: Motor 1 Input Voltage
+    temperature:
+      name: Motor 1 Temperature
+    encoder:
+      name: Motor 1 Encoder
+
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_2
+    speed:
+      name: Motor 2 Speed
+    position:
+      name: Motor 2 Position
+
+# ── Text sensors ─────────────────────────────────────────────────────────────
+text_sensor:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    motor_status:
+      name: Motor 1 Status
+    motor_mode:
+      name: Motor 1 Mode
+    motor_error:
+      name: Motor 1 Error
+
+# ── Switches ─────────────────────────────────────────────────────────────────
+switch:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    motor_output:
+      name: Motor 1 Enable
+    stall_protection:
+      name: Motor 1 Stall Protection
+    over_range_protection:
+      name: Motor 1 Over-Range Protection
+    button_switching_mode:
+      name: Motor 1 Button Mode Switching
+
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_2
+    motor_output:
+      name: Motor 2 Enable
+
+# ── Buttons ──────────────────────────────────────────────────────────────────
+button:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    save_to_flash:
+      name: Motor 1 Save to Flash
+    release_stall_protection:
+      name: Motor 1 Release Stall
+
+# ── Mode selection ───────────────────────────────────────────────────────────
+select:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    mode:
+      name: Motor 1 Mode Select
+
+# ── Numbers (setpoints & PID) ────────────────────────────────────────────────
+number:
+  # Motor 1 – speed mode
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    speed:
+      name: Motor 1 Target Speed
+      unit_of_measurement: rpm
+    speed_max_current:
+      name: Motor 1 Speed Max Current
+      unit_of_measurement: mA
+
+    # Position mode
+    position:
+      name: Motor 1 Target Position
+      unit_of_measurement: "°"
+    position_max_current:
+      name: Motor 1 Position Max Current
+      unit_of_measurement: mA
+
+    # Current mode
+    current:
+      name: Motor 1 Target Current
+      unit_of_measurement: mA
+
+    # Speed PID
+    speed_kp:
+      name: Motor 1 Speed Kp
+    speed_ki:
+      name: Motor 1 Speed Ki
+    speed_kd:
+      name: Motor 1 Speed Kd
+
+    # Position PID
+    position_kp:
+      name: Motor 1 Position Kp
+    position_ki:
+      name: Motor 1 Position Ki
+    position_kd:
+      name: Motor 1 Position Kd
+
+    # RGB brightness
+    rgb_brightness:
+      name: Motor 1 LED Brightness
+      unit_of_measurement: "%"
+
+    # Encoder
+    encoder:
+      name: Motor 1 Encoder Set
+
+# ── RGB LED ───────────────────────────────────────────────────────────────────
+light:
+  - platform: m5stack_roller
+    m5stack_roller_id: motor_1
+    rgb:
+      name: Motor 1 LED
+      id: motor1_led
+
+# ── Example automations ───────────────────────────────────────────────────────
+# Run motor 1 at 500 rpm when a Home Assistant switch is toggled
+# (uses lambda to read setpoints already configured via the number entities)
