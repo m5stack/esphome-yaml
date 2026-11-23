@@ -2,6 +2,7 @@
 
 #include "esphome/components/light/addressable_light.h"
 #include "esphome/components/light/light_output.h"
+#include "esphome/core/version.h"
 
 #include "../m5ioe1.h"
 
@@ -28,7 +29,12 @@ class M5IOE1AddressableLight : public light::AddressableLight,
     void clear_effect_data() override;
 
   protected:
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 11, 0)
+    // ESPHome 2026.11.0 replaced get_view_internal() with color accessors
+    light::CorrectedBufferColorAccessor internal_accessor_{nullptr, nullptr, {0, 1, 2}, &this->correction_};
+#else
     light::ESPColorView get_view_internal(int32_t index) const override;
+#endif
     int32_t num_leds_;
 
     // The on device driver only support RGB565 (16 bits)

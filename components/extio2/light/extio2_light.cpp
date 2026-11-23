@@ -116,6 +116,12 @@ void EXTIO2AddressableLight::setup() {
   }
 
   memset(this->effect_data_, 0x00, this->num_leds_);
+
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 11, 0)
+  this->internal_accessor_.color_data = this->buf_;
+  this->internal_accessor_.effect_data = this->effect_data_;
+  this->accessor_ = &this->internal_accessor_;
+#endif
   
   // set pin functionality
   if ( this->num_leds_ < 8 ) {
@@ -152,6 +158,7 @@ void EXTIO2AddressableLight::clear_effect_data() {
   memset(this->effect_data_, 0x00, this->num_leds_);
 }
 
+#if ESPHOME_VERSION_CODE < VERSION_CODE(2026, 11, 0)
 light::ESPColorView EXTIO2AddressableLight::get_view_internal(int32_t index) const {
   size_t pos = index * 3;
 
@@ -164,5 +171,6 @@ light::ESPColorView EXTIO2AddressableLight::get_view_internal(int32_t index) con
       &this->correction_,
   };
 }
+#endif
 
 }  // namespace esphome::extio2

@@ -31,6 +31,12 @@ void M5IOE1AddressableLight::setup() {
 
   memset(this->effect_data_, 0x00, this->num_leds_);
 
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 11, 0)
+  this->internal_accessor_.color_data = this->buf_;
+  this->internal_accessor_.effect_data = this->effect_data_;
+  this->accessor_ = &this->internal_accessor_;
+#endif
+
   // Enable LED, refresh RAM datazone
   this->parent_->setup_neopixel(this->num_leds_);
 
@@ -61,6 +67,7 @@ void M5IOE1AddressableLight::write_state(light::LightState *state) {
   this->parent_->set_led_color(hwbuf, sizeof(hwbuf));
 }
 
+#if ESPHOME_VERSION_CODE < VERSION_CODE(2026, 11, 0)
 light::ESPColorView M5IOE1AddressableLight::get_view_internal(int32_t index) const {
   size_t pos = index * 3;
 
@@ -73,6 +80,7 @@ light::ESPColorView M5IOE1AddressableLight::get_view_internal(int32_t index) con
       &this->correction_,
   };
 }
+#endif
 
 void M5IOE1AddressableLight::clear_effect_data() {
   memset(this->effect_data_, 0x00, this->num_leds_);
