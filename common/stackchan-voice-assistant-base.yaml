@@ -389,6 +389,18 @@ aw9523b:
   p0_drive_mode: PUSH_PULL
   interrupt_pin: GPIO21
 
+# BMI270 on the internal I2C bus.
+motion:
+  - platform: bmi270
+    id: imu
+    i2c_id: bsp_bus
+    address: 0x69
+    update_interval: 50ms
+    accelerometer_range: 4G
+    accelerometer_odr: 100HZ
+    gyroscope_range: 1000DPS
+    gyroscope_odr: 200HZ
+
 output:
   # DLDO1: LCD backlight
   - platform: axp2101
@@ -649,6 +661,21 @@ event:
           format: "AXP2101 event: %s"
           args: [event_type.c_str()]
 
+  # The original firmware compares a 16 m/s² acceleration difference (~1.6 g)
+  # and requires the shake to repeat. The ESPHome motion event already compares
+  # the vector jerk in g and has a cooldown, so one strong shake is enough here;
+  # repeated events simply extend the reaction.
+  - platform: motion
+    id: imu_shake
+    name: "IMU Shake"
+    threshold: 1.5
+    cooldown: 500ms
+    on_event:
+      - if:
+          condition:
+            lambda: return event_type == "shake";
+          then:
+            - stackchan_ui.shake: stackchan_face
 
 sensor:
   - platform: axp2101
