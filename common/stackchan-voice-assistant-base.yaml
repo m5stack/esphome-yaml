@@ -323,6 +323,35 @@ external_components:
 axp2101:
   id: axp2101_pmu
   i2c_id: bsp_bus
+  update_interval: 30s
+  event_poll_interval: 100ms
+
+# Power rails of the PMIC, as regulators. `always_on` implies `boot_on`, so each
+# rail is set to its voltage and switched on during setup(), before any DATA
+# component is probed, and nothing may switch it off afterwards.
+regulator:
+  - platform: axp2101
+    axp_id: axp2101_pmu
+    always_on: true
+    rails:
+      - id: rail_aldo1
+        rail: ALDO1
+        voltage: 1800mV
+      - id: rail_aldo2
+        rail: ALDO2
+        voltage: 3300mV
+      - id: rail_bldo1
+        rail: BLDO1
+        voltage: 2800mV
+      - id: rail_bldo2
+        rail: BLDO2
+        voltage: 1500mV
+      - id: rail_dcdc1
+        rail: DCDC1
+        voltage: 3300mV
+      - id: rail_dcdc3
+        rail: DCDC3
+        voltage: 3300mV
 
 # IO Expander
 aw9523b:
@@ -332,36 +361,12 @@ aw9523b:
   interrupt_pin: GPIO21
 
 output:
+  # DLDO1: LCD backlight
   - platform: axp2101
-    type: range
-    channel: DLDO1
     id: lcd_backlight_output
+    rail: DLDO1
     min_voltage: 2600
     max_voltage: 3300
-
-  - platform: axp2101
-    channel: ALDO1
-    voltage: 1800
-
-  - platform: axp2101
-    channel: ALDO2
-    voltage: 3300
-  
-  - platform: axp2101
-    channel: BLDO1
-    voltage: 2800
-  
-  - platform: axp2101
-    channel: BLDO2
-    voltage: 1500
-
-  - platform: axp2101
-    channel: DCDC1
-    voltage: 3300
-
-  - platform: axp2101
-    channel: DCDC3
-    voltage: 3300
 
 # M5IOE1 IO Expander
 m5ioe1:
@@ -496,31 +501,26 @@ number:
 
 button:
   - platform: template
-    name: "Servo Calibration"
+    name: "Power Off"
+    icon: "mdi:power"
+    entity_category: config
     on_press:
-      - lambda: |-
-          ESP_LOGD("ftservo", "Start calibration");
-          float x_zero = id(servo_x_position).state;
-          float y_zero = id(servo_y_position).state;
-          // assign offset
-          float x_offset = x_zero / 2.844f;
-          float y_offset = y_zero / 2.844f;
-          // override default offset setting
-          id(servo_x_angle)->set_angle_offset(static_cast<int>(x_offset));
-          id(servo_y_angle)->set_angle_offset(static_cast<int>(y_offset));
-          // indicating we are using calibration value
-          id(use_calib_value) = true;
-          id(x_servo_zero_step) = static_cast<int>(x_zero);
-          id(y_servo_zero_step) = static_cast<int>(y_zero);
-      - delay: 1s
-      - lambda: |-
-          ESP_LOGD("ftservo", "Preferences sync requested");
-          global_preferences->sync(); // sync at once
-          ESP_LOGD("ftservo", "Done reading and saving zero position, X zero: %d, Y zero %d", 
-                  id(x_servo_zero_step), id(y_servo_zero_step));
+      - axp2101.shutdown: axp2101_pmu
 
   - platform: template
-    name: "Clear Calibration"
+    name: "Restart SoC"
+    icon: "mdi:restart"
+    entity_category: config
+    on_press:
+      - axp2101.restart: axp2101_pmu
+
+  - platform: template
+    name: "Reset Fuel Gauge"
+    icon: "mdi:battery-sync"
+    entity_category: config
+    on_press:
+      - axp2101.reset_gauge: axp2101_pmu
+
   # Records the pose the head is in as 0° on both axes and stores it
   - platform: template
     id: servo_calibration
@@ -567,17 +567,57 @@ button:
     down:
       name: "Nudge Down"
 
+binary_sensor:
+  # PMIC status bits
+  - platform: axp2101
+    battery_charging:
+      name: "Battery Charging"
+    battery_discharging:
+      name: "Battery Discharging"
+    vbus_good:
+      name: "VBUS Good"
+    battery_present:
+      name: "Battery Present"
+      entity_category: diagnostic
+
+# Interrupt sources of the PMIC, so automations can react to the power key and
+# to the charger instead of polling the status bits.
+event:
+  - platform: axp2101
+    name: "PMU Event"
+    events:
+      - vbus_insert
+      - vbus_remove
+      - battery_insert
+      - battery_remove
+      - power_key_short_press
+      - power_key_long_press
+      - charge_started
+      - charge_done
+    on_event:
+      - logger.log:
+          format: "AXP2101 event: %s"
+          args: [event_type.c_str()]
+
 
 sensor:
   - platform: axp2101
-    id: axp2101_sensor
+    battery_voltage:
+      name: "Battery Voltage"
     battery_level:
       name: "Battery Level"
       filters:
         - delta: 1.0
-    battery_charging:
-      name: "Battery Charging"
-    
+    vbus_voltage:
+      name: "VBUS Voltage"
+    system_voltage:
+      name: "System Voltage"
+    die_temperature:
+      name: "AXP2101 Temperature"
+
+  # StackChan body: measured servo positions and the head angles derived from
+  # them. `position` and the head `yaw`/`pitch` both come from the same feedback
+  # read, so the extra entities cost no bus traffic.
   - platform: ftservo
     ftservo_id: x_servo
     position:
@@ -1198,6 +1238,17 @@ voice_assistant:
     - voice_assistant.stop:
 
 switch:
+  # PMIC settings.
+  - platform: axp2101
+    charging:
+      name: "Charging"
+    gauge:
+      name: "Fuel Gauge"
+      restore_mode: ALWAYS_ON
+    ts_external_input:
+      name: "TS External Input"
+      restore_mode: ALWAYS_ON
+
   - platform: gpio
     name: "BUS_OUT_EN"
     pin:
@@ -1263,6 +1314,17 @@ switch:
         - script.execute: draw_display
 
 select:
+  - platform: axp2101
+    charge_current:
+      name: "Charge Current"
+    charge_voltage:
+      name: "Charge Voltage"
+      initial_option: 4.1V
+    input_current_limit:
+      name: "Input Current Limit"
+    power_key_long_press:
+      name: "Power Key Long Press"
+
   - platform: template
     id: wake_word_sensitivity
     name: "Wake word sensitivity"
