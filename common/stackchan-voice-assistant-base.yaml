@@ -3,17 +3,6 @@ substitutions:
   name: stackchan-voice
   friendly_name: M5Stack StackChan Voice Assistant
 
-  # StackChan images
-  loading_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/loading.png
-  idle_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/idle.png
-  listening_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/listening.png
-  thinking_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/thinking.png
-  replying_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/replying.png
-  muted_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/muted.png
-  error_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/error.png
-  error_no_wifi_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/error-no-wifi.png
-  error_no_ha_illustration_file: https://raw.githubusercontent.com/Harrison-Xu/esphome-yaml/main/stackchan_images/error-no-ha.png
-
   # Audio files
   wake_word_triggered_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
   timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
@@ -22,40 +11,6 @@ substitutions:
   # Micro wake word models
   hi_stackchan_model_file: "https://github.com/m5stack/esphome-yaml/releases/download/2026.3.0/hi_stackchan.json"
   okay_nabu_model_file: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241226.3/okay_nabu.json
-
-  loading_illustration_background_color: '000000'
-  idle_illustration_background_color: '000000'
-  listening_illustration_background_color: 'FFFFFF'
-  thinking_illustration_background_color: 'FFFFFF'
-  replying_illustration_background_color: 'FFFFFF'
-  error_illustration_background_color: '000000'
-
-  # Faces: the drawing code of the idle, listening, thinking, replying,
-  # error and muted pages. Override one to draw your own face instead of
-  # the illustration; the request / response text is drawn on top.
-  idle_face: |-
-    it.fill(id(idle_color));
-    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_idle), ImageAlign::CENTER);
-  listening_face: |-
-    it.fill(id(listening_color));
-    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_listening), ImageAlign::CENTER);
-  thinking_face: |-
-    it.fill(id(thinking_color));
-    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_thinking), ImageAlign::CENTER);
-  replying_face: |-
-    it.fill(id(replying_color));
-    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_replying), ImageAlign::CENTER);
-  error_face: |-
-    it.fill(id(error_color));
-    it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_error), ImageAlign::CENTER);
-  muted_face: |-
-    it.fill(Color::BLACK);
-    it.image((it.get_width() / 2), (it.get_height() / 2), id(stackchan_muted), ImageAlign::CENTER);
-  # Color of the request / response text on the thinking and replying pages
-  illustration_text_color: '000000'
-  # "never" redraws only on state changes; animated faces need a
-  # periodic redraw, e.g. 66ms
-  display_update_interval: never
 
   # Phases of the Voice Assistant
   # The voice assistant is ready to be triggered by a wake word
@@ -221,6 +176,31 @@ api:
     - script.execute: draw_display
   on_client_disconnected:
     - script.execute: draw_display
+  actions:
+    - action: stackchan_set_emotion
+      variables:
+        emotion: string
+      then:
+        - stackchan_ui.set_emotion:
+            id: stackchan_face
+            emotion: !lambda return emotion;
+    - action: stackchan_say
+      variables:
+        message: string
+      then:
+        # `speak` drives the mouth; the draw_display status text leaves it
+        # off so only an explicit say animates the mouth.
+        - stackchan_ui.set_speech:
+            id: stackchan_face
+            text: !lambda return message;
+            duration: 8s
+            speak: true
+    - action: stackchan_pet
+      then:
+        - stackchan_ui.head_pet: stackchan_face
+    - action: stackchan_shake
+      then:
+        - stackchan_ui.shake: stackchan_face
 
 ota:
   - platform: esphome
@@ -824,10 +804,7 @@ light:
     default_transition_length: 1s
     flash_transition_length: 0s
 
-  # Voice assistant patterns, drawn on top of the light bar. The bar is 12 LEDs
-  # in two 6-LED halves (left 0-5, right 6-11), so every pattern works on a
-  # position p = 0-5 and paints both halves at once. Their colour follows the
-  # user facing light bar when it is on and falls back to the default
+  # Voice assistant patterns, drawn on top of the light bar.
   # assistant cyan otherwise.
   - platform: partition
     id: voice_assistant_leds
@@ -1243,6 +1220,7 @@ voice_assistant:
   volume_multiplier: 1
   on_listening:
     - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
+    - stackchan_ui.stop_speaking: stackchan_face
     - text_sensor.template.publish:
         id: text_request
         state: "..."
@@ -1263,11 +1241,13 @@ voice_assistant:
         id: text_response
         state: !lambda return x;
     - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+    - stackchan_ui.start_speaking: stackchan_face
     - script.execute: draw_display
   on_end:
     - wait_until:
         not:
           voice_assistant.is_running:
+    - stackchan_ui.stop_speaking: stackchan_face
     # Stop ducking the music.
     - mixer_speaker.apply_ducking:
         id: media_speaker_mix
@@ -1293,6 +1273,7 @@ voice_assistant:
     # Keep the wake word engine listening for the next command.
     - script.execute: start_wake_word
   on_error:
+    - stackchan_ui.stop_speaking: stackchan_face
     # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
     # These two are ignored for a better user experience
     - if:
@@ -1389,17 +1370,19 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_off:
-        - microphone.unmute:
-            id: voice_mic
-        - script.execute: start_wake_word
-        - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
-        - script.execute: draw_display
-        
+      - microphone.unmute:
+          id: voice_mic
+      - stackchan_ui.stop_speaking: stackchan_face
+      - script.execute: start_wake_word
+      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      - script.execute: draw_display
+
     on_turn_on:
-        - microphone.mute:
-            id: voice_mic
-        - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
-        - script.execute: draw_display
+      - microphone.mute:
+          id: voice_mic
+      - stackchan_ui.stop_speaking: stackchan_face
+      - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+      - script.execute: draw_display
 
 select:
   - platform: axp2101
@@ -1461,40 +1444,63 @@ display:
       number: GPIO3
       ignore_strapping_warning: true
     data_rate: 40MHz
-    update_interval: ${display_update_interval}
+    update_interval: never
     invert_colors: true
     id: m5cores3_lcd
-    pages:
-      - id: idle_page
-        lambda: |-
-          ${idle_face}
-      - id: listening_page
-        lambda: |-
-          ${listening_face}
-      - id: thinking_page
-        lambda: |-
-          ${thinking_face}
-          it.printf(5, 200, id(font_request), id(text_color), "%s", id(text_request).state.c_str());
-      - id: replying_page
-        lambda: |-
-          ${replying_face}
-          it.printf(5, 200, id(font_response), id(text_color), "%s", id(text_response).state.c_str());
-      - id: error_page
-        lambda: |-
-          ${error_face}
-      - id: no_ha_page
-        lambda: |-
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_ha), ImageAlign::CENTER);
-      - id: no_wifi_page
-        lambda: |-
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_wifi), ImageAlign::CENTER);
-      - id: initializing_page
-        lambda: |-
-          it.fill(id(loading_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(stachchan_initializing), ImageAlign::CENTER);
-      - id: muted_page
-        lambda: |-
-          ${muted_face}
+
+lvgl:
+  displays:
+    - m5cores3_lcd
+  touchscreens:
+    - touch
+  widgets: []
+
+# The face owns the LVGL screen; do not add lvgl widgets or pages here.
+stackchan_ui:
+  id: stackchan_face
+  font_id: ui_font
+  on_head_pet:
+    - if:
+        condition:
+          not:
+            stackchan_motion.is_moving: head
+        then:
+          # Only the pitch servo moves; yaw stays where it is. The base is the
+          # measured pitch, so a number slider move cannot leave a stale
+          # stackchan_motion target behind.
+          - if:
+              condition:
+                lambda: |-
+                  if (!id(y_servo)->has_feedback())
+                    return false;
+                  const float current = id(y_servo)->current_angle();
+                  // Keep the 10° nudge inside the 0..60° command range.
+                  return current >= -10.0f && current < 60.0f;
+              then:
+                # The pitch servo stalls at the top of its travel, so the pet
+                # reaction only raises the head to 60°.
+                - lambda: id(head_pet_moved) = true;
+                - ftservo.move_angle:
+                    id: y_servo
+                    angle: !lambda |-
+                      const float current = id(y_servo)->current_angle();
+                      const float target = current + 10.0f;
+                      return target > 60.0f ? 60.0f : target;
+  on_head_pet_restore:
+    # Only pitch returns to 0, and only if the pet actually moved it; yaw is
+    # left untouched. A pet that was ignored because the head was already at
+    # the 60° cap must not trigger a jump to 0.
+    - if:
+        condition:
+          lambda: return id(head_pet_moved);
+        then:
+          - lambda: id(head_pet_moved) = false;
+          - ftservo.move_angle:
+              id: y_servo
+              angle: 0
+              time: 200
+  on_shake:
+    - stackchan_motion.home: head
 
 touchscreen:
   - platform: ft63x6
@@ -1646,57 +1652,46 @@ script:
   - id: draw_display
     then:
       - script.execute: control_leds
-      - if:
-          condition:
-            lambda: return !id(init_in_progress);
-          then:
-            - if:
-                condition:
-                  wifi.connected:
-                then:
-                  - if:
-                      condition:
-                        api.connected:
-                      then:
-                        - lambda: |
-                            switch(id(voice_assistant_phase)) {
-                              case ${voice_assist_listening_phase_id}:
-                                id(m5cores3_lcd).show_page(listening_page);
-                                id(m5cores3_lcd).update();
-                                break;
-                              case ${voice_assist_thinking_phase_id}:
-                                id(m5cores3_lcd).show_page(thinking_page);
-                                id(m5cores3_lcd).update();
-                                break;
-                              case ${voice_assist_replying_phase_id}:
-                                id(m5cores3_lcd).show_page(replying_page);
-                                id(m5cores3_lcd).update();
-                                break;
-                              case ${voice_assist_error_phase_id}:
-                                id(m5cores3_lcd).show_page(error_page);
-                                id(m5cores3_lcd).update();
-                                break;
-                              case ${voice_assist_muted_phase_id}:
-                                id(m5cores3_lcd).show_page(muted_page);
-                                id(m5cores3_lcd).update();
-                                break;
-                              case ${voice_assist_not_ready_phase_id}:
-                                id(m5cores3_lcd).show_page(no_ha_page);
-                                id(m5cores3_lcd).update();
-                                break;
-                              default:
-                                id(m5cores3_lcd).show_page(idle_page);
-                                id(m5cores3_lcd).update();
-                            }
-                      else:
-                        - display.page.show: no_ha_page
-                        - component.update: m5cores3_lcd
-                else:
-                  - display.page.show: no_wifi_page
-                  - component.update: m5cores3_lcd
-          else:
-            - display.page.show: initializing_page
-            - component.update: m5cores3_lcd
+      - stackchan_ui.set_emotion:
+          id: stackchan_face
+          emotion: !lambda |-
+            if (id(init_in_progress))
+              return std::string("sleepy");
+            if (!wifi::global_wifi_component->is_connected() || !api::global_api_server->is_connected())
+              return std::string("sad");
+            switch (id(voice_assistant_phase)) {
+              case ${voice_assist_thinking_phase_id}:
+                return std::string("doubt");
+              case ${voice_assist_replying_phase_id}:
+                return std::string("happy");
+              case ${voice_assist_error_phase_id}:
+                return std::string("angry");
+              case ${voice_assist_muted_phase_id}:
+                return std::string("sleepy");
+              default:
+                return std::string("neutral");
+            }
+      - stackchan_ui.set_speech:
+          id: stackchan_face
+          text: !lambda |-
+            if (id(init_in_progress))
+              return std::string("Starting...");
+            if (!wifi::global_wifi_component->is_connected())
+              return std::string("No Wi-Fi");
+            if (!api::global_api_server->is_connected())
+              return std::string("No Home Assistant");
+            switch (id(voice_assistant_phase)) {
+              case ${voice_assist_thinking_phase_id}:
+                return id(text_request).state;
+              case ${voice_assist_replying_phase_id}:
+                return id(text_response).state;
+              case ${voice_assist_error_phase_id}:
+                return std::string("Error");
+              case ${voice_assist_muted_phase_id}:
+                return std::string("Muted");
+              default:
+                return std::string("");
+            }
 
   - id: set_idle_or_mute_phase
     then:
@@ -1739,93 +1734,11 @@ script:
               .set_announcement(true)
               .perform();
           }
-image:
-  - platform: file
-    file: ${error_illustration_file}
-    id: stachchan_error
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${idle_illustration_file}
-    id: stachchan_idle
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${listening_illustration_file}
-    id: stachchan_listening
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${thinking_illustration_file}
-    id: stachchan_thinking
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${replying_illustration_file}
-    id: stachchan_replying
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${loading_illustration_file}
-    id: stachchan_initializing
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${error_no_wifi_illustration_file}
-    id: error_no_wifi
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${error_no_ha_illustration_file}
-    id: error_no_ha
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-  - platform: file
-    file: ${muted_illustration_file}
-    id: stackchan_muted
-    resize: 320x240
-    type: RGB
-    transparency: alpha_channel
-
 font:
   - file:
       type: gfonts
       family: ${font_family}
-      weight: 300
-      italic: true
-    id: font_request
-    size: 28
+    id: ui_font
+    size: 24
     glyphsets:
       - ${font_glyphsets}
-  - file:
-      type: gfonts
-      family: ${font_family}
-      weight: 300
-    id: font_response
-    size: 28
-    glyphsets:
-      - ${font_glyphsets}
-
-color:
-  - id: idle_color
-    hex: ${idle_illustration_background_color}
-  - id: listening_color
-    hex: ${listening_illustration_background_color}
-  - id: thinking_color
-    hex: ${thinking_illustration_background_color}
-  - id: replying_color
-    hex: ${replying_illustration_background_color}
-  - id: loading_color
-    hex: ${loading_illustration_background_color}
-  - id: error_color
-    hex: ${error_illustration_background_color}
-  - id: text_color
-    hex: ${illustration_text_color}
