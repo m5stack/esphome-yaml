@@ -92,7 +92,7 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2026.10.0
+  min_version: 2026.11.0
   name_add_mac_suffix: true
   on_boot:
     # The AFE feed task runs one priority step above loopTask (6 vs 5) so a
@@ -152,6 +152,7 @@ esp32:
   variant: esp32s3
   flash_size: 16MB
   cpu_frequency: 240MHz
+  flash_mode: qio
   framework:
     type: esp-idf
     advanced:
@@ -255,14 +256,43 @@ uart:
   baud_rate: 1000000
 
 external_components:
-  - source: github://m5stack/esphome@m5-dev
-    components: [axp2101, aw88298, aw9523b, si12t, m5ioe1, ftservo, scs9009]
-    refresh: 1h
-
-  - source: github://n-IA-hane/esphome-audio-stack@v2026.12.0-dev
+  # feat-axp: axp_base + the rewritten axp2101 driver + `regulator`, the
+  # provider platform the power rails are configured with. Neither axp_base nor
+  # regulator is in the 2026.11 release, so the PMIC has to come from this
+  # branch, which is also why m5-dev no longer lists axp2101.
+  - source: github://m5stack/esphome@feat-axp
+    components: [axp_base, axp2101, regulator]
+    refresh: 0s
+  - source: github://m5stack/esphome@feat-aw9523b
+    components: [aw9523b]
+    refresh: 0s
+  # feat-m5ioe1: the IO expander of the StackChan body (PY32L020), as
+  # `m5stack_ioe1`. It sits on the cached gpio_expander base with interrupt
+  # support, and the light platform reports RGB instead of a per-channel view.
+  - source: github://m5stack/esphome@feat-m5ioe1
+    components: [m5stack_ioe1]
+    refresh: 0s
+  # feat-ftservo: the rewritten servo stack.
+  - source: github://m5stack/esphome@feat-ftservo
+    components: [ftservo, scs9009, stackchan_motion]
+    refresh: 0s
+  # audio component
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.11.1-dev
     components: [esp_audio_stack, esp_afe]
     refresh: 1h
-    
+  # Touch support
+  - source: github://m5stack/esphome@feat-si12t
+    components: [si12t]
+    refresh: 0s
+  # NFC reader support
+  - source: github://m5stack/esphome@feat-st25r3916
+    components: [st25r, st25r_i2c]
+    refresh: 0s
+  # feat-m5-ui: the LVGL StackChan face and behaviour library.
+  - source: github://m5stack/esphome@feat-m5-ui
+    components: [stackchan_ui]
+    refresh: 0s
+
 # PMU
 axp2101:
   id: axp2101_pmu
