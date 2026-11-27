@@ -377,9 +377,9 @@ output:
     min_voltage: 2600
     max_voltage: 3300
 
-# M5IOE1 IO Expander
-m5ioe1:
-  id: m5ioe1_hub
+# StackChan body: M5Stack IOE1 expander
+m5stack_ioe1:
+  id: m5stack_ioe1_hub
   i2c_id: bsp_bus
   reset: true
 
@@ -703,11 +703,12 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
     default_transition_length: 250ms
 
-  - platform: m5ioe1
+  # 12 RGB LEDs of the StackChan body, driven through the body IO expander.
+  - platform: m5stack_ioe1
     id: stackchan_light_bar
     name: "StackChan Light Bar"
     icon: mdi:led-strip
-    num_led: 12
+    num_leds: 12
     effects:
       - random:
           name: Random
@@ -1282,27 +1283,17 @@ switch:
       number: 5
     restore_mode: ALWAYS_OFF
 
+  # Body power: IO1 is the servo VM enable
   - platform: gpio
-    name: "M5IOE1 Pin 1"
+    name: "Servo Power"
+    icon: mdi:electric-switch
     pin:
-      m5ioe1_id: m5ioe1_hub
+      m5stack_ioe1_id: m5stack_ioe1_hub
       number: 0
       mode:
         output: true
         pullup: true
     restore_mode: RESTORE_DEFAULT_ON
-
-  - platform: gpio
-    name: "M5IOE1 Pin 14"
-    pin:
-      m5ioe1_id: m5ioe1_hub
-      number: 13
-      mode:
-        output: true
-        pullup: true
-        open_drain: false
-    restore_mode: RESTORE_DEFAULT_ON
-    internal: true
 
   - platform: template
     name: Microphone Mute
