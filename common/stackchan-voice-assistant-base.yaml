@@ -130,6 +130,15 @@ esphome:
               return;
             }
             ESP_LOGI("afe_boot", "loopTask core=%d priority=%u", xPortGetCoreID(), static_cast<unsigned>(priority));
+    # The body sits on the 5 V BUS, which the expander holds low until
+    # `bus_power_on` runs, so si12t and st25r would be probed on a dead bus and
+    # marked failed for the rest of the boot. This runs after the expander's
+    # output switches have parked the pins low (HARDWARE, 800) and before the
+    # first component that talks to a body device (DATA, 600).
+    - priority: 700
+      then:
+        - script.execute: bus_power_on
+
     # The calibrated zero has to be on the servos before their own setup() logs
     # the model. The restoring globals load it at HARDWARE (800), the servos come
     # up at DATA (600), so this slot is the last point where it is still ahead of
@@ -1250,28 +1259,28 @@ switch:
       restore_mode: ALWAYS_ON
 
   - platform: gpio
-    name: "BUS_OUT_EN"
-    pin:
-      aw9523b_id: aw9523b_hub
-      number: 1
-    # BUS_OUT_EN = 0
-    restore_mode: RESTORE_DEFAULT_ON
-
-  - platform: gpio
-    name: "USB_OTG_EN"
-    pin:
-      aw9523b_id: aw9523b_hub
-      number: 5
-    # USB_OTG_EN = 0
-    restore_mode: RESTORE_DEFAULT_OFF
-
-  - platform: gpio
-    name: "BOOST_EN"
+    id: boost_en
+    internal: true
     pin:
       aw9523b_id: aw9523b_hub
       number: 15
-    # BOOST_EN
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    id: bus_out_en
+    internal: true
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 1
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    id: usb_otg_en
+    internal: true
+    pin:
+      aw9523b_id: aw9523b_hub
+      number: 5
+    restore_mode: ALWAYS_OFF
 
   - platform: gpio
     name: "M5IOE1 Pin 1"
@@ -1422,6 +1431,32 @@ touchscreen:
       y_max: 240
 
 script:
+  # Powers the 5 V BUS
+  - id: bus_power_on
+    then:
+      - lambda: |-
+          // A converter under-voltage latches the AXP2101 off until the power
+          // key is pressed, and the BUS is a capacitive load, so the latch is
+          // cleared before the boost is switched onto it.
+          if (const auto *uvp = id(axp2101_pmu)->find_flag("dcdc_uvp_shutdown"); uvp != nullptr)
+            id(axp2101_pmu)->write_flag(*uvp, false);
+
+          // turn on the BOOST_EN
+          id(boost_en)->turn_on();
+          delay(50);
+
+          // Eight pulses of growing on-time bring the cold body rail up to a few
+          // volts.
+          for (int pulse = 0; pulse < 8; ++pulse) {
+            id(bus_out_en)->turn_on();
+            delayMicroseconds(pulse * 16);
+            id(bus_out_en)->turn_off();
+            delayMicroseconds(1000);
+          }
+          // turn on the BUS_OUT_EN
+          id(bus_out_en)->turn_on();
+          delay(100);
+
   # Drives the light bar from the voice assistant phase. Called from
   # draw_display, which already runs on every phase and connection change.
   - id: control_leds
