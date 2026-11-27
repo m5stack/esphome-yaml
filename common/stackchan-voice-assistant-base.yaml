@@ -78,16 +78,31 @@ substitutions:
   # for Greek use "Noto Sans" for other languages use a compatible font family
   font_family: Figtree
 
-  # Servo calibration — override in your local config if your StackChan's
-  # mechanical assembly puts the head at a different zero than the defaults.
-  # `*_angle_offset` is in degrees (mapped to steps via the servo's 0..360°
-  # → 0..1024 step range). `*_position_to_angle` is the inverse formula used
-  # to translate the servo's reported position back into degrees.
-  # note, you can override the result with 'Servo Calibration' button  
-  servo_x_angle_offset: "164"
-  servo_x_position_to_angle: "(x - 34.0f) * 0.3710f - 164.0f"
-  servo_y_angle_offset: "50"
-  servo_y_position_to_angle: "(x - 140.0f) * 90.0f / 260.0f;"
+  # Head servos: the mechanical description of each axis. `range` is the travel
+  # in degrees over the servo's full 0..1023 step range and `zero_position` the
+  # step that reads 0°, so one step is `range / 1024` degrees.
+  # The pitch numbers are measured on this unit: 0° at step 624 and 90° at step
+  # 900, i.e. 276 steps per 90° → 334° per 1024 steps. Firmware assumes
+  # the nominal 0.3125°/step (range 320) for both axes with 620 as the pitch
+  # zero, so a measurement landing within a few percent of that is expected; the
+  # yaw below still carries the old BSP formula and is worth measuring the same
+  # way (step at 0° and at ±90°) before trusting its reported angle.
+  # Override them in a local config if the assembly puts the head at a
+  # different zero, or use the "Servo Calibration" button: it records the pose
+  # the head is in as 0° on both axes and stores it in flash, so these
+  # substitutions are only the value a freshly flashed device starts from.
+  servo_x_range: "380"
+  servo_x_zero_position: "476"
+  servo_y_range: "334"
+  servo_y_zero_position: "624"
+
+  # Normal moves release torque when the servo reports the move finished
+  # (release_after_move). This delay is the fallback used by the boot and
+  # stall release path before it disables the torque.
+  servo_release_delay: "1s"
+
+  # How often each servo reports its position.
+  servo_feedback_interval: "100ms"
 
 esphome:
   name: ${name}
@@ -115,11 +130,22 @@ esphome:
               return;
             }
             ESP_LOGI("afe_boot", "loopTask core=%d priority=%u", xPortGetCoreID(), static_cast<unsigned>(priority));
+    # The calibrated zero has to be on the servos before their own setup() logs
+    # the model. The restoring globals load it at HARDWARE (800), the servos come
+    # up at DATA (600), so this slot is the last point where it is still ahead of
+    # every angle calculation.
+    - priority: 650
+      then:
+        - lambda: |-
+            id(x_servo)->set_zero_position(id(servo_x_zero_step));
+            id(y_servo)->set_zero_position(id(servo_y_zero_step));
+
     - priority: 600
       then:
         - light.turn_on:
             id: lcd_backlight
             brightness: 80%
+
     - priority: 100
       then:
         - delay: 200ms
@@ -131,22 +157,21 @@ esphome:
             then:
               - lambda: id(init_in_progress) = false;
               - script.execute: draw_display
-    # Servo calibration data
+
+    # The servos come up holding their own pose, so the head would be stiff
+    # until the first move. Release it once here, after the bus and the servo
+    # firmware had the time they need to be ready; every later release comes
+    # from `release_after_move`, so this is the only other place that touches
+    # the torque.
     - priority: -100
       then:
-        - lambda: |-
-            if (id(use_calib_value)) {
-              ESP_LOGD("boot", "Restoring calibration: X=%d, Y=%d",
-                      id(x_servo_zero_step),
-                      id(y_servo_zero_step));
-              float x_offset = id(x_servo_zero_step) / 2.844f;
-              float y_offset = id(y_servo_zero_step) / 2.844f;
-              // override default offset setting
-              id(servo_x_angle)->set_angle_offset(static_cast<int>(x_offset));
-              id(servo_y_angle)->set_angle_offset(static_cast<int>(y_offset));
-            } else {
-              ESP_LOGD("boot", "No calibration data, using defaults.");
-            }              
+        - delay: ${servo_release_delay}
+        - ftservo.set_torque:
+            id: x_servo
+            enabled: false
+        - ftservo.set_torque:
+            id: y_servo
+            enabled: false
 
 esp32:
   variant: esp32s3
@@ -223,18 +248,18 @@ globals:
     type: int
     restore_value: no
     initial_value: "0"
-  - id: use_calib_value
-    type: bool
+  # Servo zero in steps, written by the "Servo Calibration" button and applied
+  # to the servos on boot. A device that was never calibrated has no stored
+  # value and starts from the `servo_*_zero_position` substitutions.
+  - id: servo_x_zero_step
+    type: uint16_t
     restore_value: yes
-    initial_value: "false"
-  - id: x_servo_zero_step
+    initial_value: ${servo_x_zero_position}
+  - id: servo_y_zero_step
+    type: uint16_t
+    restore_value: yes
+    initial_value: ${servo_y_zero_position}
     type: int
-    restore_value: yes
-    initial_value: ${servo_x_angle_offset}
-  - id: y_servo_zero_step
-    type: int
-    restore_value: yes
-    initial_value: ${servo_y_angle_offset}    
 
 i2c:
   - id: bsp_bus
@@ -251,6 +276,7 @@ spi:
     mosi_pin: GPIO37
 
 uart:
+  id: servo_uart
   tx_pin: GPIO6
   rx_pin: GPIO7
   baud_rate: 1000000
@@ -382,52 +408,79 @@ infrared:
     receiver_frequency: 38kHz
     remote_receiver_id: ir_rx
 
-# The SCS9009 Servo
+# The SCS9009 serial bus servos.
 scs9009:
   id: scs9009_hub
+  uart_id: servo_uart
+  timeout: 100ms
+  min_interval: 5ms
 
+# A finished move releases its own torque; a stalled one releases it from on_error.
 ftservo:
   - platform: scs9009
-    address: 1
     id: x_servo
+    scs9009_id: scs9009_hub
+    address: 1
+    range: ${servo_x_range}
+    zero_position: ${servo_x_zero_position}
+    default_time: 600
+    release_after_move: true
+    update_interval: ${servo_feedback_interval}
+    # A stalled move never reaches the move-done path, so this axis releases
+    # itself here instead of pushing against the obstacle. `release_after_move`
+    # handles every normal end of a move, so nothing else touches the torque.
+    on_error:
+      - lambda: |-
+          if (code & esphome::ftservo::SERVO_ERROR_STALLED)
+            id(x_servo)->set_torque(false);
+
   - platform: scs9009
+    id: y_servo
+    scs9009_id: scs9009_hub
     address: 2
-    id: y_servo 
+    range: ${servo_y_range}
+    zero_position: ${servo_y_zero_position}
+    default_time: 600
+    release_after_move: true
+    update_interval: ${servo_feedback_interval}
+    on_error:
+      - lambda: |-
+          if (code & esphome::ftservo::SERVO_ERROR_STALLED)
+            id(y_servo)->set_torque(false);
+
+# The two servos as a pan/tilt head
+stackchan_motion:
+  id: head
+  yaw_servo: x_servo
+  pitch_servo: y_servo
+  min_yaw: -164
+  max_yaw: 164
+  min_pitch: 0
+  max_pitch: 90
+  home_yaw: 0
+  home_pitch: 0
+  nudge_step: 10
+  default_time: 600
 
 number:
-  - platform: ftservo
-    ftservo_id: x_servo
-    angle:
-      id: servo_x_angle
-      name: "Servo X Angle"
+  # One slider pair for the head, owned by the motion layer
+  - platform: stackchan_motion
+    stackchan_motion_id: head
+    yaw:
+      name: "Head Yaw"
       min_value: -164
       max_value: 164
-      use_raw_angle: false
-      angle_offset: ${servo_x_angle_offset}
-      step: 5
-    speed:
-      id: servo_x_speed
-      name: "Servo X Speed"
-      min_value: 100
-      max_value: 1500
-      step: 100
+      step: 1
+      mode: slider
 
-  - platform: ftservo
-    ftservo_id: y_servo
-    angle:
-      id: servo_y_angle
-      name: "Servo Y Angle"
+  - platform: stackchan_motion
+    stackchan_motion_id: head
+    pitch:
+      name: "Head Pitch"
       min_value: 0
       max_value: 90
-      use_raw_angle: false
-      angle_offset: ${servo_y_angle_offset}
-      step: 5
-    speed:
-      id: servo_y_speed
-      name: "Servo Y Speed"
-      min_value: 100
-      max_value: 1500
-      step: 100
+      step: 1
+      mode: slider
 
   # Post-AFE gain. It cannot repair ADC clipping and can itself clip the final
   # output; 18 dB analog gain plus this 6 dB restores the level the wake word
@@ -468,17 +521,52 @@ button:
 
   - platform: template
     name: "Clear Calibration"
+  # Records the pose the head is in as 0° on both axes and stores it
+  - platform: template
+    id: servo_calibration
+    name: "Servo Calibration"
+    icon: "mdi:crosshairs-gps"
+    entity_category: config
     on_press:
       - lambda: |-
-          ESP_LOGD("ftservo", "Restore to default settings");
-          id(use_calib_value)   = false;
-          id(x_servo_zero_step) = ${servo_x_angle_offset};
-          id(y_servo_zero_step) = ${servo_y_angle_offset};
+          if (id(head)->is_moving()) {
+            ESP_LOGW("servo_cal", "Head is moving, calibration skipped");
+            return;
+          }
+          if (!id(x_servo)->has_feedback() || !id(y_servo)->has_feedback()) {
+            ESP_LOGW("servo_cal", "No position feedback yet, calibration skipped");
+            return;
+          }
+          const uint16_t x = id(x_servo)->feedback().position;
+          const uint16_t y = id(y_servo)->feedback().position;
+          id(x_servo)->set_zero_position(x);
+          id(y_servo)->set_zero_position(y);
+          id(servo_x_zero_step) = x;
+          id(servo_y_zero_step) = y;
+          ESP_LOGI("servo_cal", "Zero position recorded at x=%u, y=%u", static_cast<unsigned>(x),
+                   static_cast<unsigned>(y));
+      # The globals queue their save on their own 1 s poll; flush it here so the
+      # calibration survives a power cut instead of waiting for the 60 s syncer.
       - delay: 1s
-      - lambda: |-
-          ESP_LOGD("ftservo", "Preferences sync requested");
-          global_preferences->sync(); // sync at once
-          ESP_LOGD("ftservo", "Done clear calibration");
+      - lambda: global_preferences->sync();
+
+  # Directional nudges for fine movement: one press moves the axis by
+  # `nudge_step` from the pose the head is actually in, so presses add up and a
+  # head that was pushed by hand continues from where it is. Home returns to the
+  # configured pose.
+  - platform: stackchan_motion
+    stackchan_motion_id: head
+    home:
+      name: "Move Home"
+    left:
+      name: "Nudge Left"
+    right:
+      name: "Nudge Right"
+    up:
+      name: "Nudge Up"
+    down:
+      name: "Nudge Down"
+
 
 sensor:
   - platform: axp2101
@@ -491,46 +579,35 @@ sensor:
       name: "Battery Charging"
     
   - platform: ftservo
-    id: x_servo_sensor
     ftservo_id: x_servo
     position:
       id: servo_x_position
       name: "Servo X Position"
       filters:
         - delta: 3.0
-      on_value:
-        - lambda: |-
-            if ( !id(use_calib_value) ) {
-              float val = ${servo_x_position_to_angle};
-              id(servo_x_angle).publish_state(roundf(val)); 
-            } else {
-              float x = id(servo_x_position).state;
-              float zero = static_cast<float>(id(x_servo_zero_step));
-              float val = (x - zero) * 0.3710f;
-              id(servo_x_angle).publish_state(roundf(val));
-            }
-
 
   - platform: ftservo
-    id: y_servo_sensor
     ftservo_id: y_servo
     position:
       id: servo_y_position
       name: "Servo Y Position"
       filters:
         - delta: 3.0
-      on_value:
-        - lambda: |-
-            if ( !id(use_calib_value) ) {
-              float val = ${servo_y_position_to_angle};
-              id(servo_y_angle).publish_state(roundf(val)); // using angle 
-            } else {
-              float x = id(servo_y_position).state;
-              float zero = static_cast<float>(id(y_servo_zero_step));
-              float val = (x - zero) * 90.0f / 260.0f;
-              id(servo_y_angle).publish_state(roundf(val));
-            }
 
+  - platform: stackchan_motion
+    stackchan_motion_id: head
+    yaw:
+      name: "Head Yaw Angle"
+      accuracy_decimals: 0
+      filters:
+        - round: 0
+        - delta: 1.0
+    pitch:
+      name: "Head Pitch Angle"
+      accuracy_decimals: 0
+      filters:
+        - round: 0
+        - delta: 1.0
 
 text_sensor:
   - platform: si12t
