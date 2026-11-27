@@ -12,7 +12,7 @@ packages:
 esphome:
   project:
     name: m5stack.stackchan-voice-assistant
-    version: 2026.4.4
+    version: 2026.11.0
 
 dashboard_import:
   package_import_url: github://m5stack/esphome-yaml/common/stackchan-voice-assistant-base.yaml@main
