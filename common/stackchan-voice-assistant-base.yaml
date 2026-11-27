@@ -268,7 +268,27 @@ globals:
     type: uint16_t
     restore_value: yes
     initial_value: ${servo_y_zero_position}
+  # StackChan head touch gesture state: 0 idle, 1 touched, 2 swiping.
+  # The position is the intensity-weighted position across the three Si12T
+  # channels, in the same -100..100 range as the original firmware.
+  - id: head_touch_state
     type: int
+    restore_value: no
+    initial_value: "0"
+  - id: head_touch_initial_position
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: head_touch_started_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+  # Set when a pet nudge actually moved the pitch; the 3 s restore callback
+  # only homes the pitch in that case.
+  - id: head_pet_moved
+    type: bool
+    restore_value: no
+    initial_value: "false"
 
 i2c:
   - id: bsp_bus
@@ -387,6 +407,10 @@ m5stack_ioe1:
 si12t:
   id: touch_hub
   i2c_id: bsp_bus
+  # The original head touch task samples the three channels every 50 ms; the
+  # same rate is needed to see the swipe before the finger is lifted.
+  update_interval: 50ms
+
 
 remote_transmitter:
   id: ir_tx
@@ -659,20 +683,35 @@ sensor:
         - delta: 1.0
 
 text_sensor:
+  # Match the original StackChan firmware: low sensitivity table, level 3.
+  # The high-sensitivity default was more sensitive than the original and
+  # could register head movement near the 90° limit as a touch.
   - platform: si12t
+    id: head_touch_left
     name: "Touch Sensor 1"
-    channel: CH_1
-    update_interval: 1s
+    channel: 1
+    sensitivity: 3
+    high_sensitivity: false
+    on_value:
+      - script.execute: head_touch_update
 
   - platform: si12t
+    id: head_touch_middle
     name: "Touch Sensor 2"
-    channel: CH_2    
-    update_interval: 1s
+    channel: 2
+    sensitivity: 3
+    high_sensitivity: false
+    on_value:
+      - script.execute: head_touch_update
 
   - platform: si12t
+    id: head_touch_right
     name: "Touch Sensor 3"
-    channel: CH_3
-    update_interval: 1s
+    channel: 3
+    sensitivity: 3
+    high_sensitivity: false
+    on_value:
+      - script.execute: head_touch_update
 
   - id: text_request
     platform: template
@@ -1447,6 +1486,54 @@ script:
           // turn on the BUS_OUT_EN
           id(bus_out_en)->turn_on();
           delay(100);
+
+  # Head pet gesture, ported from the original StackChan TouchData/GestureRecognizer
+  - id: head_touch_update
+    then:
+      - lambda: |-
+          const auto level = [](const std::string &value) -> int {
+            if (value == "High")
+              return 3;
+            if (value == "Medium")
+              return 2;
+            if (value == "Low")
+              return 1;
+            return 0;
+          };
+          const uint32_t now = millis();
+          const int left = level(id(head_touch_left).state);
+          const int middle = level(id(head_touch_middle).state);
+          const int right = level(id(head_touch_right).state);
+          const int total = left + middle + right;
+          const bool touched = total > 0;
+          const int position = total == 0 ? 0 : (right * 100 - left * 100) / total;
+
+          switch (id(head_touch_state)) {
+            case 0:
+              if (touched) {
+                id(head_touch_state) = 1;
+                id(head_touch_initial_position) = position;
+                id(head_touch_started_ms) = now;
+              }
+              break;
+            case 1:
+              if (!touched) {
+                id(head_touch_state) = 0;
+                id(stackchan_face)->head_pet_release();
+              } else if (now - id(head_touch_started_ms) >= 100 &&
+                         (position - id(head_touch_initial_position) > 40 ||
+                          position - id(head_touch_initial_position) < -40)) {
+                id(head_touch_state) = 2;
+                id(stackchan_face)->head_pet_hold();
+              }
+              break;
+            default:
+              if (!touched) {
+                id(head_touch_state) = 0;
+                id(stackchan_face)->head_pet_release();
+              }
+              break;
+          }
 
   # Drives the light bar from the voice assistant phase. Called from
   # draw_display, which already runs on every phase and connection change.
