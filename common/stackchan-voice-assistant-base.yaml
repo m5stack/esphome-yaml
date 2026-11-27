@@ -411,6 +411,23 @@ si12t:
   # same rate is needed to see the swipe before the finger is lifted.
   update_interval: 50ms
 
+# NFC reader (ST25R3916 on the body I2C bus)
+st25r_i2c:
+  id: nfc_reader
+  i2c_id: bsp_bus
+  on_tag:
+    then:
+      - logger.log:
+          format: "NFC tag: %s (%s)"
+          args: [x.c_str(), tag.get_tag_type().c_str()]
+      - text_sensor.template.publish:
+          id: nfc_tag
+          state: !lambda 'return x;'
+  on_tag_removed:
+    then:
+      - text_sensor.template.publish:
+          id: nfc_tag
+          state: ""
 
 remote_transmitter:
   id: ir_tx
@@ -712,6 +729,11 @@ text_sensor:
     high_sensitivity: false
     on_value:
       - script.execute: head_touch_update
+
+  - platform: template
+    name: "NFC Tag"
+    id: nfc_tag
+    icon: mdi:nfc
 
   - id: text_request
     platform: template
